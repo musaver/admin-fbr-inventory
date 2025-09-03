@@ -222,7 +222,7 @@ export default function Dashboard() {
           <Icon className={`h-5 w-5 ${iconColorClasses[color]}`} />
         </CardHeader>
         <CardContent>
-          <div className={`text-3xl font-bold ${iconColorClasses[color]}`}>
+          <div className={`text-xl font-bold ${iconColorClasses[color]}`}>
             {cardLoading ? <Skeleton className="h-9 w-24" /> : value}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -357,7 +357,7 @@ export default function Dashboard() {
       )}
       
       {/* Main Stats Cards classnameL grid*/}
-      <div className="gap-4 md:grid-cols-2 lg:grid-cols-5 hidden">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Customers"
           value={loading ? 0 : stats.customers}
@@ -406,7 +406,7 @@ export default function Dashboard() {
       </div>
 
       {/* Financial Dashboard Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 hidden">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <FinancialCard
           title="Revenue"
           value={loading ? <Skeleton className="h-9 w-24" /> : (
