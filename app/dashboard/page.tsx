@@ -368,10 +368,10 @@ export default function Dashboard() {
           loading={loading}
         />
         <StatCard
-          title="Services"
+          title="Products"
           value={loading ? 0 : stats.products}
           icon={PackageIcon}
-          description="Total services"
+          description="Total products"
           trend="up"
           onClick={() => router.push('/products')}
           loading={loading}
