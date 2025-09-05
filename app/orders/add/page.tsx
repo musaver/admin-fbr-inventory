@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProvinceSelect } from "@/components/ui/province-select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1706,20 +1707,11 @@ export default function AddOrder() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="seller-province">Province</Label>
-                  <Select value={sellerInfo.sellerProvince} onValueChange={(value) => setSellerInfo({...sellerInfo, sellerProvince: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Province" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Punjab">Punjab</SelectItem>
-                      <SelectItem value="Sindh">Sindh</SelectItem>
-                      <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
-                      <SelectItem value="Balochistan">Balochistan</SelectItem>
-                      <SelectItem value="Islamabad Capital Territory">Islamabad Capital Territory</SelectItem>
-                      <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
-                      <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <ProvinceSelect
+                    value={sellerInfo.sellerProvince}
+                    onValueChange={(value) => setSellerInfo({...sellerInfo, sellerProvince: value})}
+                    placeholder="Select Province"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="seller-address">Business Address</Label>

@@ -4,6 +4,7 @@ import CurrencySymbol from '../components/CurrencySymbol';
 import { useCurrency } from '@/app/contexts/CurrencyContext';
 import { CurrencyCode } from '@/app/contexts/CurrencyContext';
 import { Separator } from "@/components/ui/separator";
+import { ProvinceSelectBasic } from "@/components/ui/province-select-basic";
 
 interface TaxSetting {
   enabled: boolean;
@@ -252,6 +253,10 @@ export default function SettingsPage() {
       ...prev,
       [key]: value
     }));
+  };
+
+  const handleCustomProvinceChange = (value: string) => {
+    handleFbrSettingChange('fbrSellerProvince', value);
   };
 
   const handleSaveFbrSettings = async () => {
@@ -895,20 +900,12 @@ export default function SettingsPage() {
                   <label className="block text-sm font-medium text-gray-700">
                     Province
                   </label>
-                  <select
+                  <ProvinceSelectBasic
                     value={fbrSettings.fbrSellerProvince}
                     onChange={(e) => handleFbrSettingChange('fbrSellerProvince', e.target.value)}
+                    onCustomValueChange={handleCustomProvinceChange}
                     className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select Province</option>
-                    <option value="Punjab">Punjab</option>
-                    <option value="Sindh">Sindh</option>
-                    <option value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</option>
-                    <option value="Balochistan">Balochistan</option>
-                    <option value="Islamabad Capital Territory">Islamabad Capital Territory</option>
-                    <option value="Gilgit-Baltistan">Gilgit-Baltistan</option>
-                    <option value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</option>
-                  </select>
+                  />
                   <p className="text-xs text-gray-500">
                     The province where your business is registered
                   </p>

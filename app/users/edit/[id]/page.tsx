@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProvinceSelect } from "@/components/ui/province-select";
 
 export default function EditUser() {
   const router = useRouter();
@@ -185,20 +186,12 @@ export default function EditUser() {
           <label className="block text-gray-700 mb-2" htmlFor="buyerProvince">
             Buyer Province
           </label>
-          <Select value={formData.buyerProvince} onValueChange={(value) => setFormData({...formData, buyerProvince: value})}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select Province" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Punjab">Punjab</SelectItem>
-              <SelectItem value="Sindh">Sindh</SelectItem>
-              <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
-              <SelectItem value="Balochistan">Balochistan</SelectItem>
-              <SelectItem value="Islamabad Capital Territory (ICT)">Islamabad Capital Territory (ICT)</SelectItem>
-              <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
-              <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
-            </SelectContent>
-          </Select>
+          <ProvinceSelect
+            value={formData.buyerProvince}
+            onValueChange={(value) => setFormData({...formData, buyerProvince: value})}
+            placeholder="Select Province"
+            className="w-full"
+          />
         </div>
 
         <div className="mb-4">
