@@ -157,6 +157,9 @@ export default function AddOrder() {
   const [error, setError] = useState('');
   const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
   
+  // Error scroll reference
+  const errorRef = useRef<HTMLDivElement>(null);
+  
   // Debug JSON display state
   const [debugJson, setDebugJson] = useState<{
     orderData?: any;
@@ -1273,6 +1276,14 @@ export default function AddOrder() {
   const handlePreviewJson = () => {
     if (orderItems.length === 0) {
       setError('Please add at least one product to preview JSON');
+      // Scroll to error
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
       return;
     }
 
@@ -1374,12 +1385,28 @@ export default function AddOrder() {
     if (orderItems.length === 0) {
       setError('Please add at least one product to the order');
       setSubmitting(false);
+      // Scroll to error
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
       return;
     }
 
     if (!orderData.email) {
       setError('Please provide customer email');
       setSubmitting(false);
+      // Scroll to error
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
       return;
     }
 
@@ -1575,6 +1602,22 @@ export default function AddOrder() {
     } catch (err: any) {
       setError(err.message);
       setSubmitting(false); // Only set to false on error
+      
+      // Scroll to error after a brief delay to ensure the error is rendered
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        } else {
+          // Fallback: scroll to top if error ref is not available
+          window.scrollTo({ 
+            top: 0, 
+            behavior: 'smooth' 
+          });
+        }
+      }, 100);
     }
     // Don't set submitting to false on success - let it stay until redirect
   };
@@ -1636,18 +1679,18 @@ export default function AddOrder() {
       </div>
 
       {error && (
-        <Card className="mb-6 border-destructive">
+        <Card ref={errorRef} className="mb-6 border-destructive">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-destructive">
               <span className="font-medium">Error:</span>
               <span>{error}</span>
-        </div>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* 🔍 DEBUG: JSON Display */}
-      {debugJson.showDebug && (
+      {(debugJson.orderData || debugJson.fbrPayload || debugJson.fbrError) && (
         <Card className="mb-6 border-muted bg-muted/30">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-4">
@@ -1655,40 +1698,42 @@ export default function AddOrder() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setDebugJson(prev => ({ ...prev, showDebug: false }))}
+                onClick={() => setDebugJson(prev => ({ ...prev, showDebug: !prev.showDebug }))}
               >
-                Hide Debug
+                {debugJson.showDebug ? 'Hide Debug' : 'Show Debug'}
               </Button>
             </div>
             
-            <div className="space-y-4">
-              {debugJson.orderData && (
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2">📤 Order Data (Input to FBR Mapper):</h4>
-                  <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
-                    {JSON.stringify(debugJson.orderData, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {debugJson.fbrPayload && (
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2">📋 Generated FBR JSON Payload:</h4>
-                  <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
-                    {JSON.stringify(debugJson.fbrPayload, null, 2)}
-                  </pre>
-                </div>
-              )}
-              
-              {debugJson.fbrError && (
-                <div>
-                  <h4 className="font-medium text-red-800 mb-2">❌ FBR Error Response:</h4>
-                  <pre className="bg-muted p-3 rounded border text-xs overflow-auto max-h-96">
-                    {JSON.stringify(debugJson.fbrError, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
+            {debugJson.showDebug && (
+              <div className="space-y-4">
+                {debugJson.orderData && (
+                  <div>
+                    <h4 className="font-medium text-blue-800 mb-2">📤 Order Data (Input to FBR Mapper):</h4>
+                    <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
+                      {JSON.stringify(debugJson.orderData, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                
+                {debugJson.fbrPayload && (
+                  <div>
+                    <h4 className="font-medium text-blue-800 mb-2">📋 Generated FBR JSON Payload:</h4>
+                    <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
+                      {JSON.stringify(debugJson.fbrPayload, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                
+                {debugJson.fbrError && (
+                  <div>
+                    <h4 className="font-medium text-red-800 mb-2">❌ FBR Error Response:</h4>
+                    <pre className="bg-muted p-3 rounded border text-xs overflow-auto max-h-96">
+                      {JSON.stringify(debugJson.fbrError, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
