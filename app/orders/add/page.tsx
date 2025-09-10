@@ -210,6 +210,11 @@ export default function AddOrder() {
   const [skipSellerEmail, setSkipSellerEmail] = useState(true);
   const [skipFbrSubmission, setSkipFbrSubmission] = useState(false);
   
+  // Production environment submission
+  const [isProductionSubmission, setIsProductionSubmission] = useState(false);
+  const [productionToken, setProductionToken] = useState('');
+  const [showProductionConfirmation, setShowProductionConfirmation] = useState(false);
+  
   const [orderData, setOrderData] = useState({
     customerId: '',
     email: '',
@@ -428,13 +433,14 @@ export default function AddOrder() {
 
   const fetchInitialData = async () => {
     try {
-      const [productsRes, customersRes, stockSettingRes, driversRes, loyaltyRes, sellerInfoRes] = await Promise.all([
+      const [productsRes, customersRes, stockSettingRes, driversRes, loyaltyRes, sellerInfoRes, fbrSettingsRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/users'),
         fetch('/api/settings/stock-management'),
         fetch('/api/drivers/available?includeAll=true'),
         fetch('/api/settings/loyalty'),
-        fetch('/api/seller-info')
+        fetch('/api/seller-info'),
+        fetch('/api/settings/fbr')
       ]);
 
       const productsData = await productsRes.json();
@@ -443,6 +449,7 @@ export default function AddOrder() {
       const driversData = await driversRes.json();
       const loyaltyData = await loyaltyRes.json();
       const sellerInfoData = await sellerInfoRes.json();
+      const fbrSettingsData = await fbrSettingsRes.json();
 
       // Process products to include variants
       const processedProducts = await Promise.all(
@@ -506,6 +513,14 @@ export default function AddOrder() {
       } else {
         console.log('Seller info fetch failed or empty:', sellerInfoData);
       }
+
+      // Set production token from FBR settings
+      if (fbrSettingsData && fbrSettingsData.success && fbrSettingsData.settings) {
+        console.log('Setting production token from FBR settings');
+        setProductionToken(fbrSettingsData.settings.fbrProductionToken || '');
+      } else {
+        console.log('FBR settings fetch failed or empty:', fbrSettingsData);
+      }
     } catch (err) {
       console.error('Error fetching initial data:', err);
       setError('Failed to load initial data');
@@ -552,6 +567,11 @@ export default function AddOrder() {
   const cleanNumericValue = (value: any) => {
     if (value === undefined || value === null || value === '' || value === 0) {
       return null;
+    }
+    // Convert string values to numbers
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
     }
     return value;
   };
@@ -1377,8 +1397,7 @@ export default function AddOrder() {
     setError(''); // Clear any existing errors
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performOrderSubmission = async () => {
     setSubmitting(true);
     setError('');
 
@@ -1400,6 +1419,20 @@ export default function AddOrder() {
       setError('Please provide customer email');
       setSubmitting(false);
       // Scroll to error
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
+      return;
+    }
+
+    // Validate production token if production mode is enabled
+    if (isProductionSubmission && !skipFbrSubmission && !productionToken.trim()) {
+      setError('Please provide production environment token');
+      setSubmitting(false);
       setTimeout(() => {
         if (errorRef.current) {
           errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1487,7 +1520,11 @@ export default function AddOrder() {
         // Email and FBR submission control flags
         skipCustomerEmail,
         skipSellerEmail,
-        skipFbrSubmission
+        skipFbrSubmission,
+        
+        // Production environment fields
+        isProductionSubmission,
+        productionToken: isProductionSubmission ? productionToken : null
       };
 
       // 🔍 DEBUG: Capture the order data for display
@@ -1620,6 +1657,27 @@ export default function AddOrder() {
       }, 100);
     }
     // Don't set submitting to false on success - let it stay until redirect
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // If production mode is enabled and FBR submission is not skipped, show confirmation
+    if (isProductionSubmission && !skipFbrSubmission) {
+      setShowProductionConfirmation(true);
+    } else {
+      // Direct submission for sandbox or when FBR is skipped
+      await performOrderSubmission();
+    }
+  };
+
+  const handleProductionConfirm = async () => {
+    setShowProductionConfirmation(false);
+    await performOrderSubmission();
+  };
+
+  const handleProductionCancel = () => {
+    setShowProductionConfirmation(false);
   };
 
   const selectedProduct = products.find(p => p.id === productSelection.selectedProductId);
@@ -2401,17 +2459,54 @@ export default function AddOrder() {
             </div>
             
             {/* FBR Submission Options */}
-            <div className="flex items-center space-x-2 pt-4 border-t">
-              <input
-                type="checkbox"
-                id="skip-fbr-submission"
-                checked={skipFbrSubmission}
-                onChange={(e) => setSkipFbrSubmission(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="skip-fbr-submission" className="text-sm">
-                Do not submit invoice to FBR (create order only)
-              </Label>
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="skip-fbr-submission"
+                  checked={skipFbrSubmission}
+                  onChange={(e) => setSkipFbrSubmission(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="skip-fbr-submission" className="text-sm">
+                  Do not submit invoice to FBR (create order only)
+                </Label>
+              </div>
+              
+              {/* Production Environment Submission */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="production-submission"
+                  checked={isProductionSubmission}
+                  onChange={(e) => setIsProductionSubmission(e.target.checked)}
+                  className="rounded border-gray-300"
+                  disabled={skipFbrSubmission}
+                />
+                <Label htmlFor="production-submission" className="text-sm font-medium text-orange-600">
+                  Production Environment Invoice Submission
+                </Label>
+              </div>
+              
+              {/* Production Token Field */}
+              {isProductionSubmission && !skipFbrSubmission && (
+                <div className="ml-6 space-y-2">
+                  <Label htmlFor="production-token" className="text-sm font-medium">
+                    Production Environment Token
+                  </Label>
+                  <Input
+                    id="production-token"
+                    type="password"
+                    value={productionToken}
+                    onChange={(e) => setProductionToken(e.target.value)}
+                    placeholder="Enter production FBR token..."
+                    className="max-w-md"
+                  />
+                  <p className="text-xs text-orange-600">
+                    ⚠️ This will submit to production FBR environment
+                  </p>
+                </div>
+              )}
             </div>
             </CardContent>
           </Card>
@@ -2972,7 +3067,10 @@ export default function AddOrder() {
                             value={productSelection.taxAmount === 0 ? '' : productSelection.taxAmount}
                             onChange={(e) => {
                               const value = e.target.value;
-                              setProductSelection({...productSelection, taxAmount: value === '' ? 0 : parseFloat(value) || 0});
+                              // Allow empty string, numbers, and decimal point
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                setProductSelection({...productSelection, taxAmount: value === '' ? 0 : value});
+                              }
                             }}
                             placeholder="Enter amount"
                             className="text-sm"
@@ -2994,15 +3092,18 @@ export default function AddOrder() {
                       value={productSelection.taxPercentage === 0 ? '' : productSelection.taxPercentage}
                       onChange={async (e) => {
                         const value = e.target.value;
-                        const taxPercentage = value === '' ? 0 : parseFloat(value) || 0;
-                        
-                        // Update tax percentage immediately
-                        setProductSelection(prev => ({...prev, taxPercentage}));
-                        
-                        // Calculate tax amount if we have both values
-                        if (taxPercentage > 0 && productSelection.priceExcludingTax > 0) {
-                          const calculatedTaxAmount = await calculateTaxAmount(productSelection.priceExcludingTax, taxPercentage);
-                          setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const taxPercentage = value === '' ? 0 : parseFloat(value) || 0;
+                          
+                          // Update tax percentage immediately
+                          setProductSelection(prev => ({...prev, taxPercentage: value === '' ? 0 : value}));
+                          
+                          // Calculate tax amount if we have both values (only if value is a complete number)
+                          if (taxPercentage > 0 && productSelection.priceExcludingTax > 0 && !value.endsWith('.')) {
+                            const calculatedTaxAmount = await calculateTaxAmount(productSelection.priceExcludingTax, taxPercentage);
+                            setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                          }
                         }
                       }}
                       placeholder="Enter percentage"
@@ -3018,25 +3119,31 @@ export default function AddOrder() {
                       value={productSelection.priceIncludingTax === 0 ? '' : productSelection.priceIncludingTax}
                       onChange={async (e) => {
                         const value = e.target.value;
-                        const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
-                        
-                        // Update price including tax immediately
-                        setProductSelection(prev => ({...prev, priceIncludingTax}));
-                        
-                        // If we have tax percentage and price excluding tax, use our calculation method
-                        if (productSelection.taxPercentage > 0 && productSelection.priceExcludingTax > 0) {
-                          const calculatedTaxAmount = await calculateTaxAmount(productSelection.priceExcludingTax, productSelection.taxPercentage);
-                          setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
-                        }
-                        // Otherwise, calculate tax percentage and amount from price difference (backward compatibility)
-                        else if (priceIncludingTax > 0 && productSelection.priceExcludingTax > 0) {
-                          const taxAmount = priceIncludingTax - productSelection.priceExcludingTax;
-                          const taxPercentage = (taxAmount / productSelection.priceExcludingTax) * 100;
-                          setProductSelection(prev => ({
-                            ...prev,
-                            taxAmount: Math.round(taxAmount * 100) / 100, // Round to 2 decimal places
-                            taxPercentage: Math.round(taxPercentage * 100) / 100 // Round to 2 decimal places
-                          }));
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                          
+                          // Update price including tax immediately
+                          setProductSelection(prev => ({...prev, priceIncludingTax: value === '' ? 0 : value}));
+                          
+                          // Only perform calculations if value is a complete number (not ending with decimal point)
+                          if (!value.endsWith('.') && value !== '') {
+                            // If we have tax percentage and price excluding tax, use our calculation method
+                            if (productSelection.taxPercentage > 0 && productSelection.priceExcludingTax > 0) {
+                              const calculatedTaxAmount = await calculateTaxAmount(parseFloat(productSelection.priceExcludingTax), parseFloat(productSelection.taxPercentage));
+                              setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                            }
+                            // Otherwise, calculate tax percentage and amount from price difference (backward compatibility)
+                            else if (priceIncludingTax > 0 && productSelection.priceExcludingTax > 0) {
+                              const taxAmount = priceIncludingTax - parseFloat(productSelection.priceExcludingTax);
+                              const taxPercentage = (taxAmount / parseFloat(productSelection.priceExcludingTax)) * 100;
+                              setProductSelection(prev => ({
+                                ...prev,
+                                taxAmount: Math.round(taxAmount * 100) / 100, // Round to 2 decimal places
+                                taxPercentage: Math.round(taxPercentage * 100) / 100 // Round to 2 decimal places
+                              }));
+                            }
+                          }
                         }
                       }}
                       placeholder="Enter price"
@@ -3052,25 +3159,31 @@ export default function AddOrder() {
                       value={productSelection.priceExcludingTax === 0 ? '' : productSelection.priceExcludingTax}
                       onChange={async (e) => {
                         const value = e.target.value;
-                        const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
-                        
-                        // Update price excluding tax immediately
-                        setProductSelection(prev => ({...prev, priceExcludingTax}));
-                        
-                        // Calculate tax amount if we have tax percentage
-                        if (priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
-                          const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, productSelection.taxPercentage);
-                          setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
-                        }
-                        // Auto-calculate tax percentage if both prices are available but no existing tax percentage
-                        else if (priceExcludingTax > 0 && productSelection.priceIncludingTax > 0 && productSelection.taxPercentage === 0) {
-                          const taxAmount = productSelection.priceIncludingTax - priceExcludingTax;
-                          const taxPercentage = (taxAmount / priceExcludingTax) * 100;
-                          setProductSelection(prev => ({
-                            ...prev,
-                            taxAmount: Math.round(taxAmount * 100) / 100, // Round to 2 decimal places
-                            taxPercentage: Math.round(taxPercentage * 100) / 100 // Round to 2 decimal places
-                          }));
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                          
+                          // Update price excluding tax immediately
+                          setProductSelection(prev => ({...prev, priceExcludingTax: value === '' ? 0 : value}));
+                          
+                          // Only perform calculations if value is a complete number (not ending with decimal point)
+                          if (!value.endsWith('.') && value !== '') {
+                            // Calculate tax amount if we have tax percentage
+                            if (priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
+                              const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, parseFloat(productSelection.taxPercentage));
+                              setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                            }
+                            // Auto-calculate tax percentage if both prices are available but no existing tax percentage
+                            else if (priceExcludingTax > 0 && productSelection.priceIncludingTax > 0 && productSelection.taxPercentage === 0) {
+                              const taxAmount = parseFloat(productSelection.priceIncludingTax) - priceExcludingTax;
+                              const taxPercentage = (taxAmount / priceExcludingTax) * 100;
+                              setProductSelection(prev => ({
+                                ...prev,
+                                taxAmount: Math.round(taxAmount * 100) / 100, // Round to 2 decimal places
+                                taxPercentage: Math.round(taxPercentage * 100) / 100 // Round to 2 decimal places
+                              }));
+                            }
+                          }
                         }
                       }}
                       placeholder="Enter price"
@@ -3086,7 +3199,10 @@ export default function AddOrder() {
                       value={productSelection.extraTax === 0 ? '' : productSelection.extraTax}
                       onChange={(e) => {
                         const value = e.target.value;
-                        setProductSelection({...productSelection, extraTax: value === '' ? 0 : parseFloat(value) || 0});
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setProductSelection({...productSelection, extraTax: value === '' ? 0 : value});
+                        }
                       }}
                       placeholder="Enter amount"
                           className="text-sm"
@@ -3101,7 +3217,10 @@ export default function AddOrder() {
                       value={productSelection.furtherTax === 0 ? '' : productSelection.furtherTax}
                       onChange={(e) => {
                         const value = e.target.value;
-                        setProductSelection({...productSelection, furtherTax: value === '' ? 0 : parseFloat(value) || 0});
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setProductSelection({...productSelection, furtherTax: value === '' ? 0 : value});
+                        }
                       }}
                       placeholder="Enter amount"
                           className="text-sm"
@@ -3113,8 +3232,14 @@ export default function AddOrder() {
                         <Input
                           id="fed-payable-tax-edit"
                       type="text"
-                      value={productSelection.fedPayableTax}
-                      onChange={(e) => setProductSelection({...productSelection, fedPayableTax: e.target.value})}
+                      value={productSelection.fedPayableTax === 0 ? '' : productSelection.fedPayableTax}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setProductSelection({...productSelection, fedPayableTax: value === '' ? 0 : value});
+                        }
+                      }}
                       placeholder="Enter amount"
                           className="text-sm"
                     />
@@ -3129,7 +3254,10 @@ export default function AddOrder() {
                       value={productSelection.discountAmount === 0 ? '' : productSelection.discountAmount}
                       onChange={(e) => {
                         const value = e.target.value;
-                        setProductSelection({...productSelection, discountAmount: value === '' ? 0 : parseFloat(value) || 0});
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setProductSelection({...productSelection, discountAmount: value === '' ? 0 : value});
+                        }
                       }}
                       placeholder="Enter amount"
                           className="text-sm"
@@ -3147,7 +3275,10 @@ export default function AddOrder() {
                           value={productSelection.fixedNotifiedValueOrRetailPrice === 0 ? '' : productSelection.fixedNotifiedValueOrRetailPrice}
                           onChange={(e) => {
                             const value = e.target.value;
-                            setProductSelection({...productSelection, fixedNotifiedValueOrRetailPrice: value === '' ? 0 : parseFloat(value) || 0});
+                            // Allow empty string, numbers, and decimal point
+                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              setProductSelection({...productSelection, fixedNotifiedValueOrRetailPrice: value === '' ? 0 : value});
+                            }
                           }}
                           placeholder={orderData.scenarioId === 'SN008' ? 'Required for 3rd Schedule Goods' : 'Enter value'}
                           className={`text-sm ${orderData.scenarioId === 'SN008' ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
@@ -3795,6 +3926,45 @@ export default function AddOrder() {
               disabled={addingProduct}
             >
               {addingProduct ? 'Adding...' : 'Add Product'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Production Environment Confirmation Dialog */}
+      <Dialog open={showProductionConfirmation} onOpenChange={setShowProductionConfirmation}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              ⚠️ Production Environment Confirmation
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p>
+                You are about to submit this invoice to the <strong>production FBR environment</strong>.
+              </p>
+              <p className="text-sm bg-orange-50 p-3 rounded border border-orange-200">
+                <strong>Warning:</strong> This will create a real invoice in the FBR system and cannot be undone. 
+                Make sure all information is correct before proceeding.
+              </p>
+              <p className="text-sm">
+                Are you sure you want to continue with production submission?
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleProductionCancel}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleProductionConfirm}
+              disabled={submitting}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {submitting ? 'Submitting...' : 'Yes, Submit to Production'}
             </Button>
           </DialogFooter>
         </DialogContent>

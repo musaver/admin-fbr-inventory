@@ -183,7 +183,11 @@ export const POST = withTenant(async (req: NextRequest, context) => {
       // Email and FBR submission control flags
       skipCustomerEmail,
       skipSellerEmail,
-      skipFbrSubmission
+      skipFbrSubmission,
+      
+      // Production environment fields
+      isProductionSubmission,
+      productionToken
     } = body;
 
     // Validate required fields
@@ -370,7 +374,20 @@ export const POST = withTenant(async (req: NextRequest, context) => {
           console.log('\n🔍 === FBR SUBMISSION DEBUG ===');
           console.log('📤 Order data being sent to FBR mapper:');
           console.log(JSON.stringify(orderForFbr, null, 2));
+          if (isProductionSubmission) {
+            console.log('🚨 PRODUCTION MODE ENABLED - Will use production FBR endpoints');
+          }
           console.log('=================================\n');
+
+          // Add production mode parameters to the FBR submission
+          const fbrPayload = {
+            ...orderForFbr,
+            // Override token and production flag if production mode is enabled
+            ...(isProductionSubmission && productionToken && {
+              fbrSandboxToken: productionToken,
+              isProductionSubmission: true
+            })
+          };
 
           const fbrSubmissionResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/fbr/submit`, {
             method: 'POST',
@@ -379,7 +396,7 @@ export const POST = withTenant(async (req: NextRequest, context) => {
               'x-tenant-id': context.tenantId,
               'x-tenant-slug': context.tenantSlug,
             },
-            body: JSON.stringify(orderForFbr),
+            body: JSON.stringify(fbrPayload),
           });
 
           const fbrResult = await fbrSubmissionResponse.json();

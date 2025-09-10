@@ -33,6 +33,7 @@ export default function OrderInvoice() {
   
   const [order, setOrder] = useState<any>(null);
   const [addons, setAddons] = useState<any[]>([]);
+  const [sellerInfo, setSellerInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [debugJson, setDebugJson] = useState<{
@@ -47,6 +48,7 @@ export default function OrderInvoice() {
   useEffect(() => {
     fetchOrderData();
     fetchAddons();
+    fetchSellerInfo();
   }, [orderId]);
 
   const fetchOrderData = async () => {
@@ -91,6 +93,20 @@ export default function OrderInvoice() {
       }
     } catch (err) {
       console.error('Failed to fetch addons:', err);
+    }
+  };
+
+  const fetchSellerInfo = async () => {
+    try {
+      const sellerRes = await fetch('/api/settings/fbr');
+      if (sellerRes.ok) {
+        const sellerData = await sellerRes.json();
+        if (sellerData.success && sellerData.settings) {
+          setSellerInfo(sellerData.settings);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch seller info:', err);
     }
   };
 
@@ -442,10 +458,10 @@ export default function OrderInvoice() {
               </div>
             </div>
             <div class="company-info">
-              <h2>Hisaab360</h2>
-              <p>Office #152, WBC, Ferozpur Road, Lahore</p>
-              <p>Phone: 0321-4250013</p>
-              <p>Email: support@hisaab360.com</p>
+              ${sellerInfo?.fbrSellerBusinessName ? `<h2>${sellerInfo.fbrSellerBusinessName}</h2>` : '<h2>Business Name</h2>'}
+              ${sellerInfo?.fbrSellerNTNCNIC ? `<p>NTN/CNIC: ${sellerInfo.fbrSellerNTNCNIC}</p>` : ''}
+              ${sellerInfo?.fbrSellerAddress ? `<p>${sellerInfo.fbrSellerAddress}</p>` : ''}
+              ${sellerInfo?.fbrSellerProvince ? `<p>${sellerInfo.fbrSellerProvince} Province</p>` : ''}
             </div>
           </div>
           
@@ -492,7 +508,6 @@ export default function OrderInvoice() {
               <h3>Invoice Information</h3>
               <p>Invoice Date: ${formatDateTime(order.createdAt)}</p>
               <p>Order Status: ${order.status}</p>
-              <p>Payment Status: ${order.paymentStatus}</p>
               ${order.invoiceType ? `<p>Invoice Type: ${order.invoiceType}</p>` : ''}
               ${order.scenarioId ? `<p>Scenario ID: ${order.scenarioId}</p>` : ''}
               ${order.trackingNumber ? `<p>Tracking: ${order.trackingNumber}</p>` : ''}
@@ -579,8 +594,7 @@ export default function OrderInvoice() {
           <div class="footer">
             <div class="thank-you">Thank you for your business!</div>
             <div class="contact">
-              For questions about this invoice, please contact us at 
-              <a href="mailto:support@hisaab360.com">support@hisaab360.com</a>
+              ${sellerInfo?.fbrSellerBusinessName ? `For questions about this invoice, please contact ${sellerInfo.fbrSellerBusinessName}` : 'For questions about this invoice, please contact us'}
             </div>
           </div>
         </body>
@@ -890,21 +904,27 @@ export default function OrderInvoice() {
                 <div className="text-right space-y-3">
                   <div className="flex items-center justify-end gap-3">
                     <Building2 className="h-6 w-6" />
-                    <h2 className="text-3xl font-bold">Hisaab360</h2>
+                    <h2 className="text-3xl font-bold">
+                      {sellerInfo?.fbrSellerBusinessName || 'Business Name'}
+                    </h2>
                   </div>
                   <div className="text-slate-200 space-y-1 text-sm">
-                    <div className="flex items-center justify-end gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>Office #152, WBC, Ferozpur Road, Lahore</span>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <Phone className="h-4 w-4" />
-                      <span>0321-4250013</span>
-                    </div>
-                    <div className="flex items-center justify-end gap-2">
-                      <Mail className="h-4 w-4" />
-                      <span>support@hisaab360.com</span>
-                    </div>
+                    {sellerInfo?.fbrSellerNTNCNIC && (
+                      <div className="flex items-center justify-end gap-2">
+                        <span>NTN/CNIC: {sellerInfo.fbrSellerNTNCNIC}</span>
+                      </div>
+                    )}
+                    {sellerInfo?.fbrSellerAddress && (
+                      <div className="flex items-center justify-end gap-2">
+                        <MapPin className="h-4 w-4" />
+                        <span>{sellerInfo.fbrSellerAddress}</span>
+                      </div>
+                    )}
+                    {sellerInfo?.fbrSellerProvince && (
+                      <div className="flex items-center justify-end gap-2">
+                        <span>{sellerInfo.fbrSellerProvince} Province</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -915,7 +935,7 @@ export default function OrderInvoice() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Buyer Information */}
                 <Card className="border-l-4 border-l-blue-500">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-0">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <User className="h-5 w-5 text-blue-600" />
                       Buyer Information
@@ -943,13 +963,13 @@ export default function OrderInvoice() {
                         {order.buyerProvince && <p className="text-sm">{order.buyerProvince} Province</p>}
                         
                         {/* Contact info from order */}
-                        {(order.email || order.phone) && (
+                        {/*{(order.email || order.phone) && (
                           <div className="mt-3 pt-2 border-t border-gray-200">
                             <p className="text-xs font-medium text-gray-700 mb-1">Contact Information:</p>
                             {order.email && <p className="text-sm">{order.email}</p>}
                             {order.phone && <p className="text-sm">Phone: {order.phone}</p>}
                           </div>
-                        )}
+                        )}*/}
                       </>
                     ) : order.user ? (
                       /* Fallback: Show user table data if buyer fields are empty */
@@ -1042,7 +1062,7 @@ export default function OrderInvoice() {
 
                 {/* Invoice Information */}
                 <Card className="border-l-4 border-l-emerald-500">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-0">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <FileText className="h-5 w-5 text-emerald-600" />
                       Invoice Information
@@ -1431,10 +1451,8 @@ export default function OrderInvoice() {
                 <div className="flex items-center justify-center gap-2 text-gray-600">
                   <Mail className="h-4 w-4" />
                   <p className="text-sm">
-                    For questions about this invoice, please contact us at{' '}
-                    <a href="mailto:support@hisaab360.com" className="text-blue-600 hover:underline">
-                      support@hisaab360.com
-                    </a>
+                    For questions about this invoice, please contact{' '}
+                    {sellerInfo?.fbrSellerBusinessName || 'us'}
                   </p>
                 </div>
               </div>

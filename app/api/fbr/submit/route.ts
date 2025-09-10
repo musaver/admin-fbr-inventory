@@ -24,20 +24,27 @@ export async function POST(req: NextRequest) {
     // Check if we received an FBR invoice directly or an order to convert
     let fbrInvoice;
     let customToken: string | undefined;
+    let isProductionMode = false;
     
-    if (body.invoiceType && body.scenarioId && body.items && 
+    if (body.invoiceType && body.scenarioId && body.items &&
         body.sellerNTNCNIC && body.buyerRegistrationType && 
         body.items[0]?.hsCode && body.items[0]?.rate) {
       // Direct FBR invoice payload (has all required FBR fields)
       fbrInvoice = body;
       customToken = body.fbrSandboxToken;
+      isProductionMode = body.isProductionSubmission || false;
       console.log('📄 Received direct FBR invoice payload');
     } else {
       // Order object that needs to be converted
       const order: Order = body;
       customToken = order.fbrSandboxToken;
+      isProductionMode = order.isProductionSubmission || false;
       const customBaseUrl = order.fbrBaseUrl;
       console.log('🔄 Converting order to FBR invoice format');
+      
+      if (isProductionMode) {
+        console.log('🚨 PRODUCTION MODE DETECTED in FBR submit API');
+      }
       
       // Validate order data first
       const validation = validateOrderForFbr(order);
@@ -79,7 +86,7 @@ export async function POST(req: NextRequest) {
     
     // Step 1: Validate invoice with FBR
     const customBaseUrl = (body as any).fbrBaseUrl;
-    const validateResp = await validateInvoice(fbrInvoice, customToken, tenantContext?.tenantId, customBaseUrl);
+    const validateResp = await validateInvoice(fbrInvoice, customToken, tenantContext?.tenantId, customBaseUrl, isProductionMode);
     const validationStatus = validateResp?.validationResponse?.status;
     
     if (validationStatus !== 'Valid') {
@@ -106,7 +113,7 @@ export async function POST(req: NextRequest) {
     console.log('✅ FBR validation successful, proceeding to post invoice');
     
     // Step 2: Post invoice to FBR
-    const postResp = await postInvoice(fbrInvoice, customToken, tenantContext?.tenantId, customBaseUrl);
+    const postResp = await postInvoice(fbrInvoice, customToken, tenantContext?.tenantId, customBaseUrl, isProductionMode);
     
     console.log('📤 FBR post completed:', {
       success: postResp.success,

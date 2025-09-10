@@ -152,6 +152,10 @@ export interface Order {
   fbrSandboxToken?: string;
   fbrBaseUrl?: string;
   
+  // Production environment fields
+  isProductionSubmission?: boolean;
+  productionToken?: string;
+  
   // Order items
   items: OrderItem[];
   

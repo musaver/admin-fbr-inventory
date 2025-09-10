@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [fbrSettings, setFbrSettings] = useState({
     fbrBaseUrl: '',
     fbrSandboxToken: '',
+    fbrProductionToken: '',
     fbrSellerNTNCNIC: '',
     fbrSellerBusinessName: '',
     fbrSellerProvince: '',
@@ -841,10 +842,28 @@ export default function SettingsPage() {
                     value={fbrSettings.fbrSandboxToken}
                     onChange={(e) => handleFbrSettingChange('fbrSandboxToken', e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter your FBR API token"
+                    placeholder="Enter your FBR sandbox token"
                   />
                   <p className="text-xs text-gray-500">
-                    Your FBR sandbox/production API token for authentication
+                    Your FBR sandbox API token for testing
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-orange-600">
+                    Production Environment Token
+                  </label>
+                  <input
+                    type="password"
+                    value={fbrSettings.fbrProductionToken}
+                    onChange={(e) => handleFbrSettingChange('fbrProductionToken', e.target.value)}
+                    className="w-full p-3 border border-orange-300 rounded-md focus:ring-orange-500 focus:border-orange-500"
+                    placeholder="Enter your FBR production token"
+                  />
+                  <p className="text-xs text-orange-600">
+                    ⚠️ Your FBR production API token for live invoice submissions
                   </p>
                 </div>
               </div>

@@ -149,7 +149,7 @@ export function sanitize(obj: any): any {
  * @param tenantId Optional tenant ID to get tenant-specific FBR settings
  * @returns Validation response from FBR
  */
-export async function validateInvoice(payload: FbrInvoice, customToken?: string, tenantId?: string, customBaseUrl?: string): Promise<FbrValidationResponse> {
+export async function validateInvoice(payload: FbrInvoice, customToken?: string, tenantId?: string, customBaseUrl?: string, isProductionMode?: boolean): Promise<FbrValidationResponse> {
   let baseUrl = customBaseUrl || BASE_URL;
   let token = customToken || TOKEN;
 
@@ -179,9 +179,12 @@ export async function validateInvoice(payload: FbrInvoice, customToken?: string,
       invoiceType: sanitizedPayload.invoiceType,
       scenarioId: sanitizedPayload.scenarioId,
       itemCount: sanitizedPayload.items?.length || 0,
+      isProductionMode: isProductionMode || false,
     });
     
-    const response = await fetch(`${baseUrl}/validateinvoicedata_sb`, {
+    // Use production endpoint if production mode is enabled
+    const endpoint = isProductionMode ? 'validateinvoicedata' : 'validateinvoicedata_sb';
+    const response = await fetch(`${baseUrl}/${endpoint}`, {
       method: 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(sanitizedPayload),
@@ -233,7 +236,7 @@ export async function validateInvoice(payload: FbrInvoice, customToken?: string,
  * @param tenantId Optional tenant ID to get tenant-specific FBR settings
  * @returns Post response from FBR
  */
-export async function postInvoice(payload: FbrInvoice, customToken?: string, tenantId?: string, customBaseUrl?: string): Promise<FbrPostResponse> {
+export async function postInvoice(payload: FbrInvoice, customToken?: string, tenantId?: string, customBaseUrl?: string, isProductionMode?: boolean): Promise<FbrPostResponse> {
   let baseUrl = customBaseUrl || BASE_URL;
   let token = customToken || TOKEN;
 
@@ -263,9 +266,12 @@ export async function postInvoice(payload: FbrInvoice, customToken?: string, ten
       invoiceType: sanitizedPayload.invoiceType,
       scenarioId: sanitizedPayload.scenarioId,
       itemCount: sanitizedPayload.items?.length || 0,
+      isProductionMode: isProductionMode || false,
     });
     
-    const response = await fetch(`${baseUrl}/postinvoicedata_sb`, {
+    // Use production endpoint if production mode is enabled
+    const endpoint = isProductionMode ? 'postinvoicedata' : 'postinvoicedata_sb';
+    const response = await fetch(`${baseUrl}/${endpoint}`, {
       method: 'POST',
       headers: getHeaders(token),
       body: JSON.stringify(sanitizedPayload),
