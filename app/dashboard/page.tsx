@@ -376,7 +376,7 @@ export default function Dashboard() {
       )}
 
       {/* New Attraction Sections */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 hidden">
         {/* Recent Activity */}
         <Card>
           <CardHeader>
@@ -513,10 +513,10 @@ export default function Dashboard() {
           loading={loading}
         />
         <StatCard
-          title="Services"
+          title="Products"
           value={loading ? 0 : stats.products}
           icon={PackageIcon}
-          description="Total services"
+          description="Total Products"
           trend="up"
           onClick={() => router.push('/products')}
           loading={loading}
