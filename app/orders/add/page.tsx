@@ -1371,7 +1371,7 @@ export default function AddOrder() {
       orderData: submitData,
       fbrPayload: null,
       fbrError: null,
-      showDebug: true
+      showDebug: false
     });
     
     setError(''); // Clear any existing errors
@@ -1496,7 +1496,7 @@ export default function AddOrder() {
         orderData: submitData,
         fbrPayload: null,
         fbrError: null,
-        showDebug: true
+        showDebug: false
       }));
 
       const response = await fetch('/api/orders', {
@@ -1529,7 +1529,7 @@ export default function AddOrder() {
               .join('\n');
             
             if (itemErrors) {
-              errorMessage += '\n\nValidation Details:\n' + itemErrors;
+              //errorMessage += '\n\nValidation Details:\n' + itemErrors;
             }
           }
           
@@ -1680,7 +1680,7 @@ export default function AddOrder() {
 
       {error && (
         <Card ref={errorRef} className="mb-6 border-destructive">
-          <CardContent className="pt-6">
+          <CardContent className="">
             <div className="flex items-center gap-2 text-destructive">
               <span className="font-medium">Error:</span>
               <span>{error}</span>
@@ -1691,51 +1691,64 @@ export default function AddOrder() {
 
       {/* 🔍 DEBUG: JSON Display */}
       {(debugJson.orderData || debugJson.fbrPayload || debugJson.fbrError) && (
-        <Card className="mb-6 border-muted bg-muted/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-blue-900">🔍 Debug: FBR Submission Data</h3>
+        <div className="mb-6">
+          {!debugJson.showDebug ? (
+            <div className="flex justify-center">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setDebugJson(prev => ({ ...prev, showDebug: !prev.showDebug }))}
+                onClick={() => setDebugJson(prev => ({ ...prev, showDebug: true }))}
+                className="border-muted bg-muted/30"
               >
-                {debugJson.showDebug ? 'Hide Debug' : 'Show Debug'}
+                Show Debug
               </Button>
             </div>
-            
-            {debugJson.showDebug && (
-              <div className="space-y-4">
-                {debugJson.orderData && (
-                  <div>
-                    <h4 className="font-medium text-blue-800 mb-2">📤 Order Data (Input to FBR Mapper):</h4>
-                    <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
-                      {JSON.stringify(debugJson.orderData, null, 2)}
-                    </pre>
-                  </div>
-                )}
+          ) : (
+            <Card className="border-muted bg-muted/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-blue-900">🔍 Debug: FBR Submission Data</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDebugJson(prev => ({ ...prev, showDebug: false }))}
+                  >
+                    Hide Debug
+                  </Button>
+                </div>
                 
-                {debugJson.fbrPayload && (
-                  <div>
-                    <h4 className="font-medium text-blue-800 mb-2">📋 Generated FBR JSON Payload:</h4>
-                    <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
-                      {JSON.stringify(debugJson.fbrPayload, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                
-                {debugJson.fbrError && (
-                  <div>
-                    <h4 className="font-medium text-red-800 mb-2">❌ FBR Error Response:</h4>
-                    <pre className="bg-muted p-3 rounded border text-xs overflow-auto max-h-96">
-                      {JSON.stringify(debugJson.fbrError, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                <div className="space-y-4">
+                  {debugJson.orderData && (
+                    <div>
+                      <h4 className="font-medium text-blue-800 mb-2">📤 Order Data (Input to FBR Mapper):</h4>
+                      <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
+                        {JSON.stringify(debugJson.orderData, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  
+                  {debugJson.fbrPayload && (
+                    <div>
+                      <h4 className="font-medium text-blue-800 mb-2">📋 Generated FBR JSON Payload:</h4>
+                      <pre className=" p-3 rounded border text-xs overflow-auto max-h-96">
+                        {JSON.stringify(debugJson.fbrPayload, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  
+                  {debugJson.fbrError && (
+                    <div>
+                      <h4 className="font-medium text-red-800 mb-2">❌ FBR Error Response:</h4>
+                      <pre className="bg-muted p-3 rounded border text-xs overflow-auto max-h-96">
+                        {JSON.stringify(debugJson.fbrError, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 {/*
       {!stockManagementEnabled && (
@@ -1756,7 +1769,7 @@ export default function AddOrder() {
 */}
       {stockManagementEnabled ? (
         <Card className="mb-6 border-muted bg-muted/30">
-          <CardContent className="pt-6">
+          <CardContent className="">
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
             <div>
@@ -1770,7 +1783,7 @@ export default function AddOrder() {
         </Card>
       ) : (
         <Card className="mb-6 border-orange-200 bg-orange-50">
-          <CardContent className="pt-6">
+          <CardContent className="">
             <div className="flex items-start gap-3">
               <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
             <div>
@@ -3081,7 +3094,7 @@ export default function AddOrder() {
                   </div>
                   
                       <div className="space-y-2">
-                        <Label htmlFor="further-tax-edit" className="text-sm">Further Tax</Label>
+                        <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1</Label>
                         <Input
                           id="further-tax-edit"
                       type="text"
@@ -3100,14 +3113,12 @@ export default function AddOrder() {
                         <Input
                           id="fed-payable-tax-edit"
                       type="text"
-                      value={productSelection.fedPayableTax === 0 ? '' : productSelection.fedPayableTax}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setProductSelection({...productSelection, fedPayableTax: value === '' ? 0 : parseFloat(value) || 0});
-                      }}
+                      value={productSelection.fedPayableTax}
+                      onChange={(e) => setProductSelection({...productSelection, fedPayableTax: e.target.value})}
                       placeholder="Enter amount"
                           className="text-sm"
                     />
+
                   </div>
                   
                       <div className="space-y-2">
@@ -3402,36 +3413,32 @@ export default function AddOrder() {
               <div>
                 <label className="block text-gray-700 mb-2">Shipping Amount</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={orderData.shippingAmount}
+                  type="text"
+                  value={orderData.shippingAmount === 0 ? '' : orderData.shippingAmount}
                   onChange={(e) => setOrderData({...orderData, shippingAmount: parseFloat(e.target.value) || 0})}
                   className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                  placeholder="0.00"
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2">Tax Rate (%)</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={orderData.taxRate}
+                  type="text"
+                  value={orderData.taxRate === 0 ? '' : orderData.taxRate}
                   onChange={(e) => setOrderData({...orderData, taxRate: parseFloat(e.target.value) || 0})}
                   className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                  placeholder="0.00"
                 />
               </div>
               <div>
                 <label className="block text-gray-700 mb-2">Discount</label>
                 <div className="flex gap-2">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={orderData.discountAmount}
+                    type="text"
+                    value={orderData.discountAmount === 0 ? '' : orderData.discountAmount}
                     onChange={(e) => setOrderData({...orderData, discountAmount: parseFloat(e.target.value) || 0})}
                     className="flex-1 p-2 border rounded focus:border-blue-500 focus:outline-none"
+                    placeholder="0.00"
                   />
                   <select
                     value={orderData.discountType}
