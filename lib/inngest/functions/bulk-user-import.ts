@@ -518,10 +518,22 @@ async function processProductChunk(
     const productData = productRows[i];
     const globalRowIndex = startIndex + i + 1; // +1 for header row
 
+    // Special debug for first row
+    if (globalRowIndex === 1) {
+      console.log('🔍 FIRST ROW DEBUG:', {
+        rowIndex: globalRowIndex,
+        productData: JSON.stringify(productData, null, 2),
+        sku: productData.sku,
+        unitPrice: productData.unitPrice,
+        description: productData.description
+      });
+    }
+
     try {
       // Validate product data
       const validationError = validateProduct(productData);
       if (validationError) {
+        console.log(`❌ Validation failed for row ${globalRowIndex}:`, validationError);
         result.errors.push({
           row: globalRowIndex,
           identifier: productData.sku || 'N/A',
@@ -541,6 +553,7 @@ async function processProductChunk(
         .limit(1);
 
       if (existingProduct.length > 0) {
+        console.log(`⚠️ Product with SKU ${productData.sku} already exists, skipping...`);
         result.errors.push({
           row: globalRowIndex,
           identifier: productData.sku,
@@ -589,12 +602,15 @@ async function processProductChunk(
         rawExpiryDate: productData.expiryDate
       });
 
-      // DEBUG: Force write this to import job result
-      result.errors.push({
-        row: globalRowIndex,
-        identifier: `DEBUG-PARSED-${productData.sku}`,
-        message: `Parsed: GST=${gstAmount}, Serial=${productData.serialNumber}, UOM=${productData.uom}`
-      });
+        // DEBUG: Log parsed values for first few products
+        if (globalRowIndex <= 3) {
+          console.log(`🔍 Parsed values for row ${globalRowIndex}:`, {
+            gstAmount, 
+            gstPercentage,
+            serialNumber: productData.serialNumber, 
+            uom: productData.uom
+          });
+        }
       
       const newProduct = {
         id: newProductId,
@@ -705,29 +721,21 @@ async function processProductChunk(
           uom: newProduct.uom,
         });
 
-        // DEBUG: Force write this to import job result
-        result.errors.push({
-          row: globalRowIndex,
-          identifier: `DEBUG-INSERT-${productData.sku}`,
-          message: `About to insert: TaxAmount=${newProduct.taxAmount}, Serial=${newProduct.serialNumber}`
-        });
-
-        // AGGRESSIVE DEBUG: Throw error with debug info for first product only
-        if (globalRowIndex === 1) {
-          throw new Error(`DEBUG STOP: First product debug info - TaxAmount: ${newProduct.taxAmount}, SerialNumber: ${newProduct.serialNumber}, HSCode: ${newProduct.hsCode}, UOM: ${newProduct.uom}`);
+        // DEBUG: Log critical values for first few products
+        if (globalRowIndex <= 3) {
+          console.log(`🔥 About to insert product ${globalRowIndex}:`, {
+            sku: productData.sku,
+            taxAmount: newProduct.taxAmount,
+            serialNumber: newProduct.serialNumber,
+            hsCode: newProduct.hsCode,
+            uom: newProduct.uom
+          });
         }
 
         // Try to insert with all new fields first
         try {
-       await db.insert(products).values(newProduct);
+        await db.insert(products).values(newProduct);
           console.log(`✅ Product inserted successfully with all fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
-          
-          // Store success info in result for debugging
-          result.errors.push({
-            row: globalRowIndex,
-            identifier: productData.sku || 'N/A',
-            message: `SUCCESS: Product inserted with all fields. TaxAmount: ${newProduct.taxAmount}, SerialNumber: ${newProduct.serialNumber}`
-          });
          } catch (newFieldsError: any) {
            console.error(`❌ Product insertion with new fields failed:`, {
              message: newFieldsError.message,
@@ -798,13 +806,6 @@ async function processProductChunk(
              await db.insert(products).values(basicProduct);
              console.log(`✅ Product inserted successfully with basic fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
              console.log(`⚠️ Note: The following fields were not saved due to missing database columns: GST Amount, GST Percentage, HS Code, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM`);
-             
-             // Store fallback info in result
-             result.errors.push({
-               row: globalRowIndex,
-               identifier: productData.sku || 'N/A',
-               message: `FALLBACK: Used basic product creation due to missing database columns`
-             });
            } else {
              console.error(`❌ Product insertion failed with unexpected error:`, {
                message: newFieldsError.message,

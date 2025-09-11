@@ -13,6 +13,14 @@ export const POST = withTenant(async (request: NextRequest, context) => {
     const uploadedBy = formData.get('uploadedBy') as string;
     const importType = (formData.get('type') as string) || 'users'; // Default to users for backward compatibility
     
+    // DEBUG: Log what we received
+    console.log('🚨 BULK UPLOAD API CALLED:', { 
+      fileName: file?.name, 
+      importType, 
+      uploadedBy,
+      formDataKeys: Array.from(formData.keys())
+    });
+    
     if (!file) {
       return ErrorResponses.invalidInput('No file provided');
     }
@@ -64,6 +72,16 @@ export const POST = withTenant(async (request: NextRequest, context) => {
     await db.insert(importJobs).values(importJob);
 
     // Trigger Inngest background job (same function handles both types)
+    console.log('🚨 SENDING INNGEST EVENT:', {
+      eventName: 'user/bulk-import',
+      data: {
+        jobId,
+        importType,
+        fileName: file.name,
+        tenantId: context.tenantId
+      }
+    });
+    
     await inngest.send({
       name: 'user/bulk-import', // Keep same event name for simplicity
       data: {
@@ -75,6 +93,8 @@ export const POST = withTenant(async (request: NextRequest, context) => {
         importType, // Add type to event data
       },
     });
+    
+    console.log('✅ INNGEST EVENT SENT SUCCESSFULLY');
 
     const responseMessage = importType === 'users' 
       ? 'User import job started. You will receive progress updates.'
