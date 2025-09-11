@@ -95,9 +95,10 @@ export default function BulkUserUpload() {
 "Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
       fileName = 'bulk_user_import_template.csv';
     } else {
-      csvContent = `SKU,Unit Price,Description,Category ID,Subcategory ID,Supplier ID,Tags,Weight,Is Featured,Is Active,Is Digital,Requires Shipping,Taxable,GST Amount,GST Percentage,HS Code,Product Type,Stock Management Type,Stock Quantity,Status,Location,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Fixed Notified Value/Retail Price,Sale Type,UOM
-"PROD-001","29.99","Premium quality product","cat-123","subcat-456","sup-789","electronics,premium,new","0.5","true","true","false","true","true","2.50","8.5","1234567890","simple","quantity","100","Initial Stock","Warehouse A","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","35.00","Goods at standard rate","Pcs"
-"DIG-001","19.99","Instant download service","cat-456","","","digital,service,download","","false","true","true","false","true","","","","simple","quantity","0","","","","","","","","","",""`;
+      csvContent = `SKU,Unit Price,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM
+"PROD-001","29.99","Premium quality product","2.50","8.5","1234567890","100","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","Pcs"
+"PROD-002","19.99","Standard quality item","1.60","8.0","9876543210","50","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","Kg"
+"PROD-003","45.00","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
     }
     
@@ -316,8 +317,8 @@ export default function BulkUserUpload() {
                 <AlertDescription className="space-y-2">
                   <div>Download the CSV template below to see the required format</div>
                   <ul className="list-disc list-inside space-y-1 mt-2">
-                    <li><strong>Required fields:</strong> Product SKU, Product Title, Product Price</li>
-                    <li><strong>Optional fields:</strong> Product Description</li>
+                    <li><strong>Required fields:</strong> SKU, Unit Price</li>
+                    <li><strong>Optional fields:</strong> Description, GST Amount, GST Percentage, HS Code, Stock Quantity, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM</li>
                     <li>Supports up to 100MB files (~300,000 products)</li>
                     <li>Duplicate SKUs within your tenant will be skipped</li>
                     <li>Processing happens in background with real-time progress</li>

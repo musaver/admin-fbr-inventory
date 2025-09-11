@@ -34,6 +34,17 @@ interface Product {
   categoryId?: string;
   images?: any;
   createdAt: string;
+  // Tax and pricing fields
+  taxAmount?: string;
+  taxPercentage?: string;
+  hsCode?: string;
+  // Product identification fields
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+  uom?: string;
 }
 
 interface ProductWithCategory {
@@ -326,6 +337,51 @@ export default function ProductsList() {
           )}
         </div>
       )
+    },
+    {
+      key: 'taxInfo',
+      title: 'Tax Info',
+      render: (_: any, item: ProductWithCategory) => (
+        <div className="text-xs space-y-1">
+          {item.product.taxAmount && (
+            <div className="text-blue-600">GST: {item.product.taxAmount}</div>
+          )}
+          {item.product.taxPercentage && (
+            <div className="text-blue-600">Rate: {item.product.taxPercentage}%</div>
+          )}
+          {item.product.hsCode && (
+            <div className="text-gray-600">HS: {item.product.hsCode}</div>
+          )}
+        </div>
+      ),
+      mobileHidden: true
+    },
+    {
+      key: 'identifiers',
+      title: 'Identifiers',
+      render: (_: any, item: ProductWithCategory) => (
+        <div className="text-xs space-y-1">
+          {item.product.serialNumber && (
+            <div className="text-green-600">Serial: {item.product.serialNumber}</div>
+          )}
+          {item.product.listNumber && (
+            <div className="text-purple-600">List: {item.product.listNumber}</div>
+          )}
+          {item.product.bcNumber && (
+            <div className="text-orange-600">BC: {item.product.bcNumber}</div>
+          )}
+          {item.product.lotNumber && (
+            <div className="text-pink-600">Lot: {item.product.lotNumber}</div>
+          )}
+          {item.product.expiryDate && (
+            <div className="text-red-600">Exp: {item.product.expiryDate}</div>
+          )}
+          {item.product.uom && (
+            <div className="text-gray-600">UOM: {item.product.uom}</div>
+          )}
+        </div>
+      ),
+      mobileHidden: true
     },
     {
       key: 'createdAt',

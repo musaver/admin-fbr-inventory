@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest';
 import { db } from '@/lib/db';
-import { importJobs, user, userLoyaltyPoints, products } from '@/lib/schema';
+import { importJobs, user, userLoyaltyPoints, products, stockMovements } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,8 +17,18 @@ interface UserImportRow {
 
 interface ProductImportRow {
   sku: string;
-  price: string;
-  description?: string; // Added back for product name
+  unitPrice: string;
+  description?: string;
+  gstAmount?: string;
+  gstPercentage?: string;
+  hsCode?: string;
+  stockQuantity?: string;
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+  uom?: string;
 }
 
 interface ProcessingResult {
@@ -162,12 +172,24 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
 
   // Parse header
   const header = lines[0].split(',').map(h => h.replace(/['"]/g, '').trim());
+  console.log('📋 Product CSV Headers found:', header);
+  console.log('📋 Expected template headers: SKU,Unit Price,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM');
   
   // Expected columns (case-insensitive)
   const columnMap = {
-    'sku': ['product sku', 'sku', 'product_sku'],
-    'price': ['product price', 'price', 'unit price'], // Added unit price variant
-    'description': ['description', 'product description', 'short description', 'summary']
+    'sku': ['sku', 'product sku', 'product_sku'],
+    'unitPrice': ['unit price', 'price', 'product price'],
+    'description': ['description', 'product description', 'short description'],
+    'gstAmount': ['gst amount', 'gst_amount', 'tax amount'],
+    'gstPercentage': ['gst percentage', 'gst_percentage', 'tax percentage'],
+    'hsCode': ['hs code', 'hs_code', 'hscode'],
+    'stockQuantity': ['stock quantity', 'stock_quantity', 'quantity', 'qty'],
+    'serialNumber': ['serial number', 'serial_number', 'serial no'],
+    'listNumber': ['list number', 'list_number', 'list no'],
+    'bcNumber': ['bc number', 'bc_number', 'bc no'],
+    'lotNumber': ['lot number', 'lot_number', 'lot no'],
+    'expiryDate': ['expiry date', 'expiry_date', 'expiration date'],
+    'uom': ['uom', 'unit of measure', 'unit']
   };
 
   // Map header indices
@@ -178,12 +200,28 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
     );
     if (index !== -1) {
       headerMap[key] = index;
+      console.log(`✅ Product: Mapped column "${key}" to header "${header[index]}" at index ${index}`);
+    } else {
+      console.log(`❌ Product: Could not map column "${key}". Available headers:`, header.map(h => `"${h.toLowerCase()}"`));
     }
   });
+  console.log('📊 Product CSV Final headerMap:', headerMap);
+  
+  // Show which columns are missing
+  const missingColumns = Object.keys(columnMap).filter(key => headerMap[key] === undefined);
+  if (missingColumns.length > 0) {
+    console.log('❌ Missing columns that could not be mapped:', missingColumns);
+    console.log('💡 Make sure your CSV headers exactly match one of these variants for each field:');
+    missingColumns.forEach(col => {
+      console.log(`   ${col}: ${columnMap[col].join(', ')}`);
+    });
+  } else {
+    console.log('✅ All expected columns were successfully mapped!');
+  }
 
   // Validate required columns
-  if (headerMap.sku === undefined || headerMap.price === undefined) {
-    throw new Error('Required columns missing: Product SKU and Product Price are required');
+  if (headerMap.sku === undefined || headerMap.unitPrice === undefined) {
+    throw new Error('Required columns missing: SKU and Unit Price are required');
   }
 
   // Parse data rows
@@ -213,9 +251,39 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
     // Extract product data
     const productData: ProductImportRow = {
       sku: values[headerMap.sku] || '',
-      price: values[headerMap.price] || '',
+      unitPrice: values[headerMap.unitPrice] || '',
       description: values[headerMap.description] || '',
+      gstAmount: values[headerMap.gstAmount] || '',
+      gstPercentage: values[headerMap.gstPercentage] || '',
+      hsCode: values[headerMap.hsCode] || '',
+      stockQuantity: values[headerMap.stockQuantity] || '',
+      serialNumber: values[headerMap.serialNumber] || '',
+      listNumber: values[headerMap.listNumber] || '',
+      bcNumber: values[headerMap.bcNumber] || '',
+      lotNumber: values[headerMap.lotNumber] || '',
+      expiryDate: values[headerMap.expiryDate] || '',
+      uom: values[headerMap.uom] || '',
     };
+
+    // Debug log for first few rows
+    if (i <= 3) {
+      console.log(`🔍 Product Row ${i} extracted data:`, productData);
+      console.log(`🔍 Product Row ${i} raw values:`, values);
+      console.log(`🔍 Product Row ${i} header mapping:`, {
+        sku: headerMap.sku,
+        unitPrice: headerMap.unitPrice,
+        description: headerMap.description,
+        gstAmount: headerMap.gstAmount,
+        gstPercentage: headerMap.gstPercentage,
+        hsCode: headerMap.hsCode,
+        serialNumber: headerMap.serialNumber,
+        listNumber: headerMap.listNumber,
+        bcNumber: headerMap.bcNumber,
+        lotNumber: headerMap.lotNumber,
+        expiryDate: headerMap.expiryDate,
+        uom: headerMap.uom
+      });
+    }
 
     products.push(productData);
   }
@@ -246,17 +314,17 @@ function validateUser(userData: UserImportRow): string | null {
 // Validate product data
 function validateProduct(productData: ProductImportRow): string | null {
   if (!productData.sku?.trim()) {
-    return 'Product SKU is required';
+    return 'SKU is required';
   }
 
-  if (!productData.price?.trim()) {
-    return 'Product Price is required';
+  if (!productData.unitPrice?.trim()) {
+    return 'Unit Price is required';
   }
 
   // Validate price is a valid number
-  const price = parseFloat(productData.price);
+  const price = parseFloat(productData.unitPrice);
   if (isNaN(price) || price < 0) {
-    return 'Product Price must be a valid positive number';
+    return 'Unit Price must be a valid positive number';
   }
 
   return null;
@@ -319,28 +387,28 @@ async function processUserChunk(
 
       // Try to insert new user first, handle duplicate email case
       try {
-        await db.insert(user).values(newUser);
+      await db.insert(user).values(newUser);
         console.log(`✅ New user inserted successfully: ${userData.email}`);
-        
+
         // Initialize loyalty points for the new user
-        await db.insert(userLoyaltyPoints).values({
-          id: uuidv4(),
-          userId: newUserId,
-          totalPointsEarned: 0,
-          totalPointsRedeemed: 0,
-          availablePoints: 0,
-          pendingPoints: 0,
-          pointsExpiringSoon: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        
-        result.successful++;
-        result.successfulUsers!.push({
-          id: newUserId,
-          name: userData.name.trim(),
-          email: userData.email.toLowerCase().trim()
-        });
+      await db.insert(userLoyaltyPoints).values({
+        id: uuidv4(),
+        userId: newUserId,
+        totalPointsEarned: 0,
+        totalPointsRedeemed: 0,
+        availablePoints: 0,
+        pendingPoints: 0,
+        pointsExpiringSoon: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      result.successful++;
+      result.successfulUsers!.push({
+        id: newUserId,
+        name: userData.name.trim(),
+        email: userData.email.toLowerCase().trim()
+      });
         
       } catch (insertError: any) {
         // Check if this is specifically our tenant-email unique constraint
@@ -421,7 +489,7 @@ async function processUserChunk(
     } catch (error: any) {
       result.errors.push({
         row: globalRowIndex,
-        email: 'N/A',
+        email: userData.email || 'N/A',
         message: error.message || 'Unknown error occurred'
       });
       result.failed++;
@@ -482,19 +550,82 @@ async function processProductChunk(
         continue;
       }
 
-      // Create new product - match exact format from working API
+      // Create new product with only the 14 specified fields
       const newProductId = uuidv4();
-      const price = parseFloat(productData.price);
+      const price = parseFloat(productData.unitPrice);
+      
+      // Parse GST fields
+      const gstAmount = productData.gstAmount && productData.gstAmount.trim() !== '' ? parseFloat(productData.gstAmount) : null;
+      const gstPercentage = productData.gstPercentage && productData.gstPercentage.trim() !== '' ? parseFloat(productData.gstPercentage) : null;
+      
+      // Parse stock quantity
+      const stockQuantity = productData.stockQuantity ? parseInt(productData.stockQuantity) : 0;
+      
+      // Parse expiry date
+      let expiryDate = null;
+      if (productData.expiryDate) {
+        try {
+          const parsedDate = new Date(productData.expiryDate);
+          if (!isNaN(parsedDate.getTime())) {
+            // Format as YYYY-MM-DD for database
+            expiryDate = parsedDate.toISOString().split('T')[0];
+          }
+        } catch {
+          expiryDate = null;
+        }
+      }
+
+      // Debug: Log the parsed values from CSV
+      console.log(`🔍 DEBUG: Parsed CSV values for ${productData.sku}:`, {
+        gstAmount: gstAmount,
+        gstPercentage: gstPercentage,
+        hsCode: productData.hsCode,
+        serialNumber: productData.serialNumber,
+        listNumber: productData.listNumber,
+        bcNumber: productData.bcNumber,
+        lotNumber: productData.lotNumber,
+        expiryDate: expiryDate,
+        uom: productData.uom,
+        rawExpiryDate: productData.expiryDate
+      });
+
+      // DEBUG: Force write this to import job result
+      result.errors.push({
+        row: globalRowIndex,
+        identifier: `DEBUG-PARSED-${productData.sku}`,
+        message: `Parsed: GST=${gstAmount}, Serial=${productData.serialNumber}, UOM=${productData.uom}`
+      });
       
       const newProduct = {
         id: newProductId,
-        tenantId, // This should match the working format
-        name: productData.description?.trim() || productData.sku.trim(), // Use description as name, fallback to SKU
+        tenantId,
+        name: productData.description?.trim() || productData.sku.trim(),
         slug: `${productData.sku.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${newProductId.substring(0, 8)}`,
-        description: productData.description?.trim() || null, // Use description from CSV
+        description: productData.description?.trim() || null,
+        sku: productData.sku.trim(),
+        price: price.toFixed(2),
+        // GST fields from CSV mapped to correct database columns
+        taxAmount: gstAmount !== null ? gstAmount.toFixed(2) : '0.00',  // GST Amount -> tax_amount (default to '0.00' not null)
+        taxPercentage: gstPercentage !== null ? gstPercentage.toFixed(2) : '0.00',  // GST Percentage -> tax_percentage (default to '0.00' not null)
+        // HS Code mapped to correct database column
+        hsCode: productData.hsCode && productData.hsCode.trim() !== '' ? productData.hsCode.trim() : null,  // HS Code -> hs_code
+        // Stock Quantity will be handled separately via stock movements
+        // Inventory tracking fields mapped to correct database columns
+        serialNumber: productData.serialNumber && productData.serialNumber.trim() !== '' ? productData.serialNumber.trim() : null,  // Serial Number -> serial_number
+        listNumber: productData.listNumber && productData.listNumber.trim() !== '' ? productData.listNumber.trim() : null,  // List Number -> list_number
+        bcNumber: productData.bcNumber && productData.bcNumber.trim() !== '' ? productData.bcNumber.trim() : null,  // BC Number -> bc_number
+        lotNumber: productData.lotNumber && productData.lotNumber.trim() !== '' ? productData.lotNumber.trim() : null,  // Lot Number -> lot_number
+        expiryDate: expiryDate,  // Expiry Date -> expiry_date (stored as YYYY-MM-DD string)
+        // UOM mapped to correct database column
+        uom: productData.uom && productData.uom.trim() !== '' ? productData.uom.trim() : null,  // UOM -> uom
+        // Default required fields
+        isActive: true,
+        productType: 'simple',
+        stockManagementType: 'quantity',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        // Set other fields to null/defaults
         shortDescription: null,
-        sku: productData.sku.trim() || null,
-        price: price.toFixed(2), // Use toFixed(2) for decimal compatibility
         comparePrice: null,
         costPrice: null,
         images: null,
@@ -506,13 +637,9 @@ async function processProductChunk(
         weight: null,
         dimensions: null,
         isFeatured: false,
-        isActive: true,
         isDigital: false,
         requiresShipping: true,
-        taxable: true,
-        // Tax fields - match working format with null for optional fields
-        taxAmount: null,
-        taxPercentage: null,
+        taxable: gstAmount || gstPercentage ? true : false,
         priceIncludingTax: null,
         priceExcludingTax: null,
         extraTax: null,
@@ -521,63 +648,209 @@ async function processProductChunk(
         discount: null,
         metaTitle: null,
         metaDescription: null,
-        // Stock management fields
-        productType: 'simple',
         variationAttributes: null,
-        stockManagementType: 'quantity',
         pricePerUnit: null,
         baseWeightUnit: 'grams',
-        // Cannabis fields
         thc: null,
         cbd: null,
         difficulty: null,
         floweringTime: null,
         yieldAmount: null,
-        // Core fields only (new fields will be added separately if needed)
-        createdAt: new Date(),
-        updatedAt: new Date(),
       };
 
-      // Insert product with error handling
+       // Insert product with fallback for missing columns
       try {
         console.log(`🔄 Attempting to insert product: ${newProduct.name} (SKU: ${newProduct.sku})`);
-        
-        // First try to insert with new fields if they exist in schema
-        try {
-          const productWithNewFields = {
-            ...newProduct,
-            serialNumber: null,
-            listNumber: null,
-            bcNumber: null,
-            lotNumber: null,
-            expiryDate: null,
-            fixedNotifiedValueOrRetailPrice: '0.00',
-            saleType: 'Goods at standard rate',
-            uom: null,
-          };
-          
-          await db.insert(products).values(productWithNewFields);
-          console.log(`✅ Product inserted successfully with new fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
-        } catch (newFieldsError: any) {
-          // If new fields cause error (columns don't exist), try without them
-          if (newFieldsError.code === 'ER_BAD_FIELD_ERROR' || newFieldsError.errno === 1054) {
-            console.log(`⚠️ New fields not available, inserting without them: ${newProduct.name} (SKU: ${newProduct.sku})`);
-            await db.insert(products).values(newProduct);
-            console.log(`✅ Product inserted successfully without new fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
-          } else {
-            throw newFieldsError;
-          }
+         console.log('🔍 Product CSV data received:', {
+           gstAmount: productData.gstAmount,
+           gstPercentage: productData.gstPercentage,
+           hsCode: productData.hsCode,
+           serialNumber: productData.serialNumber,
+           listNumber: productData.listNumber,
+           bcNumber: productData.bcNumber,
+           lotNumber: productData.lotNumber,
+           expiryDate: productData.expiryDate,
+           uom: productData.uom
+         });
+         console.log('🔍 Product database values being inserted:', {
+           taxAmount: newProduct.taxAmount,
+           taxPercentage: newProduct.taxPercentage,
+           hsCode: newProduct.hsCode,
+           serialNumber: newProduct.serialNumber,
+           listNumber: newProduct.listNumber,
+           bcNumber: newProduct.bcNumber,
+           lotNumber: newProduct.lotNumber,
+           expiryDate: newProduct.expiryDate,
+           uom: newProduct.uom,
+           price: newProduct.price,
+           sku: newProduct.sku,
+           name: newProduct.name
+         });
+         
+         console.log('🔍 All product fields being inserted:', Object.keys(newProduct));
+
+        // Debug: Log the exact values being inserted
+        console.log(`🔍 DEBUG: Inserting product with values:`, {
+          name: newProduct.name,
+          sku: newProduct.sku,
+          price: newProduct.price,
+          taxAmount: newProduct.taxAmount,
+          taxPercentage: newProduct.taxPercentage,
+          hsCode: newProduct.hsCode,
+          serialNumber: newProduct.serialNumber,
+          listNumber: newProduct.listNumber,
+          bcNumber: newProduct.bcNumber,
+          lotNumber: newProduct.lotNumber,
+          expiryDate: newProduct.expiryDate,
+          uom: newProduct.uom,
+        });
+
+        // DEBUG: Force write this to import job result
+        result.errors.push({
+          row: globalRowIndex,
+          identifier: `DEBUG-INSERT-${productData.sku}`,
+          message: `About to insert: TaxAmount=${newProduct.taxAmount}, Serial=${newProduct.serialNumber}`
+        });
+
+        // AGGRESSIVE DEBUG: Throw error with debug info for first product only
+        if (globalRowIndex === 1) {
+          throw new Error(`DEBUG STOP: First product debug info - TaxAmount: ${newProduct.taxAmount}, SerialNumber: ${newProduct.serialNumber}, HSCode: ${newProduct.hsCode}, UOM: ${newProduct.uom}`);
         }
+
+        // Try to insert with all new fields first
+        try {
+       await db.insert(products).values(newProduct);
+          console.log(`✅ Product inserted successfully with all fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
+          
+          // Store success info in result for debugging
+          result.errors.push({
+            row: globalRowIndex,
+            identifier: productData.sku || 'N/A',
+            message: `SUCCESS: Product inserted with all fields. TaxAmount: ${newProduct.taxAmount}, SerialNumber: ${newProduct.serialNumber}`
+          });
+         } catch (newFieldsError: any) {
+           console.error(`❌ Product insertion with new fields failed:`, {
+             message: newFieldsError.message,
+             code: newFieldsError.code,
+             errno: newFieldsError.errno,
+             sqlState: newFieldsError.sqlState,
+             sqlMessage: newFieldsError.sqlMessage
+           });
+           
+           // Store the error in the result for debugging
+           result.errors.push({
+             row: globalRowIndex,
+             identifier: productData.sku || 'N/A',
+             message: `Database insertion failed: ${newFieldsError.message} (Code: ${newFieldsError.code}, Errno: ${newFieldsError.errno})`
+           });
+           
+           // If new fields cause error (columns don't exist), try without them
+           if (newFieldsError.code === 'ER_BAD_FIELD_ERROR' || newFieldsError.errno === 1054) {
+             console.log(`⚠️ Column doesn't exist error detected, inserting with basic fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
+             
+             // Create basic product without the new fields
+             const basicProduct = {
+               id: newProduct.id,
+               tenantId: newProduct.tenantId,
+               name: newProduct.name,
+               slug: newProduct.slug,
+               description: newProduct.description,
+               sku: newProduct.sku,
+               price: newProduct.price,
+               isActive: newProduct.isActive,
+               productType: newProduct.productType,
+               stockManagementType: newProduct.stockManagementType,
+               createdAt: newProduct.createdAt,
+               updatedAt: newProduct.updatedAt,
+               shortDescription: newProduct.shortDescription,
+               comparePrice: newProduct.comparePrice,
+               costPrice: newProduct.costPrice,
+               images: newProduct.images,
+               banner: newProduct.banner,
+               categoryId: newProduct.categoryId,
+               subcategoryId: newProduct.subcategoryId,
+               supplierId: newProduct.supplierId,
+               tags: newProduct.tags,
+               weight: newProduct.weight,
+               dimensions: newProduct.dimensions,
+               isFeatured: newProduct.isFeatured,
+               isDigital: newProduct.isDigital,
+               requiresShipping: newProduct.requiresShipping,
+               taxable: newProduct.taxable,
+               priceIncludingTax: newProduct.priceIncludingTax,
+               priceExcludingTax: newProduct.priceExcludingTax,
+               extraTax: newProduct.extraTax,
+               furtherTax: newProduct.furtherTax,
+               fedPayableTax: newProduct.fedPayableTax,
+               discount: newProduct.discount,
+               metaTitle: newProduct.metaTitle,
+               metaDescription: newProduct.metaDescription,
+               variationAttributes: newProduct.variationAttributes,
+               pricePerUnit: newProduct.pricePerUnit,
+               baseWeightUnit: newProduct.baseWeightUnit,
+               thc: newProduct.thc,
+               cbd: newProduct.cbd,
+               difficulty: newProduct.difficulty,
+               floweringTime: newProduct.floweringTime,
+               yieldAmount: newProduct.yieldAmount
+             };
+
+             await db.insert(products).values(basicProduct);
+             console.log(`✅ Product inserted successfully with basic fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
+             console.log(`⚠️ Note: The following fields were not saved due to missing database columns: GST Amount, GST Percentage, HS Code, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM`);
+             
+             // Store fallback info in result
+             result.errors.push({
+               row: globalRowIndex,
+               identifier: productData.sku || 'N/A',
+               message: `FALLBACK: Used basic product creation due to missing database columns`
+             });
+           } else {
+             console.error(`❌ Product insertion failed with unexpected error:`, {
+               message: newFieldsError.message,
+               code: newFieldsError.code,
+               errno: newFieldsError.errno
+             });
+             throw newFieldsError;
+           }
+         }
+         
+         // Create stock movement entry if stock quantity is provided
+         if (stockQuantity > 0) {
+           const stockMovementId = uuidv4();
+           const inventoryId = uuidv4(); // Create inventory ID for this movement
+           
+           const stockMovementEntry = {
+             id: stockMovementId,
+             tenantId: tenantId,
+             inventoryId: inventoryId,
+             productId: newProductId,
+             variantId: null, // No variant for simple products
+             movementType: 'in', // Stock coming in
+             quantity: stockQuantity,
+             previousQuantity: 0, // Starting from 0
+             newQuantity: stockQuantity, // New total quantity
+             weightQuantity: '0.00',
+             previousWeightQuantity: '0.00', 
+             newWeightQuantity: '0.00',
+             reason: 'Product Import - Initial Stock',
+             notes: `Initial stock set during bulk product import from CSV`,
+             processedBy: 'system', // Import system user
+             createdAt: new Date(),
+           };
+           
+           await db.insert(stockMovements).values(stockMovementEntry);
+           console.log(`✅ Stock movement created: ${stockQuantity} units for ${newProduct.sku}`);
+         }
+         
       } catch (insertError: any) {
         console.error(`❌ Failed to insert product: ${newProduct.name} (SKU: ${newProduct.sku})`);
         console.error('Database error details:', {
           message: insertError.message,
           code: insertError.code,
-          sqlState: insertError.sqlState,
-          sqlMessage: insertError.sqlMessage,
-          errno: insertError.errno
+           errno: insertError.errno
         });
-        
+         
         throw insertError;
       }
 
@@ -613,6 +886,9 @@ export const bulkUserImport = inngest.createFunction(
   { event: 'user/bulk-import' },
   async ({ event, step }) => {
     const { jobId, blobUrl, tenantId, fileName, importType = 'users' } = event.data;
+    
+    // SUPER AGGRESSIVE DEBUG: Log function entry
+    console.log('🚨 BULK IMPORT FUNCTION CALLED!', { jobId, importType, fileName });
     
     console.log('🎯 INNGEST FUNCTION TRIGGERED!');
     console.log(`🚀 Starting ${importType} import job:`, {
