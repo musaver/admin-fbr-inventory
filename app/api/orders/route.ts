@@ -611,6 +611,12 @@ export const POST = withTenant(async (req: NextRequest, context) => {
         uom: item.uom || null,
         itemSerialNumber: item.itemSerialNumber || null,
         sroScheduleNumber: item.sroScheduleNumber || null,
+        // Product identification fields
+        serialNumber: item.serialNumber || null,
+        listNumber: item.listNumber || null,
+        bcNumber: item.bcNumber || null,
+        lotNumber: item.lotNumber || null,
+        expiryDate: item.expiryDate || null,
         quantity: item.quantity,
         price: item.price,
         costPrice: costPrice ? costPrice.toString() : null,

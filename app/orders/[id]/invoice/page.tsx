@@ -312,6 +312,47 @@ export default function OrderInvoice() {
               margin-top: 4px;
             }
             
+            .product-identification {
+              font-size: 11px;
+              font-weight: 600;
+              line-height: 1.3;
+              margin-bottom: 3px;
+            }
+            
+            .tax-details-row {
+              background-color: #f0fdf4 !important;
+              border-bottom: 1px solid #d1d5db;
+            }
+            
+            .tax-details-row td {
+              padding: 12px !important;
+              font-size: 11px !important;
+              color: #374151 !important;
+            }
+            
+            .tax-details-title {
+              font-weight: 600;
+              margin-bottom: 8px;
+              color: #1f2937;
+              font-size: 12px;
+            }
+            
+            .tax-details-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px 24px;
+            }
+            
+            .tax-detail-item {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 4px;
+            }
+            
+            .tax-detail-value {
+              font-weight: 600;
+            }
+            
             .price-highlight {
               color: #059669;
               font-weight: 700;
@@ -530,6 +571,11 @@ export default function OrderInvoice() {
               ${orderItems.map((item: any) => `
                 <tr>
                   <td>
+                    ${item.serialNumber ? `<div class="product-identification" style="color: #2563eb;">🔢 Serial: ${item.serialNumber}</div>` : ''}
+                    ${item.listNumber ? `<div class="product-identification" style="color: #059669;">📋 List: ${item.listNumber}</div>` : ''}
+                    ${item.bcNumber ? `<div class="product-identification" style="color: #7c3aed;">🏢 BC: ${item.bcNumber}</div>` : ''}
+                    ${item.lotNumber ? `<div class="product-identification" style="color: #ea580c;">📦 Lot: ${item.lotNumber}</div>` : ''}
+                    ${item.expiryDate ? `<div class="product-identification" style="color: #dc2626;">📅 Exp: ${item.expiryDate}</div>` : ''}
                     <div class="product-name">${item.productName}</div>
                     ${item.variantTitle ? `<div class="product-details">Variant: ${item.variantTitle}</div>` : ''}
                     ${item.sku ? `<div class="product-details">SKU: ${item.sku}</div>` : ''}
@@ -546,6 +592,75 @@ export default function OrderInvoice() {
                   <td class="text-right"><span class="price-highlight">${formatAmountForPrint(item.priceIncludingTax || item.price)}</span></td>
                   <td class="text-right"><strong class="price-highlight">${formatAmountForPrint(item.totalPrice)}</strong></td>
                 </tr>
+                ${(item.taxAmount || item.taxPercentage || item.discount || item.extraTax || item.furtherTax || item.fedPayableTax || item.priceIncludingTax || item.priceExcludingTax || item.fixedNotifiedValueOrRetailPrice || item.saleType) ? `
+                <tr class="tax-details-row">
+                  <td colspan="6">
+                    <div class="tax-details-title">💰 Tax & Discount Details:</div>
+                    <div class="tax-details-grid">
+                      ${(Number(item.taxAmount) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Tax Amount:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.taxAmount || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.taxPercentage) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Tax Percentage:</span>
+                        <span class="tax-detail-value">${Number(item.taxPercentage || 0).toFixed(2)}%</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.priceIncludingTax) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Price Inc. Tax:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.priceIncludingTax || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.priceExcludingTax) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Price Ex. Tax:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.priceExcludingTax || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.extraTax) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Extra Tax:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.extraTax || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.furtherTax) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Further Tax:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.furtherTax || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.fedPayableTax) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>FED Payable Tax:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.fedPayableTax || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.discount) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Discount:</span>
+                        <span class="tax-detail-value" style="color: #10b981;">-${formatAmountForPrint(item.discount || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${(Number(item.fixedNotifiedValueOrRetailPrice) || 0) > 0 ? `
+                      <div class="tax-detail-item">
+                        <span>Fixed Notified Value/Retail Price:</span>
+                        <span class="tax-detail-value">${formatAmountForPrint(item.fixedNotifiedValueOrRetailPrice || 0)}</span>
+                      </div>
+                      ` : ''}
+                      ${item.saleType && item.saleType !== 'Goods at standard rate' ? `
+                      <div class="tax-detail-item">
+                        <span>Sale Type:</span>
+                        <span class="tax-detail-value">${item.saleType}</span>
+                      </div>
+                      ` : ''}
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
               `).join('')}
             </tbody>
           </table>
