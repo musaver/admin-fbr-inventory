@@ -31,6 +31,7 @@ import { useCurrency } from '@/app/contexts/CurrencyContext';
 interface Product {
   id: string;
   name: string;
+  description?: string; // Product description
   sku?: string;
   price: number;
   productType: string;
@@ -52,6 +53,12 @@ interface Product {
   furtherTax?: number;
   fedPayableTax?: number;
   discount?: number;
+  // Product identification fields
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
 }
 
 interface ProductVariant {
@@ -112,6 +119,12 @@ interface OrderItem {
   // Additional fields
   itemSerialNumber?: string; // Item serial number
   sroScheduleNumber?: string; // SRO / Schedule Number
+  // Product identification fields
+  serialNumber?: string; // Product serial number
+  listNumber?: string; // List reference number
+  bcNumber?: string; // BC identification number
+  lotNumber?: string; // Batch/lot number
+  expiryDate?: string; // Expiry date
   // Tax and discount fields
   taxAmount?: number;
   taxPercentage?: number;
@@ -302,7 +315,13 @@ export default function AddOrder() {
     discountAmount: 0,
     // Additional tax fields
     fixedNotifiedValueOrRetailPrice: 0,
-    saleType: 'Goods at standard rate'
+    saleType: 'Goods at standard rate',
+    // Product identification fields
+    serialNumber: '',
+    listNumber: '',
+    bcNumber: '',
+    lotNumber: '',
+    expiryDate: ''
   });
 
   // Group product addon selection
@@ -387,7 +406,13 @@ export default function AddOrder() {
           discountAmount: product.discount || 0,
           // Additional tax fields (reset to defaults)
           fixedNotifiedValueOrRetailPrice: 0,
-          saleType: 'Goods at standard rate'
+          saleType: 'Goods at standard rate',
+          // Populate product identification fields from product
+          serialNumber: product.serialNumber || '',
+          listNumber: product.listNumber || '',
+          bcNumber: product.bcNumber || '',
+          lotNumber: product.lotNumber || '',
+          expiryDate: product.expiryDate || ''
         }));
       }
     } else {
@@ -410,7 +435,13 @@ export default function AddOrder() {
         discountAmount: 0,
         // Additional tax fields (reset to defaults)
         fixedNotifiedValueOrRetailPrice: 0,
-        saleType: 'Goods at standard rate'
+        saleType: 'Goods at standard rate',
+        // Reset product identification fields
+        serialNumber: '',
+        listNumber: '',
+        bcNumber: '',
+        lotNumber: '',
+        expiryDate: ''
       }));
     }
   }, [productSelection.selectedProductId, products, isEditingItem]);
@@ -898,6 +929,12 @@ export default function AddOrder() {
       // Additional editable fields
       itemSerialNumber: productSelection.itemSerialNumber || undefined,
       sroScheduleNumber: productSelection.sroScheduleNumber || undefined,
+      // Product identification fields
+      serialNumber: productSelection.serialNumber || undefined,
+      listNumber: productSelection.listNumber || undefined,
+      bcNumber: productSelection.bcNumber || undefined,
+      lotNumber: productSelection.lotNumber || undefined,
+      expiryDate: productSelection.expiryDate || undefined,
       // Tax and discount fields from editable selection
       taxAmount: productSelection.taxAmount || 0,
       taxPercentage: productSelection.taxPercentage || 0,
@@ -944,7 +981,13 @@ export default function AddOrder() {
       discountAmount: 0,
       // Additional tax fields (reset to defaults)
       fixedNotifiedValueOrRetailPrice: 0,
-      saleType: 'Goods at standard rate'
+      saleType: 'Goods at standard rate',
+      // Reset product identification fields
+      serialNumber: '',
+      listNumber: '',
+      bcNumber: '',
+      lotNumber: '',
+      expiryDate: ''
     });
     clearSelectedAddons();
     
@@ -3035,6 +3078,66 @@ export default function AddOrder() {
                           className="text-sm"
                       />
                     </div>
+                    
+                      <div className="space-y-2">
+                        <Label htmlFor="product-serial-number-edit" className="text-sm">Product Serial No.</Label>
+                        <Input
+                          id="product-serial-number-edit"
+                        type="text"
+                        value={productSelection.serialNumber}
+                        onChange={(e) => setProductSelection({...productSelection, serialNumber: e.target.value})}
+                        placeholder="Product serial number"
+                          className="text-sm"
+                      />
+                    </div>
+                    
+                      <div className="space-y-2">
+                        <Label htmlFor="list-number-edit" className="text-sm">List Number</Label>
+                        <Input
+                          id="list-number-edit"
+                        type="text"
+                        value={productSelection.listNumber}
+                        onChange={(e) => setProductSelection({...productSelection, listNumber: e.target.value})}
+                        placeholder="List reference number"
+                          className="text-sm"
+                      />
+                    </div>
+                    
+                      <div className="space-y-2">
+                        <Label htmlFor="bc-number-edit" className="text-sm">BC Number</Label>
+                        <Input
+                          id="bc-number-edit"
+                        type="text"
+                        value={productSelection.bcNumber}
+                        onChange={(e) => setProductSelection({...productSelection, bcNumber: e.target.value})}
+                        placeholder="BC identification number"
+                          className="text-sm"
+                      />
+                    </div>
+                    
+                      <div className="space-y-2">
+                        <Label htmlFor="lot-number-edit" className="text-sm">Lot Number</Label>
+                        <Input
+                          id="lot-number-edit"
+                        type="text"
+                        value={productSelection.lotNumber}
+                        onChange={(e) => setProductSelection({...productSelection, lotNumber: e.target.value})}
+                        placeholder="Batch or lot number"
+                          className="text-sm"
+                      />
+                    </div>
+                    
+                      <div className="space-y-2">
+                        <Label htmlFor="expiry-date-edit" className="text-sm">Expiry Date</Label>
+                        <Input
+                          id="expiry-date-edit"
+                        type="date"
+                        value={productSelection.expiryDate}
+                        onChange={(e) => setProductSelection({...productSelection, expiryDate: e.target.value})}
+                        placeholder="YYYY-MM-DD"
+                          className="text-sm"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -3099,10 +3202,16 @@ export default function AddOrder() {
                           // Update tax percentage immediately
                           setProductSelection(prev => ({...prev, taxPercentage: value === '' ? 0 : value}));
                           
-                          // Calculate tax amount if we have both values (only if value is a complete number)
+                          // Calculate tax amount and price including tax if we have both values (only if value is a complete number)
                           if (taxPercentage > 0 && productSelection.priceExcludingTax > 0 && !value.endsWith('.')) {
-                            const calculatedTaxAmount = await calculateTaxAmount(productSelection.priceExcludingTax, taxPercentage);
-                            setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                            const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
+                            const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTaxNum, taxPercentage);
+                            const calculatedPriceIncludingTax = priceExcludingTaxNum + calculatedTaxAmount;
+                            setProductSelection(prev => ({
+                              ...prev, 
+                              taxAmount: calculatedTaxAmount,
+                              priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100 // Round to 2 decimal places
+                            }));
                           }
                         }
                       }}
@@ -3130,13 +3239,16 @@ export default function AddOrder() {
                           if (!value.endsWith('.') && value !== '') {
                             // If we have tax percentage and price excluding tax, use our calculation method
                             if (productSelection.taxPercentage > 0 && productSelection.priceExcludingTax > 0) {
-                              const calculatedTaxAmount = await calculateTaxAmount(parseFloat(productSelection.priceExcludingTax), parseFloat(productSelection.taxPercentage));
+                              const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
+                              const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
+                              const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTaxNum, taxPercentageNum);
                               setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
                             }
                             // Otherwise, calculate tax percentage and amount from price difference (backward compatibility)
                             else if (priceIncludingTax > 0 && productSelection.priceExcludingTax > 0) {
-                              const taxAmount = priceIncludingTax - parseFloat(productSelection.priceExcludingTax);
-                              const taxPercentage = (taxAmount / parseFloat(productSelection.priceExcludingTax)) * 100;
+                              const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
+                              const taxAmount = priceIncludingTax - priceExcludingTaxNum;
+                              const taxPercentage = (taxAmount / priceExcludingTaxNum) * 100;
                               setProductSelection(prev => ({
                                 ...prev,
                                 taxAmount: Math.round(taxAmount * 100) / 100, // Round to 2 decimal places
@@ -3168,14 +3280,21 @@ export default function AddOrder() {
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point)
                           if (!value.endsWith('.') && value !== '') {
-                            // Calculate tax amount if we have tax percentage
+                            // Calculate tax amount and price including tax if we have tax percentage
                             if (priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
-                              const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, parseFloat(productSelection.taxPercentage));
-                              setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
+                              const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
+                              const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, taxPercentageNum);
+                              const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+                              setProductSelection(prev => ({
+                                ...prev, 
+                                taxAmount: calculatedTaxAmount,
+                                priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100 // Round to 2 decimal places
+                              }));
                             }
                             // Auto-calculate tax percentage if both prices are available but no existing tax percentage
                             else if (priceExcludingTax > 0 && productSelection.priceIncludingTax > 0 && productSelection.taxPercentage === 0) {
-                              const taxAmount = parseFloat(productSelection.priceIncludingTax) - priceExcludingTax;
+                              const priceIncludingTaxNum = parseFloat(productSelection.priceIncludingTax.toString());
+                              const taxAmount = priceIncludingTaxNum - priceExcludingTax;
                               const taxPercentage = (taxAmount / priceExcludingTax) * 100;
                               setProductSelection(prev => ({
                                 ...prev,

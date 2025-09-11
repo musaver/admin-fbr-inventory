@@ -52,6 +52,8 @@ interface ProductWithCategory {
 export default function ProductsList() {
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -77,6 +79,81 @@ export default function ProductsList() {
         setProducts(products.filter((item) => item.product.id !== id));
       } catch (error) {
         console.error('Error deleting product:', error);
+      }
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (checked) {
+      setSelectedProducts(new Set(products.map(item => item.product.id)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleSelectProduct = (productId: string, checked: boolean) => {
+    const newSelected = new Set(selectedProducts);
+    if (checked) {
+      newSelected.add(productId);
+    } else {
+      newSelected.delete(productId);
+    }
+    setSelectedProducts(newSelected);
+    setSelectAll(newSelected.size === products.length && products.length > 0);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedProducts.size === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${selectedProducts.size} selected product(s)? This action cannot be undone.`)) {
+      try {
+        setLoading(true);
+        const deletePromises = Array.from(selectedProducts).map(productId =>
+          fetch(`/api/products/${productId}`, { method: 'DELETE' })
+        );
+        
+        const results = await Promise.all(deletePromises);
+        const failedDeletes = results.filter(res => !res.ok);
+        
+        if (failedDeletes.length === 0) {
+          // Remove deleted products from state
+          const remainingProducts = products.filter(item => !selectedProducts.has(item.product.id));
+          setProducts(remainingProducts);
+          setSelectedProducts(new Set());
+          setSelectAll(false);
+          alert(`${selectedProducts.size} product(s) deleted successfully.`);
+        } else {
+          alert(`Failed to delete ${failedDeletes.length} product(s). Please try again.`);
+        }
+      } catch (error) {
+        console.error('Error deleting selected products:', error);
+        alert('Error deleting selected products. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (confirm('Are you sure you want to delete ALL products? This action cannot be undone and will also delete all related data including product variants, inventory, and order history.')) {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/products/delete-all', { method: 'DELETE' });
+        if (res.ok) {
+          setProducts([]);
+          setSelectedProducts(new Set());
+          setSelectAll(false);
+          alert('All products have been deleted successfully.');
+        } else {
+          const errorData = await res.json();
+          alert(`Failed to delete products: ${errorData.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting all products:', error);
+        alert('Error deleting all products. Please try again.');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -127,6 +204,11 @@ export default function ProductsList() {
   };
 
   const getStats = () => {
+    // Safety check to ensure products is an array
+    if (!Array.isArray(products)) {
+      return { totalProducts: 0, activeProducts: 0, featuredProducts: 0, groupProducts: 0 };
+    }
+    
     const totalProducts = products.length;
     const activeProducts = products.filter(item => item.product.isActive).length;
     const featuredProducts = products.filter(item => item.product.isFeatured).length;
@@ -138,6 +220,26 @@ export default function ProductsList() {
   const stats = getStats();
 
   const columns = [
+    {
+      key: 'select',
+      title: (
+        <input
+          type="checkbox"
+          checked={selectAll}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      width: '50px',
+      render: (_: any, item: ProductWithCategory) => (
+        <input
+          type="checkbox"
+          checked={selectedProducts.has(item.product.id)}
+          onChange={(e) => handleSelectProduct(item.product.id, e.target.checked)}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      )
+    },
     {
       key: 'image',
       title: 'Image',
@@ -276,6 +378,24 @@ export default function ProductsList() {
           <Button onClick={fetchProducts} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button 
+            onClick={handleDeleteSelected} 
+            disabled={loading || selectedProducts.size === 0} 
+            variant="destructive" 
+            size="sm"
+          >
+            <TrashIcon className="h-4 w-4 mr-2" />
+            Delete Selected ({selectedProducts.size})
+          </Button>
+          <Button 
+            onClick={handleDeleteAll} 
+            disabled={loading || products.length === 0} 
+            variant="destructive" 
+            size="sm"
+          >
+            <TrashIcon className="h-4 w-4 mr-2" />
+            Delete All
           </Button>
           <Button asChild variant="outline">
             <Link href="/users/bulk-upload?tab=products">

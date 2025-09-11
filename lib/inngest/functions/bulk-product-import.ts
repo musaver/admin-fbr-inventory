@@ -1,18 +1,15 @@
 import { inngest } from '@/lib/inngest';
 import { db } from '@/lib/db';
-import { importJobs, products, productInventory, stockMovements } from '@/lib/schema';
+import { importJobs, products as productsTable, productInventory, stockMovements } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ProductImportRow {
   name: string;
-  price: string;
+  unitPrice: string; // Changed from 'price' to 'unitPrice'
   slug?: string;
-  description?: string;
-  shortDescription?: string;
+  description?: string; // Changed from 'shortDescription' to 'description'
   sku?: string;
-  comparePrice?: string;
-  costPrice?: string;
   categoryId?: string;
   subcategoryId?: string;
   supplierId?: string;
@@ -23,12 +20,10 @@ interface ProductImportRow {
   isDigital?: string;
   requiresShipping?: string;
   taxable?: string;
-  metaTitle?: string;
-  metaDescription?: string;
   
-  // Tax and discount fields
-  taxAmount?: string;
-  taxPercentage?: string;
+  // Tax and discount fields (renamed)
+  gstAmount?: string; // Changed from 'taxAmount' to 'gstAmount'
+  gstPercentage?: string; // Changed from 'taxPercentage' to 'gstPercentage'
   priceIncludingTax?: string;
   priceExcludingTax?: string;
   extraTax?: string;
@@ -101,13 +96,10 @@ function parseCSV(csvText: string): ProductImportRow[] {
   const columnMap: { [key: string]: string[] } = {
     // Basic Information
     'name': ['name', 'product name', 'title'],
-    'price': ['price', 'selling price', 'unit price'],
+    'unitPrice': ['unit price', 'price', 'selling price'], // Changed mapping
     'slug': ['slug', 'url slug'],
-    'description': ['description', 'long description'],
-    'shortDescription': ['short description', 'summary'],
+    'description': ['description', 'long description', 'short description', 'summary'], // Combined description fields
     'sku': ['sku', 'product code', 'item code'],
-    'comparePrice': ['compare price', 'original price', 'mrp'],
-    'costPrice': ['cost price', 'purchase price', 'wholesale price'],
     
     // Categories and Organization
     'categoryId': ['category id', 'category', 'category_id'],
@@ -123,13 +115,9 @@ function parseCSV(csvText: string): ProductImportRow[] {
     'requiresShipping': ['requires shipping', 'shipping required'],
     'taxable': ['taxable', 'tax applicable'],
     
-    // SEO
-    'metaTitle': ['meta title', 'seo title'],
-    'metaDescription': ['meta description', 'seo description'],
-    
     // Tax and Discount Fields (matching add product form)
-    'taxAmount': ['tax amount'],
-    'taxPercentage': ['tax percentage'],
+    'gstAmount': ['gst amount', 'tax amount'], // Changed from taxAmount
+    'gstPercentage': ['gst percentage', 'tax percentage'], // Changed from taxPercentage
     'priceIncludingTax': ['price including tax'],
     'priceExcludingTax': ['price excluding tax'],
     'extraTax': ['extra tax'],
@@ -233,12 +221,12 @@ function validateProduct(product: ProductImportRow, rowIndex: number): string[] 
     errors.push('Product name is required');
   }
   
-  if (!product.price?.trim()) {
-    errors.push('Price is required');
+  if (!product.unitPrice?.trim()) {
+    errors.push('Unit Price is required');
   } else {
-    const price = parseFloat(product.price);
+    const price = parseFloat(product.unitPrice);
     if (isNaN(price) || price < 0) {
-      errors.push('Price must be a valid positive number');
+      errors.push('Unit Price must be a valid positive number');
     }
   }
   
@@ -303,7 +291,7 @@ async function processProductChunk(
       const parseDecimal = (value: string | undefined, defaultValue = '0.00'): string => {
         if (!value?.trim()) return defaultValue;
         const parsed = parseFloat(value);
-        return isNaN(parsed) ? defaultValue : parsed.toString();
+        return isNaN(parsed) ? defaultValue : parsed.toFixed(2);
       };
 
       // Helper function to parse boolean values
@@ -316,21 +304,21 @@ async function processProductChunk(
       const newProduct = {
         id: productId,
         tenantId,
-        name: product.name.trim(),
+        name: product.description?.trim() || product.name.trim(), // Use description as name, fallback to original name
         slug: `${slug}-${Date.now()}`, // Add timestamp to ensure uniqueness
         description: product.description?.trim() || null,
-        shortDescription: product.shortDescription?.trim() || null,
+        shortDescription: null, // Removed shortDescription field
         sku: product.sku?.trim() || null,
-        price: product.price.trim(),
-        comparePrice: parseDecimal(product.comparePrice, null),
-        costPrice: parseDecimal(product.costPrice, null),
+        price: parseDecimal(product.unitPrice), // Parse price as decimal
+        comparePrice: null, // Removed comparePrice field
+        costPrice: null, // Removed costPrice field
         images: null, // Images not supported in CSV
         banner: null, // Banner not supported in CSV
         categoryId: product.categoryId?.trim() || null,
         subcategoryId: product.subcategoryId?.trim() || null,
         supplierId: product.supplierId?.trim() || null,
         tags: parsedTags,
-        weight: parseDecimal(product.weight, null),
+        weight: parseDecimal(product.weight, '0.00'),
         dimensions: null, // Dimensions not supported in CSV
         isFeatured: parseBoolean(product.isFeatured, false),
         isActive: parseBoolean(product.isActive, true),
@@ -339,8 +327,8 @@ async function processProductChunk(
         taxable: parseBoolean(product.taxable, true),
         
         // Tax and discount fields (from CSV or defaults)
-        taxAmount: parseDecimal(product.taxAmount),
-        taxPercentage: parseDecimal(product.taxPercentage),
+        taxAmount: parseDecimal(product.gstAmount), // Changed from taxAmount to gstAmount
+        taxPercentage: parseDecimal(product.gstPercentage), // Changed from taxPercentage to gstPercentage
         priceIncludingTax: parseDecimal(product.priceIncludingTax),
         priceExcludingTax: parseDecimal(product.priceExcludingTax),
         extraTax: parseDecimal(product.extraTax),
@@ -348,21 +336,21 @@ async function processProductChunk(
         fedPayableTax: parseDecimal(product.fedPayableTax),
         discount: parseDecimal(product.discount),
         
-        // SEO fields
-        metaTitle: product.metaTitle?.trim() || null,
-        metaDescription: product.metaDescription?.trim() || null,
+        // SEO fields - removed metaTitle and metaDescription
+        metaTitle: null,
+        metaDescription: null,
         
         // Additional product fields
         hsCode: product.hsCode?.trim() || null,
         productType: product.productType?.trim() || 'simple',
         variationAttributes: null, // Variations not supported in bulk import
         stockManagementType: product.stockManagementType?.trim() || 'quantity',
-        pricePerUnit: parseDecimal(product.pricePerUnit, null),
+        pricePerUnit: parseDecimal(product.pricePerUnit, '0.00'),
         baseWeightUnit: product.baseWeightUnit?.trim() || 'grams',
         
         // Cannabis-specific fields (optional)
-        thc: parseDecimal(product.thc, null),
-        cbd: parseDecimal(product.cbd, null),
+        thc: parseDecimal(product.thc, '0.00'),
+        cbd: parseDecimal(product.cbd, '0.00'),
         difficulty: product.difficulty?.trim() || null,
         floweringTime: product.floweringTime?.trim() || null,
         yieldAmount: product.yieldAmount?.trim() || null,
@@ -375,7 +363,7 @@ async function processProductChunk(
         expiryDate: product.expiryDate?.trim() || null,
         
         // Additional tax fields
-        fixedNotifiedValueOrRetailPrice: parseDecimal(product.fixedNotifiedValueOrRetailPrice, null),
+        fixedNotifiedValueOrRetailPrice: parseDecimal(product.fixedNotifiedValueOrRetailPrice, '0.00'),
         saleType: product.saleType?.trim() || null,
         
         // Unit of measurement
@@ -386,7 +374,7 @@ async function processProductChunk(
       };
 
       // Insert product
-      await db.insert(products).values(newProduct);
+      await db.insert(productsTable).values(newProduct);
 
       // Handle stock if provided
       const stockQuantity = product.stockQuantity ? parseInt(product.stockQuantity) : 0;
@@ -451,7 +439,7 @@ async function processProductChunk(
           location: product.location?.trim() || null,
           reference: 'BULK-IMPORT',
           notes: `Created via bulk product import. Original product: ${product.name}`,
-          costPrice: parseDecimal(product.costPrice, null),
+          costPrice: null, // Removed costPrice field
           supplierId: product.supplierId?.trim() || null,
           supplier: null, // Legacy field - keeping null
           processedBy: 'system-bulk-import',

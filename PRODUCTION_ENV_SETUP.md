@@ -110,7 +110,7 @@ After deployment, register your functions with Inngest:
 
 ## Testing Production Import
 
-1. **Access your live domain**: `https://yourdomain.com/products/bulk-upload`
+1. **Access your live domain**: `https://yourdomain.com/users/bulk-upload?tab=products`
 2. **Upload a test CSV** with columns: `name,price,description,sku`
 3. **Monitor progress** in real-time
 4. **Check Inngest dashboard** for function execution logs

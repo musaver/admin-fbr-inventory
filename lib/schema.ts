@@ -82,7 +82,10 @@ export const user = mysqlTable('user', {
   
   createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => ({
+  // Ensure email is unique only within each tenant
+  emailTenantUnique: unique("user_email_tenant_unique").on(table.email, table.tenantId),
+}));
 
 // ✅ Accounts table (OAuth support: Google, Facebook)
 export const account = mysqlTable(
@@ -216,6 +219,20 @@ export const products = mysqlTable("products", {
   difficulty: varchar("difficulty", { length: 50 }), // Growing difficulty level
   floweringTime: varchar("flowering_time", { length: 100 }), // Time to flower
   yieldAmount: varchar("yield_amount", { length: 100 }), // Expected yield
+  
+  // Product identification fields
+  serialNumber: varchar("serial_number", { length: 100 }), // Product serial number
+  listNumber: varchar("list_number", { length: 100 }), // List reference number
+  bcNumber: varchar("bc_number", { length: 100 }), // BC identification number
+  lotNumber: varchar("lot_number", { length: 100 }), // Batch/lot number
+  expiryDate: varchar("expiry_date", { length: 20 }), // Expiry date (YYYY-MM-DD)
+  
+  // Additional tax fields
+  fixedNotifiedValueOrRetailPrice: decimal("fixed_notified_value_or_retail_price", { precision: 10, scale: 2 }).default('0.00'),
+  saleType: varchar("sale_type", { length: 100 }).default("Goods at standard rate"),
+  
+  // Unit of measurement
+  uom: varchar("uom", { length: 50 }), // Unit of Measurement
   
   createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
@@ -467,6 +484,13 @@ export const orderItems = mysqlTable("order_items", {
   uom: varchar("uom", { length: 50 }), // Unit of Measurement for non-weight based products
   itemSerialNumber: varchar("item_serial_number", { length: 100 }), // Item serial number
   sroScheduleNumber: varchar("sro_schedule_number", { length: 100 }), // SRO / Schedule Number
+  
+  // Product identification fields (from product)
+  serialNumber: varchar("serial_number", { length: 100 }), // Product serial number
+  listNumber: varchar("list_number", { length: 100 }), // List reference number
+  bcNumber: varchar("bc_number", { length: 100 }), // BC identification number
+  lotNumber: varchar("lot_number", { length: 100 }), // Batch/lot number
+  expiryDate: varchar("expiry_date", { length: 20 }), // Expiry date (YYYY-MM-DD)
   
   // Quantity-based order fields
   quantity: int("quantity").notNull().default(0),

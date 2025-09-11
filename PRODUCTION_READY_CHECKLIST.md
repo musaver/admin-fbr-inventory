@@ -80,7 +80,7 @@ vercel --prod
 
 ### 4. **Verification**
 After deployment, test:
-1. Go to `https://yourdomain.com/products/bulk-upload`
+1. Go to `https://yourdomain.com/users/bulk-upload?tab=products`
 2. Upload test CSV: `name,price,description,sku`
 3. Verify immediate response and background processing
 4. Check Inngest dashboard for function execution
@@ -127,9 +127,9 @@ name,price,description,sku
 ```
 
 ### **Production URLs:**
-- **Upload**: `https://yourdomain.com/products/bulk-upload`
-- **API**: `https://yourdomain.com/api/products/bulk-upload`
-- **Status**: `https://yourdomain.com/api/products/import-status/[jobId]`
+- **Upload**: `https://yourdomain.com/users/bulk-upload?tab=products`
+- **API**: `https://yourdomain.com/api/users/bulk-upload`
+- **Status**: `https://yourdomain.com/api/users/import-status/[jobId]`
 - **Inngest**: `https://yourdomain.com/api/inngest`
 
 ---

@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface UserImportRow {
   name: string;
   email: string;
+  phone: string;
   buyerNTNCNIC: string;
   buyerBusinessName: string;
   buyerProvince: string;
@@ -16,9 +17,8 @@ interface UserImportRow {
 
 interface ProductImportRow {
   sku: string;
-  title: string;
   price: string;
-  description: string;
+  description?: string; // Added back for product name
 }
 
 interface ProcessingResult {
@@ -42,6 +42,26 @@ interface ProcessingResult {
   }>;
 }
 
+// Test function to verify CSV parsing
+function testCSVParsing() {
+  const testCSV = `Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
+"John Doe","john@test.com","+92300-1234567","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Registered"
+"Jane Smith","jane@test.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
+"Bob Wilson","bob@test.com","+92333-1122334","1122334455667","Wilson Corp","KPK","789 Market Road, Peshawar","Unregistered"`;
+  
+  console.log('🧪 Testing CSV parsing...');
+  console.log('Raw CSV:', testCSV);
+  
+  try {
+    const users = parseUserCSV(testCSV);
+    console.log('✅ Parsed users:', users);
+    return users;
+  } catch (error) {
+    console.error('❌ CSV parsing failed:', error);
+    return [];
+  }
+}
+
 // Utility function to parse CSV for users
 function parseUserCSV(csvText: string): UserImportRow[] {
   const lines = csvText.split('\n').filter(line => line.trim());
@@ -52,11 +72,13 @@ function parseUserCSV(csvText: string): UserImportRow[] {
 
   // Parse header
   const header = lines[0].split(',').map(h => h.replace(/['"]/g, '').trim());
+  console.log('📋 User CSV Headers found:', header);
   
   // Expected columns (case-insensitive)
   const columnMap = {
     'name': ['name', 'full name', 'user name'],
     'email': ['email', 'email address'],
+    'phone': ['phone', 'phone number', 'mobile', 'mobile number'],
     'buyerNTNCNIC': ['buyer ntn or cnic', 'ntn', 'cnic', 'buyer ntn/cnic'],
     'buyerBusinessName': ['buyer business name', 'business name'],
     'buyerProvince': ['buyer province', 'province'],
@@ -72,8 +94,12 @@ function parseUserCSV(csvText: string): UserImportRow[] {
     );
     if (index !== -1) {
       headerMap[key] = index;
+      console.log(`✅ User: Mapped column "${key}" to header "${header[index]}" at index ${index}`);
+    } else {
+      console.log(`❌ User: Could not map column "${key}". Available headers:`, header.map(h => `"${h.toLowerCase()}"`));
     }
   });
+  console.log('📊 User CSV Final headerMap:', headerMap);
 
   // Validate required columns
   if (headerMap.name === undefined || headerMap.email === undefined) {
@@ -108,6 +134,7 @@ function parseUserCSV(csvText: string): UserImportRow[] {
     const userData: UserImportRow = {
       name: values[headerMap.name] || '',
       email: values[headerMap.email] || '',
+      phone: values[headerMap.phone] || '',
       buyerNTNCNIC: values[headerMap.buyerNTNCNIC] || '',
       buyerBusinessName: values[headerMap.buyerBusinessName] || '',
       buyerProvince: values[headerMap.buyerProvince] || '',
@@ -115,6 +142,10 @@ function parseUserCSV(csvText: string): UserImportRow[] {
       buyerRegistrationType: values[headerMap.buyerRegistrationType] || '',
     };
 
+    // Debug logs (uncomment if needed)
+    // console.log(`👤 User ${i}: Raw values:`, values);
+    // console.log(`👤 User ${i}: Parsed data:`, userData);
+    // console.log(`👤 User ${i}: HeaderMap:`, headerMap);
     users.push(userData);
   }
 
@@ -135,9 +166,8 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
   // Expected columns (case-insensitive)
   const columnMap = {
     'sku': ['product sku', 'sku', 'product_sku'],
-    'title': ['product title', 'title', 'name', 'product name'],
-    'price': ['product price', 'price'],
-    'description': ['product description', 'description']
+    'price': ['product price', 'price', 'unit price'], // Added unit price variant
+    'description': ['description', 'product description', 'short description', 'summary']
   };
 
   // Map header indices
@@ -152,8 +182,8 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
   });
 
   // Validate required columns
-  if (headerMap.sku === undefined || headerMap.title === undefined || headerMap.price === undefined) {
-    throw new Error('Required columns missing: Product SKU, Product Title, and Product Price are required');
+  if (headerMap.sku === undefined || headerMap.price === undefined) {
+    throw new Error('Required columns missing: Product SKU and Product Price are required');
   }
 
   // Parse data rows
@@ -183,7 +213,6 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
     // Extract product data
     const productData: ProductImportRow = {
       sku: values[headerMap.sku] || '',
-      title: values[headerMap.title] || '',
       price: values[headerMap.price] || '',
       description: values[headerMap.description] || '',
     };
@@ -194,8 +223,9 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
   return products;
 }
 
+
 // Validate user data
-function validateUser(userData: UserImportRow, rowIndex: number): string | null {
+function validateUser(userData: UserImportRow): string | null {
   if (!userData.name?.trim()) {
     return 'Name is required';
   }
@@ -214,13 +244,9 @@ function validateUser(userData: UserImportRow, rowIndex: number): string | null 
 }
 
 // Validate product data
-function validateProduct(productData: ProductImportRow, rowIndex: number): string | null {
+function validateProduct(productData: ProductImportRow): string | null {
   if (!productData.sku?.trim()) {
     return 'Product SKU is required';
-  }
-  
-  if (!productData.title?.trim()) {
-    return 'Product Title is required';
   }
 
   if (!productData.price?.trim()) {
@@ -242,6 +268,8 @@ async function processUserChunk(
   tenantId: string, 
   startIndex: number
 ): Promise<ProcessingResult> {
+  console.log(`👥 Processing ${users.length} users for tenant: ${tenantId}`);
+  
   const result: ProcessingResult = {
     successful: 0,
     failed: 0,
@@ -255,8 +283,10 @@ async function processUserChunk(
 
     try {
       // Validate user data
-      const validationError = validateUser(userData, globalRowIndex);
+      // console.log(`🔍 Validating user ${globalRowIndex}:`, userData);
+      const validationError = validateUser(userData);
       if (validationError) {
+        console.log(`❌ Validation failed for user ${globalRowIndex}: ${validationError}`);
         result.errors.push({
           row: globalRowIndex,
           email: userData.email || 'N/A',
@@ -265,30 +295,18 @@ async function processUserChunk(
         result.failed++;
         continue;
       }
+      // console.log(`✅ Validation passed for user ${globalRowIndex}`);
 
-      // Check if user already exists in this tenant
-      const existingUser = await db.select({ id: user.id })
-        .from(user)
-        .where(eq(user.email, userData.email.toLowerCase().trim()))
-        .limit(1);
-
-      if (existingUser.length > 0) {
-        result.errors.push({
-          row: globalRowIndex,
-          email: userData.email,
-          message: 'User with this email already exists'
-        });
-        result.failed++;
-        continue;
-      }
-
-      // Create new user
+      // Create new user ID
       const newUserId = uuidv4();
+      
+      // Create new user object with original email
       const newUser = {
         id: newUserId,
         tenantId,
         name: userData.name.trim(),
         email: userData.email.toLowerCase().trim(),
+        phone: userData.phone?.trim() || null,
         userType: 'customer',
         buyerNTNCNIC: userData.buyerNTNCNIC?.trim() || null,
         buyerBusinessName: userData.buyerBusinessName?.trim() || null,
@@ -299,33 +317,111 @@ async function processUserChunk(
         updatedAt: new Date(),
       };
 
-      // Insert user
-      await db.insert(user).values(newUser);
-
-      // Initialize loyalty points for the user
-      await db.insert(userLoyaltyPoints).values({
-        id: uuidv4(),
-        userId: newUserId,
-        totalPointsEarned: 0,
-        totalPointsRedeemed: 0,
-        availablePoints: 0,
-        pendingPoints: 0,
-        pointsExpiringSoon: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      result.successful++;
-      result.successfulUsers!.push({
-        id: newUserId,
-        name: userData.name.trim(),
-        email: userData.email.toLowerCase().trim()
-      });
+      // Try to insert new user first, handle duplicate email case
+      try {
+        await db.insert(user).values(newUser);
+        console.log(`✅ New user inserted successfully: ${userData.email}`);
+        
+        // Initialize loyalty points for the new user
+        await db.insert(userLoyaltyPoints).values({
+          id: uuidv4(),
+          userId: newUserId,
+          totalPointsEarned: 0,
+          totalPointsRedeemed: 0,
+          availablePoints: 0,
+          pendingPoints: 0,
+          pointsExpiringSoon: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        
+        result.successful++;
+        result.successfulUsers!.push({
+          id: newUserId,
+          name: userData.name.trim(),
+          email: userData.email.toLowerCase().trim()
+        });
+        
+      } catch (insertError: any) {
+        // Check if this is specifically our tenant-email unique constraint
+        const isTenantEmailDuplicate = insertError.code === 'ER_DUP_ENTRY' && 
+                                      insertError.message?.includes('user_email_tenant_unique');
+        
+        if (isTenantEmailDuplicate) {
+          console.log(`🔄 User with email ${userData.email} already exists in this tenant, updating...`);
+          
+          // Update existing user with new data
+          try {
+            await db.update(user)
+              .set({
+                name: userData.name.trim(),
+                phone: userData.phone?.trim() || null,
+                buyerNTNCNIC: userData.buyerNTNCNIC?.trim() || null,
+                buyerBusinessName: userData.buyerBusinessName?.trim() || null,
+                buyerProvince: userData.buyerProvince?.trim() || null,
+                buyerAddress: userData.buyerAddress?.trim() || null,
+                buyerRegistrationType: userData.buyerRegistrationType?.trim() || null,
+                updatedAt: new Date(),
+              })
+              .where(and(
+                eq(user.email, userData.email.toLowerCase().trim()),
+                eq(user.tenantId, tenantId)
+              ));
+            
+            // Get the existing user ID for response
+            const existingUser = await db.select({ id: user.id })
+              .from(user)
+              .where(and(
+                eq(user.email, userData.email.toLowerCase().trim()),
+                eq(user.tenantId, tenantId)
+              ))
+              .limit(1);
+            
+            console.log(`✅ User updated successfully: ${userData.email}`);
+            
+            result.successful++;
+            result.successfulUsers!.push({
+              id: existingUser[0]?.id || newUserId,
+              name: userData.name.trim(),
+              email: userData.email.toLowerCase().trim()
+            });
+            
+          } catch (updateError: any) {
+            console.error(`💥 Error updating existing user ${userData.email}:`, {
+              message: updateError.message,
+              code: updateError.code,
+              sqlState: updateError.sqlState,
+              errno: updateError.errno
+            });
+            
+            result.errors.push({
+              row: globalRowIndex,
+              email: userData.email,
+              message: `Failed to update existing user: ${updateError.message}`
+            });
+            result.failed++;
+          }
+        } else {
+          console.error(`💥 Error inserting new user ${userData.email}:`, {
+            message: insertError.message,
+            code: insertError.code,
+            sqlState: insertError.sqlState,
+            errno: insertError.errno
+          });
+          
+          result.errors.push({
+            row: globalRowIndex,
+            email: userData.email,
+            message: `Database error: ${insertError.message}`
+          });
+          result.failed++;
+        }
+      }
 
     } catch (error: any) {
       result.errors.push({
         row: globalRowIndex,
-        email: userData.email || 'N/A',
+        email: 'N/A',
         message: error.message || 'Unknown error occurred'
       });
       result.failed++;
@@ -356,7 +452,7 @@ async function processProductChunk(
 
     try {
       // Validate product data
-      const validationError = validateProduct(productData, globalRowIndex);
+      const validationError = validateProduct(productData);
       if (validationError) {
         result.errors.push({
           row: globalRowIndex,
@@ -393,12 +489,12 @@ async function processProductChunk(
       const newProduct = {
         id: newProductId,
         tenantId, // This should match the working format
-        name: productData.title.trim(),
-        slug: `${productData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${newProductId.substring(0, 8)}`,
-        description: productData.description?.trim() || null,
+        name: productData.description?.trim() || productData.sku.trim(), // Use description as name, fallback to SKU
+        slug: `${productData.sku.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${newProductId.substring(0, 8)}`,
+        description: productData.description?.trim() || null, // Use description from CSV
         shortDescription: null,
         sku: productData.sku.trim() || null,
-        price: price.toString(), // Match working format - use toString(), not toFixed()
+        price: price.toFixed(2), // Use toFixed(2) for decimal compatibility
         comparePrice: null,
         costPrice: null,
         images: null,
@@ -437,29 +533,58 @@ async function processProductChunk(
         difficulty: null,
         floweringTime: null,
         yieldAmount: null,
+        // Core fields only (new fields will be added separately if needed)
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       // Insert product with error handling
       try {
         console.log(`🔄 Attempting to insert product: ${newProduct.name} (SKU: ${newProduct.sku})`);
-        await db.insert(products).values(newProduct);
-        console.log(`✅ Product inserted successfully: ${newProduct.name} (SKU: ${newProduct.sku})`);
+        
+        // First try to insert with new fields if they exist in schema
+        try {
+          const productWithNewFields = {
+            ...newProduct,
+            serialNumber: null,
+            listNumber: null,
+            bcNumber: null,
+            lotNumber: null,
+            expiryDate: null,
+            fixedNotifiedValueOrRetailPrice: '0.00',
+            saleType: 'Goods at standard rate',
+            uom: null,
+          };
+          
+          await db.insert(products).values(productWithNewFields);
+          console.log(`✅ Product inserted successfully with new fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
+        } catch (newFieldsError: any) {
+          // If new fields cause error (columns don't exist), try without them
+          if (newFieldsError.code === 'ER_BAD_FIELD_ERROR' || newFieldsError.errno === 1054) {
+            console.log(`⚠️ New fields not available, inserting without them: ${newProduct.name} (SKU: ${newProduct.sku})`);
+            await db.insert(products).values(newProduct);
+            console.log(`✅ Product inserted successfully without new fields: ${newProduct.name} (SKU: ${newProduct.sku})`);
+          } else {
+            throw newFieldsError;
+          }
+        }
       } catch (insertError: any) {
         console.error(`❌ Failed to insert product: ${newProduct.name} (SKU: ${newProduct.sku})`);
         console.error('Database error details:', {
           message: insertError.message,
           code: insertError.code,
           sqlState: insertError.sqlState,
-          sqlMessage: insertError.sqlMessage
+          sqlMessage: insertError.sqlMessage,
+          errno: insertError.errno
         });
-        console.error('Product data that failed:', JSON.stringify(newProduct, null, 2));
+        
         throw insertError;
       }
 
       result.successful++;
       result.successfulProducts!.push({
         id: newProductId,
-        name: productData.title.trim(),
+        name: productData.description?.trim() || productData.sku.trim(), // Use description as name, fallback to SKU
         sku: productData.sku.trim()
       });
 
@@ -489,6 +614,7 @@ export const bulkUserImport = inngest.createFunction(
   async ({ event, step }) => {
     const { jobId, blobUrl, tenantId, fileName, importType = 'users' } = event.data;
     
+    console.log('🎯 INNGEST FUNCTION TRIGGERED!');
     console.log(`🚀 Starting ${importType} import job:`, {
       jobId,
       tenantId,
@@ -499,12 +625,14 @@ export const bulkUserImport = inngest.createFunction(
 
     // Step 1: Update job status to processing
     await step.run('update-job-status-processing', async () => {
+      console.log(`📝 Updating job ${jobId} status to processing...`);
       await db.update(importJobs)
         .set({ 
           status: 'processing',
           startedAt: new Date()
         })
         .where(eq(importJobs.id, jobId));
+      console.log(`✅ Job ${jobId} status updated to processing`);
     });
 
     try {
@@ -525,8 +653,17 @@ export const bulkUserImport = inngest.createFunction(
           return { type: 'products', data };
         } else {
           console.log('🔍 Parsing as user CSV...');
+          
+          // Run test to debug CSV parsing
+          console.log('🧪 Running CSV parsing test first...');
+          testCSVParsing();
+          
+          console.log('🔍 Now parsing actual CSV...');
+          console.log('CSV Content (first 500 chars):', csvText.substring(0, 500));
+          
           const data = parseUserCSV(csvText);
           console.log(`✅ Parsed ${data.length} users from CSV`);
+          console.log('First user data sample:', data[0]);
           return { type: 'users', data };
         }
       });
@@ -560,10 +697,14 @@ export const bulkUserImport = inngest.createFunction(
 
         const chunkResult = await step.run(`process-chunk-${chunkIndex}`, async () => {
           console.log(`🔄 Processing chunk ${chunkIndex + 1}/${chunks.length} for ${importType} (${chunk.length} items)`);
+          console.log(`📊 Chunk data sample:`, chunk.slice(0, 2)); // Show first 2 items
+          
           if (importType === 'products') {
             return processProductChunk(chunk as ProductImportRow[], tenantId, startIndex);
           } else {
-            return processUserChunk(chunk as UserImportRow[], tenantId, startIndex);
+            const result = processUserChunk(chunk as UserImportRow[], tenantId, startIndex);
+            console.log(`🏁 Chunk ${chunkIndex + 1} processing completed`);
+            return result;
           }
         });
 
@@ -572,11 +713,20 @@ export const bulkUserImport = inngest.createFunction(
         totalResults.failed += chunkResult.failed;
         totalResults.errors.push(...chunkResult.errors);
         
+        console.log(`📈 Chunk ${chunkIndex + 1} results:`, {
+          successful: chunkResult.successful,
+          failed: chunkResult.failed,
+          errors: chunkResult.errors.length
+        });
+        
         if (importType === 'users' && chunkResult.successfulUsers) {
           totalResults.successfulUsers!.push(...chunkResult.successfulUsers);
+          console.log(`👥 Added ${chunkResult.successfulUsers.length} successful users to total`);
         } else if (importType === 'products' && chunkResult.successfulProducts) {
           totalResults.successfulProducts!.push(...chunkResult.successfulProducts);
         }
+        
+        console.log(`📊 Running totals: ${totalResults.successful} successful, ${totalResults.failed} failed`);
 
         // Update progress
         await step.run(`update-progress-${chunkIndex}`, async () => {
@@ -615,13 +765,29 @@ export const bulkUserImport = inngest.createFunction(
       };
 
     } catch (error: any) {
+      console.log('💥 INNGEST FUNCTION CAUGHT ERROR!');
+      console.error('Full error details:', error);
+      
       // Mark job as failed
       await step.run('mark-job-failed', async () => {
+        const errorMessage = error.message || 'Unknown error occurred';
+        console.error('❌ Import job failed:', {
+          jobId,
+          tenantId,
+          importType,
+          error: errorMessage,
+          stack: error.stack
+        });
+        
         await db.update(importJobs)
           .set({ 
             status: 'failed',
             completedAt: new Date(),
-            errors: [{ row: 0, email: 'N/A', message: error.message }]
+            errors: [{ 
+              row: 0, 
+              identifier: 'SYSTEM_ERROR', 
+              message: `Import failed: ${errorMessage}` 
+            }]
           })
           .where(eq(importJobs.id, jobId));
       });

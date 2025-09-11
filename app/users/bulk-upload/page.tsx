@@ -89,15 +89,15 @@ export default function BulkUserUpload() {
     let fileName = '';
     
     if (activeTab === 'users') {
-      csvContent = `Name,Email,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
-"John Doe","john.doe@example.com","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Registered"
-"Jane Smith","jane.smith@example.com","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
-"Ahmed Khan","ahmed.khan@example.com","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
+      csvContent = `Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
+"John Doe","john.doe@example.com","+92300-1234567","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Registered"
+"Jane Smith","jane.smith@example.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
+"Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
       fileName = 'bulk_user_import_template.csv';
     } else {
-      csvContent = `Name,Price,SKU,Description,Short Description,Compare Price,Cost Price,Category ID,Subcategory ID,Supplier ID,Tags,Weight,Is Featured,Is Active,Is Digital,Requires Shipping,Taxable,Meta Title,Meta Description,Tax Amount,Tax Percentage,HS Code,Product Type,Stock Management Type,Stock Quantity,Status,Location,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Fixed Notified Value/Retail Price,Sale Type,UOM
-"Premium Product 1","29.99","PROD-001","High quality premium product with detailed description","Premium quality product","39.99","20.00","cat-123","subcat-456","sup-789","electronics,premium,new","0.5","true","true","false","true","true","Premium Product - Best Quality","Premium product with amazing features","2.50","8.5","1234567890","simple","quantity","100","Initial Stock","Warehouse A","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","35.00","Goods at standard rate","Pcs"
-"Digital Service","19.99","DIG-001","Digital download service","Instant download","","15.00","cat-456","","","digital,service,download","","false","true","true","false","true","Digital Service - Instant Access","Download digital service instantly","","","","simple","quantity","0","","","","","","","","","",""`;
+      csvContent = `SKU,Unit Price,Description,Category ID,Subcategory ID,Supplier ID,Tags,Weight,Is Featured,Is Active,Is Digital,Requires Shipping,Taxable,GST Amount,GST Percentage,HS Code,Product Type,Stock Management Type,Stock Quantity,Status,Location,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Fixed Notified Value/Retail Price,Sale Type,UOM
+"PROD-001","29.99","Premium quality product","cat-123","subcat-456","sup-789","electronics,premium,new","0.5","true","true","false","true","true","2.50","8.5","1234567890","simple","quantity","100","Initial Stock","Warehouse A","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","35.00","Goods at standard rate","Pcs"
+"DIG-001","19.99","Instant download service","cat-456","","","digital,service,download","","false","true","true","false","true","","","","simple","quantity","0","","","","","","","","","",""`;
       fileName = 'bulk_product_import_template.csv';
     }
     
@@ -270,7 +270,7 @@ export default function BulkUserUpload() {
                     <li><strong>Required fields:</strong> Name, Email</li>
                     <li><strong>Optional fields:</strong> Buyer NTN/CNIC, Business Name, Province, Address, Registration Type</li>
                     <li>Supports up to 100MB files (~200,000 users)</li>
-                    <li>Duplicate emails within your tenant will be skipped</li>
+                    <li>Duplicate emails will update existing users with new information</li>
                     <li>Processing happens in background with real-time progress</li>
                   </ul>
                 </AlertDescription>

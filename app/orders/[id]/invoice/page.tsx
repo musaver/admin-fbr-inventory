@@ -1134,6 +1134,32 @@ export default function OrderInvoice() {
                             {/* Product Name */}
                             <TableCell className="py-4">
                               <div>
+                                {/* Product Identification Fields - Show before product name if they have data */}
+                                {item.serialNumber && (
+                                  <div className="text-xs text-blue-600 mb-1">
+                                    🔢 Serial: {item.serialNumber}
+                                  </div>
+                                )}
+                                {item.listNumber && (
+                                  <div className="text-xs text-green-600 mb-1">
+                                    📋 List: {item.listNumber}
+                                  </div>
+                                )}
+                                {item.bcNumber && (
+                                  <div className="text-xs text-purple-600 mb-1">
+                                    🏢 BC: {item.bcNumber}
+                                  </div>
+                                )}
+                                {item.lotNumber && (
+                                  <div className="text-xs text-orange-600 mb-1">
+                                    📦 Lot: {item.lotNumber}
+                                  </div>
+                                )}
+                                {item.expiryDate && (
+                                  <div className="text-xs text-red-600 mb-1">
+                                    📅 Exp: {item.expiryDate}
+                                  </div>
+                                )}
                                 <div className="font-medium">{item.productName}</div>
                                 {item.variantTitle && (
                                   <div className="text-xs text-gray-500">{item.variantTitle}</div>

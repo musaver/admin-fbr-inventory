@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 interface SimpleProductRow {
   name: string;
-  price: string;
+  unitPrice: string; // Changed from 'price' to 'unitPrice'
   description?: string;
   sku?: string;
 }
@@ -47,15 +47,15 @@ async function processProducts(
     
     try {
       // Basic validation
-      if (!product.name || !product.price) {
-        errors.push(`Row ${i + 2}: Missing required fields (name, price)`);
+      if (!product.name || !product.unitPrice) {
+        errors.push(`Row ${i + 2}: Missing required fields (name, unit price)`);
         failed++;
         continue;
       }
 
-      const price = parseFloat(product.price);
+      const price = parseFloat(product.unitPrice);
       if (isNaN(price) || price < 0) {
-        errors.push(`Row ${i + 2}: Invalid price: ${product.price}`);
+        errors.push(`Row ${i + 2}: Invalid unit price: ${product.unitPrice}`);
         failed++;
         continue;
       }
@@ -64,14 +64,14 @@ async function processProducts(
       const productRecord = {
         id: uuidv4(),
         tenantId: tenantId, // Correct camelCase field name
-        name: product.name,
+        name: product.description || product.name, // Use description as name, fallback to original name
         price: price.toString(),
         slug: `${product.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${Date.now()}`, // Make slug unique
         description: product.description || null,
         shortDescription: null,
         sku: product.sku || null,
-        comparePrice: null,
-        costPrice: null,
+        comparePrice: null, // Removed field but keeping null for schema compatibility
+        costPrice: null, // Removed field but keeping null for schema compatibility
         images: null,
         banner: null,
         categoryId: null,
@@ -93,8 +93,8 @@ async function processProducts(
         furtherTax: '0.00',
         fedPayableTax: '0.00',
         discount: '0.00',
-        metaTitle: null,
-        metaDescription: null,
+        metaTitle: null, // Removed field but keeping null for schema compatibility
+        metaDescription: null, // Removed field but keeping null for schema compatibility
         hsCode: null,
         productType: 'simple',
         variationAttributes: null,

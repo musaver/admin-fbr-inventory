@@ -18,15 +18,16 @@ This feature allows tenants to import large numbers of products with stock infor
 
 ### Components
 
-1. **Frontend UI** (`/products/bulk-upload`)
-   - File upload interface
+1. **Frontend UI** (`/users/bulk-upload?tab=products`)
+   - Unified upload interface for both users and products
+   - Tab-based navigation between import types
    - Progress tracking with real-time updates
    - Error display with row-level details
    - Template download functionality
 
 2. **API Routes**
-   - `/api/products/bulk-upload` - Handles file upload and job creation
-   - `/api/products/import-status/[jobId]` - Returns job progress
+   - `/api/users/bulk-upload` - Handles file upload and job creation for both users and products
+   - `/api/users/import-status/[jobId]` - Returns job progress for both import types
    - `/api/inngest` - Inngest webhook endpoint
 
 3. **Background Processing**
@@ -44,8 +45,8 @@ This feature allows tenants to import large numbers of products with stock infor
 ## CSV Format
 
 ### Required Columns
-- `Name` - Product name
-- `Price` - Selling price (decimal format)
+- `SKU` - Product code/identifier (will be used as product name)
+- `Unit Price` - Selling price (decimal format)
 
 ### Stock Columns
 - `Stock Quantity` - Initial stock amount (integer)
@@ -53,16 +54,12 @@ This feature allows tenants to import large numbers of products with stock infor
 - `Location` - Warehouse or storage location (optional)
 
 ### Basic Information Columns
-- `SKU` - Product code/identifier
-- `Description` - Full product description
-- `Short Description` - Brief product summary
+- `Description` - Product description (replaces Short Description)
 - `Weight` - Product weight (decimal)
 
 ### Pricing & Tax Columns
-- `Compare Price` - Original/MSRP price (decimal)
-- `Cost Price` - Purchase/wholesale price (decimal)
-- `Tax Amount` - Fixed tax amount (decimal)
-- `Tax Percentage` - Tax percentage (decimal)
+- `GST Amount` - Fixed GST amount (decimal) - renamed from Tax Amount
+- `GST Percentage` - GST percentage (decimal) - renamed from Tax Percentage
 - `Price Including Tax` - Price with tax included (decimal)
 - `Price Excluding Tax` - Price without tax (decimal)
 - `Extra Tax` - Additional tax amount (decimal)
@@ -82,10 +79,6 @@ This feature allows tenants to import large numbers of products with stock infor
 - `Is Digital` - true/false for digital products
 - `Requires Shipping` - true/false for shipping requirement (default: true)
 - `Taxable` - true/false for tax applicability (default: true)
-
-### SEO Columns
-- `Meta Title` - SEO title
-- `Meta Description` - SEO description
 
 ### Advanced Columns
 - `HS Code` - Harmonized System Code for customs
@@ -129,16 +122,16 @@ Based on the exact predefined reasons in the add stock movement form:
 
 ### Example CSV
 ```csv
-Name,Price,SKU,Description,Short Description,Compare Price,Cost Price,Category ID,Subcategory ID,Supplier ID,Tags,Weight,Is Featured,Is Active,Is Digital,Requires Shipping,Taxable,Meta Title,Meta Description,Tax Amount,Tax Percentage,HS Code,Product Type,Stock Management Type,Stock Quantity,Status,Location,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Fixed Notified Value/Retail Price,Sale Type,UOM
-"Premium Product 1","29.99","PROD-001","High quality premium product with detailed description","Premium quality product","39.99","20.00","cat-123","subcat-456","sup-789","electronics,premium,new","0.5","true","true","false","true","true","Premium Product - Best Quality","Premium product with amazing features","2.50","8.5","1234567890","simple","quantity","100","Initial Stock","Warehouse A","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","35.00","Goods at standard rate","Pcs"
-"Digital Service","19.99","DIG-001","Digital download service","Instant download","","15.00","cat-456","","","digital,service,download","","false","true","true","false","true","Digital Service - Instant Access","Download digital service instantly","","","","simple","quantity","0","","","","","","","","","",""
+SKU,Unit Price,Description,Category ID,Subcategory ID,Supplier ID,Tags,Weight,Is Featured,Is Active,Is Digital,Requires Shipping,Taxable,GST Amount,GST Percentage,HS Code,Product Type,Stock Management Type,Stock Quantity,Status,Location,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Fixed Notified Value/Retail Price,Sale Type,UOM
+"PROD-001","29.99","High quality premium product with detailed description","cat-123","subcat-456","sup-789","electronics,premium,new","0.5","true","true","false","true","true","2.50","8.5","1234567890","simple","quantity","100","Initial Stock","Warehouse A","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","35.00","Goods at standard rate","Pcs"
+"DIG-001","19.99","Digital download service","cat-456","","","digital,service,download","","false","true","true","false","true","","","","simple","quantity","0","","","","","","","","","",""
 ```
 
 ### Simplified Example (Required Fields Only)
 ```csv
-Name,Price,Stock Quantity,Status
-"Basic Product","15.99","50","Initial Stock"
-"Another Product","25.00","25","Purchase Order"
+SKU,Unit Price,Stock Quantity,Status
+"BASIC-001","15.99","50","Initial Stock"
+"ANOTHER-002","25.00","25","Purchase Order"
 ```
 
 ## Usage
@@ -146,7 +139,7 @@ Name,Price,Stock Quantity,Status
 ### 1. Access Bulk Import
 - Navigate to Products page
 - Click "Bulk Import" button
-- Or go directly to `/products/bulk-upload`
+- Or go directly to `/users/bulk-upload?tab=products`
 
 ### 2. Download Template
 - Click "Download CSV Template" to get the correct format
@@ -220,7 +213,7 @@ DB_NAME=your-db-name
 
 ## API Reference
 
-### POST /api/products/bulk-upload
+### POST /api/users/bulk-upload
 Upload CSV file and start import job.
 
 **Headers:**

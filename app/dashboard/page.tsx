@@ -241,7 +241,7 @@ export default function Dashboard() {
           <Icon className={`h-5 w-5 ${variant.icon}`} />
         </CardHeader>
         <CardContent>
-          <div className={`text-3xl font-bold ${variant.text}`}>
+          <div className={`text-lg font-bold ${variant.text}`}>
             {cardLoading ? <Skeleton className="h-9 w-24" /> : value}
           </div>
           <p className="text-xs text-muted-foreground mt-1">

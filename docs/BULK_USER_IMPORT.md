@@ -45,6 +45,7 @@ This feature allows tenants to import large numbers of users via CSV files using
 - `Email` - User's email address (must be unique within tenant)
 
 ### Optional Columns
+- `Phone` - User's phone number
 - `Buyer NTN Or CNIC` - Tax identification number
 - `Buyer Business Name` - Business name
 - `Buyer Province` - Province/state
@@ -53,9 +54,9 @@ This feature allows tenants to import large numbers of users via CSV files using
 
 ### Example CSV
 ```csv
-Name,Email,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
-"John Doe","john.doe@example.com","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Individual"
-"Jane Smith","jane.smith@example.com","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Company"
+Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
+"John Doe","john.doe@example.com","+92300-1234567","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Individual"
+"Jane Smith","jane.smith@example.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Company"
 ```
 
 ## Usage
