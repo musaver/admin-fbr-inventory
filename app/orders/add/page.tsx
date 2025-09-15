@@ -2296,21 +2296,44 @@ export default function AddOrder() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="buyer-province">Buyer Province</Label>
-                                    <Select value={orderData.buyerProvince} onValueChange={(value) => setOrderData({...orderData, buyerProvince: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Province" />
-                  </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Punjab">Punjab</SelectItem>
-                        <SelectItem value="Sindh">Sindh</SelectItem>
-                        <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
-                        <SelectItem value="Balochistan">Balochistan</SelectItem>
-                        <SelectItem value="Islamabad">Islamabad</SelectItem>
-                        <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
-                        <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
-                        <SelectItem value="N/A">N/A</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select 
+                        value={
+                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
+                            ? orderData.buyerProvince 
+                            : orderData.buyerProvince ? "custom" : ""
+                        } 
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            setOrderData({...orderData, buyerProvince: ""});
+                          } else {
+                            setOrderData({...orderData, buyerProvince: value});
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Punjab">Punjab</SelectItem>
+                          <SelectItem value="Sindh">Sindh</SelectItem>
+                          <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
+                          <SelectItem value="Balochistan">Balochistan</SelectItem>
+                          <SelectItem value="Islamabad">Islamabad</SelectItem>
+                          <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
+                          <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
+                          <SelectItem value="custom">Other (Type below)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {!["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A", ""].includes(orderData.buyerProvince || "") && (
+                        <Input
+                          placeholder="Enter custom province"
+                          value={orderData.buyerProvince || ""}
+                          onChange={(e) => setOrderData({...orderData, buyerProvince: e.target.value})}
+                        />
+                      )}
+                    </div>
                 </div>
                   <div className="space-y-2">
                     <Label htmlFor="buyer-address">Buyer Address</Label>
