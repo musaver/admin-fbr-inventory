@@ -197,6 +197,7 @@ export default function EditUser() {
               <SelectItem value="Islamabad">Islamabad</SelectItem>
               <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
               <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
+              <SelectItem value="N/A">N/A</SelectItem>
             </SelectContent>
           </Select>
         </div>
