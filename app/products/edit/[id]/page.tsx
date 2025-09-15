@@ -170,6 +170,7 @@ export default function EditProduct() {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [customUom, setCustomUom] = useState('');
 
   useEffect(() => {
     fetchProductAndInitialData();
@@ -260,8 +261,12 @@ export default function EditProduct() {
         // Additional tax fields
         fixedNotifiedValueOrRetailPrice: product.fixedNotifiedValueOrRetailPrice || '',
         saleType: product.saleType || 'Goods at standard rate',
-        // Unit of measurement
-        uom: product.uom || '',
+        // Unit of measurement - check if it's a predefined option or custom
+        uom: (() => {
+          const predefinedUoms = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+          const productUom = product.uom || '';
+          return predefinedUoms.includes(productUom) ? productUom : 'custom';
+        })(),
         // Tax and discount fields
         taxAmount: product.taxAmount || '',
         taxPercentage: product.taxPercentage || '',
@@ -272,6 +277,13 @@ export default function EditProduct() {
         fedPayableTax: product.fedPayableTax || '',
         discount: product.discount || ''
       });
+      
+      // Set custom UOM if the product has a UOM that's not in predefined options
+      const predefinedUoms = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+      const productUom = product.uom || '';
+      if (productUom && !predefinedUoms.includes(productUom)) {
+        setCustomUom(productUom);
+      }
       
       setImages(Array.isArray(productImages) ? productImages : []);
       setCategories(categoriesData);
@@ -397,6 +409,18 @@ export default function EditProduct() {
         ...formData,
         [name]: value,
         slug: generateSlug(value)
+      });
+      return;
+    }
+    
+    // Handle UOM field changes
+    if (name === 'uom') {
+      if (value !== 'custom') {
+        setCustomUom(''); // Clear custom UOM when selecting predefined option
+      }
+      setFormData({
+        ...formData,
+        [name]: value
       });
       return;
     }
@@ -1525,8 +1549,12 @@ export default function EditProduct() {
                       <input
                         type="text"
                         placeholder="Enter custom UOM"
+                        value={customUom}
                         className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                        onChange={(e) => setFormData(prev => ({ ...prev, uom: e.target.value }))}
+                        onChange={(e) => {
+                          setCustomUom(e.target.value);
+                          setFormData(prev => ({ ...prev, uom: e.target.value }));
+                        }}
                       />
                     </div>
                   )}

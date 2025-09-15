@@ -426,7 +426,9 @@ export default function AddOrder() {
           listNumber: product.listNumber || '',
           bcNumber: product.bcNumber || '',
           lotNumber: product.lotNumber || '',
-          expiryDate: product.expiryDate || ''
+          expiryDate: product.expiryDate || '',
+          // Populate UOM from product
+          uom: product.uom || ''
         }));
       }
     } else {
@@ -3059,7 +3061,9 @@ export default function AddOrder() {
                               ? productSelection.uom
                               : isCustomUom 
                                 ? "Others"
-                                : "Select UOM..."}
+                                : productSelection.uom
+                                  ? "Others"
+                                  : "Select UOM..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -3092,7 +3096,7 @@ export default function AddOrder() {
                                   }}
                                 >
                                   <Check
-                                    className={`mr-2 h-4 w-4 ${isCustomUom ? "opacity-100" : "opacity-0"}`}
+                                    className={`mr-2 h-4 w-4 ${isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom)) ? "opacity-100" : "opacity-0"}`}
                                   />
                                   Others (Custom)
                                 </CommandItem>
@@ -3101,11 +3105,11 @@ export default function AddOrder() {
                           </Command>
                         </PopoverContent>
                       </Popover>
-                      {(productSelection.uom === "" || isCustomUom) && (
+                      {(productSelection.uom === "" || isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom))) && (
                         <Input
                           className="flex-1"
                           type="text"
-                          value={isCustomUom ? productSelection.uom : ""}
+                          value={isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom)) ? productSelection.uom : ""}
                           onChange={(e) => setProductSelection({...productSelection, uom: e.target.value})}
                           placeholder="Enter custom UOM"
                         />
