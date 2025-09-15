@@ -279,6 +279,9 @@ export default function AddOrder() {
     buyerRegistrationType: ''
   });
 
+  // State for custom province input
+  const [isCustomProvince, setIsCustomProvince] = useState(false);
+
   // Customer/shipping information
   const [customerInfo, setCustomerInfo] = useState({
     isGuest: true,
@@ -722,6 +725,12 @@ export default function AddOrder() {
             buyerAddress: customer.buyerAddress || '',
             buyerRegistrationType: customer.buyerRegistrationType || ''
           }));
+          
+          // Set custom province flag if the loaded province is not in predefined list
+          const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+          if (customer.buyerProvince && !predefinedProvinces.includes(customer.buyerProvince)) {
+            setIsCustomProvince(true);
+          }
         setCustomerInfo(prev => ({
           ...prev,
           isGuest: false,
@@ -2299,14 +2308,17 @@ export default function AddOrder() {
                     <div className="space-y-2">
                       <Select 
                         value={
+                          isCustomProvince ? "custom" :
                           ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
                             ? orderData.buyerProvince 
-                            : orderData.buyerProvince ? "custom" : ""
+                            : ""
                         } 
                         onValueChange={(value) => {
                           if (value === "custom") {
+                            setIsCustomProvince(true);
                             setOrderData({...orderData, buyerProvince: ""});
                           } else {
+                            setIsCustomProvince(false);
                             setOrderData({...orderData, buyerProvince: value});
                           }
                         }}
@@ -2326,7 +2338,7 @@ export default function AddOrder() {
                           <SelectItem value="custom">Other (Type below)</SelectItem>
                         </SelectContent>
                       </Select>
-                      {!["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A", ""].includes(orderData.buyerProvince || "") && (
+                      {isCustomProvince && (
                         <Input
                           placeholder="Enter custom province"
                           value={orderData.buyerProvince || ""}
