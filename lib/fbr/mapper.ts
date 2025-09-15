@@ -105,9 +105,45 @@ function getSellerInfo(): SellerInfo {
  */
 function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
   // Base amount should be the price excluding tax (not totalPrice which includes tax)
-  const baseAmount = item.priceExcludingTax 
-    ? (item.priceExcludingTax * item.quantity)
-    : (item.price * item.quantity);
+  // Try priceExcludingTax first, then calculate from priceIncludingTax, then fall back to price
+  let baseAmount;
+  if (item.priceExcludingTax && item.priceExcludingTax > 0) {
+    baseAmount = item.priceExcludingTax * item.quantity;
+  } else if (item.priceIncludingTax && item.priceIncludingTax > 0) {
+    // Calculate excluding tax from including tax if we have tax percentage
+    const priceIncludingTax = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax) : item.priceIncludingTax;
+    
+    if (item.taxPercentage && item.taxPercentage > 0) {
+      const taxPercentage = typeof item.taxPercentage === 'string' ? parseFloat(item.taxPercentage) : item.taxPercentage;
+      const priceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
+      baseAmount = priceExcludingTax * item.quantity;
+    } else {
+      // If we only have priceIncludingTax but no tax percentage, we need to determine if there's tax
+      // For scenarios that are exempt or zero-rated, use priceIncludingTax directly
+      // For scenarios with tax, we need to calculate backwards using default rate
+      if (isExemptOrZeroRated(scenarioId)) {
+        baseAmount = priceIncludingTax * item.quantity;
+      } else {
+        // Use the default tax rate for this scenario to calculate backwards
+        const defaultRate = parseRate(getDefaultRateForScenario(scenarioId));
+        if (defaultRate > 0) {
+          const priceExcludingTax = priceIncludingTax / (1 + defaultRate);
+          baseAmount = priceExcludingTax * item.quantity;
+        } else {
+          // If default rate is 0, then including tax = excluding tax
+          baseAmount = priceIncludingTax * item.quantity;
+        }
+      }
+    }
+  } else {
+    baseAmount = item.price * item.quantity;
+  }
+
+  // Validate baseAmount is not NaN or undefined
+  if (isNaN(baseAmount) || baseAmount === undefined || baseAmount === null) {
+    console.error(`❌ Invalid baseAmount in calculateItemTax for item ${item.productName}:`, baseAmount);
+    baseAmount = 0;
+  }
   
   // Prioritize user-provided tax amounts, then calculate if not provided
   let salesTaxApplicable = 0;
@@ -162,10 +198,59 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
  * @returns FBR item
  */
 async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, saleType: string, invoiceDate?: string): Promise<FbrItem> {
+  
   // Base amount should be the price excluding tax (not totalPrice which includes tax)
-  const baseAmount = item.priceExcludingTax 
-    ? (item.priceExcludingTax * item.quantity)
-    : (item.price * item.quantity);
+  // Try priceExcludingTax first, then calculate from priceIncludingTax, then fall back to price
+  let baseAmount;
+  if (item.priceExcludingTax && item.priceExcludingTax > 0) {
+    baseAmount = item.priceExcludingTax * item.quantity;
+  } else if (item.priceIncludingTax && item.priceIncludingTax > 0) {
+    // Calculate excluding tax from including tax if we have tax percentage
+    const priceIncludingTax = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax) : item.priceIncludingTax;
+    
+    if (item.taxPercentage && item.taxPercentage > 0) {
+      const taxPercentage = typeof item.taxPercentage === 'string' ? parseFloat(item.taxPercentage) : item.taxPercentage;
+      const priceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
+      baseAmount = priceExcludingTax * item.quantity;
+    } else {
+      // If we only have priceIncludingTax but no tax percentage, we need to determine if there's tax
+      // For scenarios that are exempt or zero-rated, use priceIncludingTax directly
+      // For scenarios with tax, we need to calculate backwards using default rate
+      if (isExemptOrZeroRated(scenarioId)) {
+        baseAmount = priceIncludingTax * item.quantity;
+      } else {
+        // Use the default tax rate for this scenario to calculate backwards
+        const defaultRate = parseRate(getDefaultRateForScenario(scenarioId));
+        if (defaultRate > 0) {
+          const priceExcludingTax = priceIncludingTax / (1 + defaultRate);
+          baseAmount = priceExcludingTax * item.quantity;
+        } else {
+          // If default rate is 0, then including tax = excluding tax
+          baseAmount = priceIncludingTax * item.quantity;
+        }
+      }
+    }
+  } else {
+    baseAmount = item.price * item.quantity;
+  }
+
+  // Validate baseAmount is not NaN or undefined
+  if (isNaN(baseAmount) || baseAmount === undefined || baseAmount === null) {
+    console.error(`❌ Invalid baseAmount for item ${item.productName}:`, baseAmount);
+    baseAmount = 0;
+  }
+
+  // 🔍 DEBUG: Log baseAmount calculation
+  console.log(`🔍 FBR Item ${item.productName} baseAmount calculation:`, {
+    baseAmount,
+    hasExcludingTax: !!(item.priceExcludingTax && item.priceExcludingTax > 0),
+    hasIncludingTax: !!(item.priceIncludingTax && item.priceIncludingTax > 0),
+    hasTaxPercentage: !!(item.taxPercentage && item.taxPercentage > 0),
+    scenarioId,
+    isExemptOrZeroRated: isExemptOrZeroRated(scenarioId),
+    defaultRate: getDefaultRateForScenario(scenarioId)
+  });
+
   const taxCalc = calculateItemTax(item, scenarioId);
   
   // Get rate label - prioritize user input, then FBR API, then scenario defaults
@@ -192,17 +277,17 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
     productDescription: item.productDescription || item.productName,
     rate: rateLabel,
     uoM: item.uom || (scenarioId === 'SN018' ? 'Numbers, pieces, units' : 'PCS'), // Unit of Measurement
-    quantity: item.quantity,
-    valueSalesExcludingST: baseAmount,
+    quantity: parseFloat(item.quantity.toString()) || 0,
+    valueSalesExcludingST: parseFloat(baseAmount.toString()) || 0,
     totalValues: 0, // Will be calculated after all taxes are set
-    salesTaxApplicable: taxCalc.salesTaxApplicable,
+    salesTaxApplicable: parseFloat(taxCalc.salesTaxApplicable.toString()) || 0,
     saleType,
     // Always include these numeric fields (FBR expects them)
     fixedNotifiedValueOrRetailPrice: 0,
     salesTaxWithheldAtSource: 0,
     furtherTax: 0,
     fedPayable: 0,
-    extraTax: "", // Empty string as per working example
+    extraTax: 0, // Default to 0, will be overridden if provided
     discount: 0,
   };
   
@@ -210,34 +295,34 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   
   // Withholding tax (SN002 etc.)
   if (taxCalc.salesTaxWithheldAtSource > 0) {
-    fbrItem.salesTaxWithheldAtSource = taxCalc.salesTaxWithheldAtSource;
+    fbrItem.salesTaxWithheldAtSource = parseFloat(taxCalc.salesTaxWithheldAtSource.toString()) || 0;
   }
   
   // Extra tax - use provided value or keep empty string
   if (item.extraTax !== undefined && item.extraTax !== null) {
-    fbrItem.extraTax = item.extraTax;
+    fbrItem.extraTax = parseFloat(item.extraTax.toString()) || 0;
   }
   
   // Further tax
   if (item.furtherTax && item.furtherTax > 0) {
-    fbrItem.furtherTax = item.furtherTax;
+    fbrItem.furtherTax = parseFloat(item.furtherTax.toString()) || 0;
   }
   
   // FED payable (FED-in-ST scenarios)
   if (taxCalc.fedPayable > 0) {
-    fbrItem.fedPayable = taxCalc.fedPayable;
+    fbrItem.fedPayable = parseFloat(taxCalc.fedPayable.toString()) || 0;
   }
   
   // Discount
   if (item.discount && item.discount > 0) {
-    fbrItem.discount = item.discount;
+    fbrItem.discount = parseFloat(item.discount.toString()) || 0;
   }
   
   // 3rd Schedule (SN008) - override the default 0
   if (supportsThirdSchedule(scenarioId)) {
     // For 3rd Schedule scenarios, fixedNotifiedValueOrRetailPrice is mandatory
     // Use the provided value or fallback to price if not specified
-    fbrItem.fixedNotifiedValueOrRetailPrice = item.fixedNotifiedValueOrRetailPrice || item.price;
+    fbrItem.fixedNotifiedValueOrRetailPrice = parseFloat((item.fixedNotifiedValueOrRetailPrice || item.price).toString()) || 0;
   }
   
   // SRO Schedule Number (use empty string as per working example)
@@ -246,13 +331,65 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   // SRO Item Serial Number (use empty string as per working example)
   fbrItem.sroItemSerialNo = item.itemSerialNumber || "";
   
+  // Add display fields for preview purposes (not sent to FBR API)
+  if (item.priceIncludingTax !== undefined && item.priceIncludingTax !== null) {
+    fbrItem.priceIncludingTax = item.priceIncludingTax;
+  }
+  if (item.priceExcludingTax !== undefined && item.priceExcludingTax !== null) {
+    fbrItem.priceExcludingTax = item.priceExcludingTax;
+  }
+  if (item.taxPercentage !== undefined && item.taxPercentage !== null) {
+    fbrItem.taxPercentage = item.taxPercentage;
+  }
+  
   // Calculate totalValues after all taxes are set
-  fbrItem.totalValues = fbrItem.valueSalesExcludingST + 
-                        fbrItem.salesTaxApplicable + 
-                        (fbrItem.fedPayable || 0) + 
-                        (fbrItem.furtherTax || 0) + 
-                        (fbrItem.extraTax || 0) - 
-                        (fbrItem.discount || 0);
+  // Ensure all values are converted to numbers to avoid string concatenation
+  const valueSalesExcludingST = parseFloat(fbrItem.valueSalesExcludingST?.toString() || '0') || 0;
+  const salesTaxApplicable = parseFloat(fbrItem.salesTaxApplicable?.toString() || '0') || 0;
+  const fedPayable = parseFloat((fbrItem.fedPayable || 0)?.toString() || '0') || 0;
+  const furtherTax = parseFloat((fbrItem.furtherTax || 0)?.toString() || '0') || 0;
+  const extraTax = parseFloat((fbrItem.extraTax || 0)?.toString() || '0') || 0;
+  const discount = parseFloat((fbrItem.discount || 0)?.toString() || '0') || 0;
+
+  fbrItem.totalValues = valueSalesExcludingST + 
+                        salesTaxApplicable + 
+                        fedPayable + 
+                        furtherTax + 
+                        extraTax - 
+                        discount;
+
+  // 🔍 DEBUG: Log the totalValues calculation
+  console.log(`🔍 FBR Item ${item.productName} totalValues calculation:`, {
+    // Show original values
+    originalValues: {
+      valueSalesExcludingST: fbrItem.valueSalesExcludingST,
+      salesTaxApplicable: fbrItem.salesTaxApplicable,
+      fedPayable: fbrItem.fedPayable || 0,
+      furtherTax: fbrItem.furtherTax || 0,
+      extraTax: fbrItem.extraTax || 0,
+      discount: fbrItem.discount || 0,
+    },
+    // Show converted numeric values used in calculation
+    numericValues: {
+      valueSalesExcludingST,
+      salesTaxApplicable,
+      fedPayable,
+      furtherTax,
+      extraTax,
+      discount,
+    },
+    // Show the calculation breakdown
+    calculation: `${valueSalesExcludingST} + ${salesTaxApplicable} + ${fedPayable} + ${furtherTax} + ${extraTax} - ${discount} = ${fbrItem.totalValues}`,
+    calculatedTotalValues: fbrItem.totalValues,
+    originalItem: {
+      priceIncludingTax: item.priceIncludingTax,
+      priceExcludingTax: item.priceExcludingTax,
+      taxPercentage: item.taxPercentage,
+      taxAmount: item.taxAmount,
+      price: item.price,
+      quantity: item.quantity
+    }
+  });
 
   // Remove empty string fields that should be omitted
   const sanitizedItem = sanitizeFbrItemPrecision(fbrItem);
@@ -377,7 +514,13 @@ export async function mapOrderToFbrInvoice(
   }
   
   const scenarioId = order.scenarioId as ScenarioId;
-  const invoiceDate = order.invoiceDate || new Date().toISOString().split('T')[0];
+  
+  // Invoice date is required for FBR submission
+  if (!order.invoiceDate) {
+    throw new Error('Invoice date is required for FBR integration. Please set the invoice date in the Invoice & Validation section.');
+  }
+  
+  const invoiceDate = order.invoiceDate;
   
   // Get sale type (with optional FBR verification)
   const saleType = await getSaleTypeForScenarioWithFallback(scenarioId, invoiceDate);
@@ -441,6 +584,10 @@ export function validateOrderForFbr(order: Order): { isValid: boolean; errors: s
   
   if (!order.email) {
     errors.push('Order must have buyer email');
+  }
+  
+  if (!order.invoiceDate) {
+    errors.push('Invoice date is required for FBR integration. Please set the invoice date in the Invoice & Validation section.');
   }
   
   // Validate items

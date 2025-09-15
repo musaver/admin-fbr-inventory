@@ -15,6 +15,10 @@ import type { Order, FbrApiResponse } from '@/lib/fbr/types';
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if this is a preview request
+    const { searchParams } = new URL(req.url);
+    const isPreview = searchParams.get('preview') === 'true';
+    
     // Get tenant context for FBR settings
     const { getTenantContext } = await import('@/lib/api-helpers');
     const tenantContext = await getTenantContext(req);
@@ -77,6 +81,20 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // If this is a preview request, return the FBR invoice without submitting
+    if (isPreview) {
+      // Import sanitize function for preview
+      const { sanitize } = await import('@/lib/fbr/client');
+      const sanitizedPreview = sanitize(fbrInvoice, true); // true for preview mode
+      
+      return NextResponse.json({
+        step: 'preview',
+        ok: true,
+        fbrInvoice: sanitizedPreview,
+        message: 'FBR invoice preview generated successfully'
+      });
+    }
+    
     console.log('🔍 Starting FBR validation for invoice:', {
       invoiceType: fbrInvoice.invoiceType,
       scenarioId: fbrInvoice.scenarioId,
@@ -119,7 +137,30 @@ export async function POST(req: NextRequest) {
       success: postResp.success,
       invoiceNumber: postResp.invoiceNumber,
       message: postResp.message,
+      isProductionMode: isProductionMode || false,
     });
+    
+    // Check if the post was successful using the updated response structure
+    if (!postResp.success) {
+      console.error('❌ FBR post failed after successful validation:', {
+        success: postResp.success,
+        message: postResp.message,
+        invoiceNumber: postResp.invoiceNumber,
+        validationStatus: postResp.validationResponse?.status,
+        statusCode: postResp.validationResponse?.statusCode,
+        error: postResp.validationResponse?.error,
+        isProductionMode: isProductionMode || false,
+      });
+      
+      return NextResponse.json({
+        step: 'post',
+        ok: false,
+        error: `FBR post failed: ${postResp.message || postResp.validationResponse?.error || 'Unknown error'}`,
+        response: postResp,
+        validation: validateResp, // Include validation response for reference
+        fbrInvoice, // Include the final FBR payload for debugging
+      } as FbrApiResponse & { validation: any; fbrInvoice: any }, { status: 400 });
+    }
     
     // Return both responses for complete audit trail
     return NextResponse.json({

@@ -18,6 +18,7 @@ interface UserImportRow {
 interface ProductImportRow {
   sku: string;
   unitPrice: string;
+  priceIncludingTax?: string;
   description?: string;
   gstAmount?: string;
   gstPercentage?: string;
@@ -173,12 +174,13 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
   // Parse header
   const header = lines[0].split(',').map(h => h.replace(/['"]/g, '').trim());
   console.log('📋 Product CSV Headers found:', header);
-  console.log('📋 Expected template headers: SKU,Unit Price,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM');
+  console.log('📋 Expected template headers: SKU,Unit Price,Price Including Tax,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM');
   
   // Expected columns (case-insensitive)
   const columnMap = {
     'sku': ['sku', 'product sku', 'product_sku'],
     'unitPrice': ['unit price', 'price', 'product price'],
+    'priceIncludingTax': ['price including tax', 'price_including_tax', 'inclusive price', 'price incl tax'],
     'description': ['description', 'product description', 'short description'],
     'gstAmount': ['gst amount', 'gst_amount', 'tax amount'],
     'gstPercentage': ['gst percentage', 'gst_percentage', 'tax percentage'],
@@ -252,6 +254,7 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
     const productData: ProductImportRow = {
       sku: values[headerMap.sku] || '',
       unitPrice: values[headerMap.unitPrice] || '',
+      priceIncludingTax: values[headerMap.priceIncludingTax] || '',
       description: values[headerMap.description] || '',
       gstAmount: values[headerMap.gstAmount] || '',
       gstPercentage: values[headerMap.gstPercentage] || '',
@@ -272,6 +275,7 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
       console.log(`🔍 Product Row ${i} header mapping:`, {
         sku: headerMap.sku,
         unitPrice: headerMap.unitPrice,
+        priceIncludingTax: headerMap.priceIncludingTax,
         description: headerMap.description,
         gstAmount: headerMap.gstAmount,
         gstPercentage: headerMap.gstPercentage,
@@ -567,6 +571,10 @@ async function processProductChunk(
       const newProductId = uuidv4();
       const price = parseFloat(productData.unitPrice);
       
+      // Parse price fields for the new mapping requirements
+      const priceExcludingTax = parseFloat(productData.unitPrice); // Unit Price -> price_excluding_tax
+      const priceIncludingTax = productData.priceIncludingTax && productData.priceIncludingTax.trim() !== '' ? parseFloat(productData.priceIncludingTax) : null; // Price Including Tax -> price_including_tax
+      
       // Parse GST fields
       const gstAmount = productData.gstAmount && productData.gstAmount.trim() !== '' ? parseFloat(productData.gstAmount) : null;
       const gstPercentage = productData.gstPercentage && productData.gstPercentage.trim() !== '' ? parseFloat(productData.gstPercentage) : null;
@@ -656,8 +664,8 @@ async function processProductChunk(
         isDigital: false,
         requiresShipping: true,
         taxable: gstAmount || gstPercentage ? true : false,
-        priceIncludingTax: null,
-        priceExcludingTax: null,
+        priceIncludingTax: priceIncludingTax !== null ? priceIncludingTax.toFixed(2) : '0.00',  // Price Including Tax -> price_including_tax
+        priceExcludingTax: priceExcludingTax.toFixed(2),  // Unit Price -> price_excluding_tax
         extraTax: null,
         furtherTax: null,
         fedPayableTax: null,
@@ -678,6 +686,8 @@ async function processProductChunk(
       try {
         console.log(`🔄 Attempting to insert product: ${newProduct.name} (SKU: ${newProduct.sku})`);
          console.log('🔍 Product CSV data received:', {
+           unitPrice: productData.unitPrice,
+           priceIncludingTax: productData.priceIncludingTax,
            gstAmount: productData.gstAmount,
            gstPercentage: productData.gstPercentage,
            hsCode: productData.hsCode,
@@ -689,6 +699,9 @@ async function processProductChunk(
            uom: productData.uom
          });
          console.log('🔍 Product database values being inserted:', {
+           price: newProduct.price,
+           priceIncludingTax: newProduct.priceIncludingTax,
+           priceExcludingTax: newProduct.priceExcludingTax,
            taxAmount: newProduct.taxAmount,
            taxPercentage: newProduct.taxPercentage,
            hsCode: newProduct.hsCode,
@@ -698,7 +711,6 @@ async function processProductChunk(
            lotNumber: newProduct.lotNumber,
            expiryDate: newProduct.expiryDate,
            uom: newProduct.uom,
-           price: newProduct.price,
            sku: newProduct.sku,
            name: newProduct.name
          });

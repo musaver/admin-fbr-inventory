@@ -24,6 +24,11 @@ export interface FbrItem {
   discount?: number;
   saleType: string; // Canonical scenario label
   sroItemSerialNo?: string; // When applicable
+  
+  // Additional fields for display purposes (not sent to FBR API)
+  priceIncludingTax?: number; // Original price including tax for display
+  priceExcludingTax?: number; // Original price excluding tax for display
+  taxPercentage?: number; // Tax percentage for display
 }
 
 export interface FbrInvoice {
@@ -174,9 +179,20 @@ export interface FbrValidationResponse {
 }
 
 export interface FbrPostResponse {
-  success?: boolean;
-  message?: string;
   invoiceNumber?: string;
+  dated?: string;
+  validationResponse?: {
+    statusCode?: string;   // "00" means Valid
+    status?: string;       // "Valid"
+    error?: string;        // usually ""
+    invoiceStatuses?: Array<{
+      statusCode?: string; // "00"
+      status?: string;     // "Valid"
+      invoiceNo?: string;  // e.g., "6408543DI175...-1"
+      errorCode?: string;
+      error?: string;
+    }>;
+  };
   [key: string]: any;
 }
 

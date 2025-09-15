@@ -11,6 +11,18 @@
 import type { FbrInvoice, FbrValidationResponse, FbrPostResponse } from './types';
 
 /**
+ * Check if FBR post response indicates success
+ * @param resp FBR post response
+ * @returns true if the post was successful
+ */
+function isPostSuccess(resp: FbrPostResponse): boolean {
+  const v = resp?.validationResponse;
+  const headerValid = (v?.status === "Valid" || v?.statusCode === "00");
+  const lineValid = (v?.invoiceStatuses || []).every(s => s.status === "Valid" || s.statusCode === "00");
+  return Boolean(resp?.invoiceNumber) && headerValid && lineValid;
+}
+
+/**
  * Get FBR settings from tenant database
  * @param tenantId The tenant ID to get settings for
  * @returns FBR settings object with baseUrl and token
@@ -94,21 +106,28 @@ function sanitizeJsonText(jsonText: string): string {
  * Keep zero values for numeric fields as FBR expects them
  * 
  * @param obj The object to sanitize
+ * @param isPreview Whether this is for preview (preserves display fields) or FBR submission
  * @returns Sanitized object with empty values removed
  */
-export function sanitize(obj: any): any {
+export function sanitize(obj: any, isPreview: boolean = false): any {
   if (Array.isArray(obj)) {
-    return obj.map(sanitize);
+    return obj.map(item => sanitize(item, isPreview));
   }
   
   if (obj && typeof obj === 'object') {
     const sanitized: any = {};
     
     // Numeric fields that should be included even if zero
-    const numericFields = [
+    let numericFields = [
       'discount', 'fedPayable', 'extraTax', 'furtherTax', 
-      'salesTaxWithheldAtSource', 'fixedNotifiedValueOrRetailPrice'
+      'salesTaxWithheldAtSource', 'fixedNotifiedValueOrRetailPrice',
+      'totalValues', 'valueSalesExcludingST', 'salesTaxApplicable', 'quantity'
     ];
+    
+    // Add display fields for preview mode
+    if (isPreview) {
+      numericFields = [...numericFields, 'priceIncludingTax', 'priceExcludingTax', 'taxPercentage'];
+    }
     
     // String fields that should be included even if empty string (FBR expects them)
     const requiredStringFields = [
@@ -131,7 +150,7 @@ export function sanitize(obj: any): any {
       }
       // For other fields, skip if empty string
       else if (value !== '') {
-        sanitized[key] = sanitize(value);
+        sanitized[key] = sanitize(value, isPreview);
       }
     }
     
@@ -173,7 +192,7 @@ export async function validateInvoice(payload: FbrInvoice, customToken?: string,
   }
   
   try {
-    const sanitizedPayload = sanitize(payload);
+    const sanitizedPayload = sanitize(payload, false); // false for FBR submission (removes display fields)
     
     console.log('🔍 Validating invoice with FBR:', {
       invoiceType: sanitizedPayload.invoiceType,
@@ -213,11 +232,14 @@ export async function validateInvoice(payload: FbrInvoice, customToken?: string,
         status: response.status,
         statusText: response.statusText,
         result,
+        isProductionMode: isProductionMode || false,
+        endpoint: `${baseUrl}/${endpoint}`
       });
     } else {
       console.log('✅ FBR validation response:', {
         status: result.validationResponse?.status,
         hasError: !!result.validationResponse?.error,
+        isProductionMode: isProductionMode || false,
       });
     }
     
@@ -260,7 +282,7 @@ export async function postInvoice(payload: FbrInvoice, customToken?: string, ten
   }
   
   try {
-    const sanitizedPayload = sanitize(payload);
+    const sanitizedPayload = sanitize(payload, false); // false for FBR submission (removes display fields)
     
     console.log('📤 Posting invoice to FBR:', {
       invoiceType: sanitizedPayload.invoiceType,
@@ -296,20 +318,52 @@ export async function postInvoice(payload: FbrInvoice, customToken?: string, ten
     }
     
     if (!response.ok) {
-      console.error('❌ FBR post failed:', {
+      console.error('❌ FBR post HTTP failed:', {
         status: response.status,
         statusText: response.statusText,
         result,
+        isProductionMode: isProductionMode || false,
+        endpoint: `${baseUrl}/${endpoint}`
+      });
+      
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        invoiceNumber: result.invoiceNumber,
+        validationResponse: result.validationResponse,
+        ...result
+      };
+    }
+
+    // Check if the post was actually successful using proper FBR response structure
+    const success = isPostSuccess(result);
+    
+    if (success) {
+      console.log('✅ FBR post successful:', {
+        success: true,
+        invoiceNumber: result.invoiceNumber,
+        validationStatus: result.validationResponse?.status,
+        statusCode: result.validationResponse?.statusCode,
+        isProductionMode: isProductionMode || false,
       });
     } else {
-      console.log('✅ FBR post successful:', {
-        success: result.success,
+      console.error('❌ FBR post validation failed:', {
+        success: false,
         invoiceNumber: result.invoiceNumber,
-        message: result.message,
+        validationStatus: result.validationResponse?.status,
+        statusCode: result.validationResponse?.statusCode,
+        error: result.validationResponse?.error,
+        isProductionMode: isProductionMode || false,
       });
     }
     
-    return result;
+    return {
+      success,
+      invoiceNumber: result.invoiceNumber,
+      message: result.validationResponse?.error || (success ? 'Invoice posted successfully' : 'Post validation failed'),
+      validationResponse: result.validationResponse,
+      ...result
+    };
   } catch (error) {
     console.error('❌ Error posting invoice to FBR:', error);
     throw new Error(`Failed to post invoice: ${error instanceof Error ? error.message : String(error)}`);

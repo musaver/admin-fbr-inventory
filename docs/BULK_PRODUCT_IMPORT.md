@@ -46,7 +46,7 @@ This feature allows tenants to import large numbers of products with stock infor
 
 ### Required Columns
 - `SKU` - Product code/identifier (will be used as product name)
-- `Unit Price` - Selling price (decimal format)
+- `Unit Price` - Price excluding tax (decimal format, maps to `price_excluding_tax` database column)
 
 ### Stock Columns
 - `Stock Quantity` - Initial stock amount (integer)
@@ -54,6 +54,7 @@ This feature allows tenants to import large numbers of products with stock infor
 - `Location` - Warehouse or storage location (optional)
 
 ### Basic Information Columns
+- `Price Including Tax` - Price including tax (decimal format, maps to `price_including_tax` database column)
 - `Description` - Product description (replaces Short Description)
 - `Weight` - Product weight (decimal)
 
@@ -106,7 +107,7 @@ This feature allows tenants to import large numbers of products with stock infor
 - `Sale Type` - Type of sale (default: "Goods at standard rate")
 
 ### Unit of Measurement Column (Optional)
-- `UOM` - Unit of measurement (select from predefined list or custom value)
+- `UOM` - Unit of measurement (maps to `uom` database column, select from predefined list or custom value)
 
 ### Valid Stock Status Values
 Based on the exact predefined reasons in the add stock movement form:

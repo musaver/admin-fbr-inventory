@@ -95,10 +95,10 @@ export default function BulkUserUpload() {
 "Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
       fileName = 'bulk_user_import_template.csv';
     } else {
-      csvContent = `SKU,Unit Price,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM
-"PROD-001","29.99","Premium quality product","2.50","8.5","1234567890","100","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","Pcs"
-"PROD-002","19.99","Standard quality item","1.60","8.0","9876543210","50","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","Kg"
-"PROD-003","45.00","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
+      csvContent = `SKU,Unit Price,Price Including Tax,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM
+"PROD-001","29.99","32.49","Premium quality product","2.50","8.5","1234567890","100","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","Pcs"
+"PROD-002","19.99","21.59","Standard quality item","1.60","8.0","9876543210","50","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","Kg"
+"PROD-003","45.00","48.60","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
     }
     
@@ -318,7 +318,7 @@ export default function BulkUserUpload() {
                   <div>Download the CSV template below to see the required format</div>
                   <ul className="list-disc list-inside space-y-1 mt-2">
                     <li><strong>Required fields:</strong> SKU, Unit Price</li>
-                    <li><strong>Optional fields:</strong> Description, GST Amount, GST Percentage, HS Code, Stock Quantity, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM</li>
+                    <li><strong>Optional fields:</strong> Price Including Tax, Description, GST Amount, GST Percentage, HS Code, Stock Quantity, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM</li>
                     <li>Supports up to 100MB files (~300,000 products)</li>
                     <li>Duplicate SKUs within your tenant will be skipped</li>
                     <li>Processing happens in background with real-time progress</li>

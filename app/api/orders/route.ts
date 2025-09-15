@@ -8,6 +8,33 @@ import { isWeightBasedProduct, convertToGrams } from '@/utils/weightUtils';
 import { sendInvoiceEmails } from '@/lib/email';
 import { withTenant, ErrorResponses } from '@/lib/api-helpers';
 
+// Helper function to format date for FBR without timezone conversion
+function formatDateForFbr(dateInput: string | Date): string {
+  let date: Date;
+  
+  if (typeof dateInput === 'string') {
+    // If it's already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+      return dateInput;
+    }
+    // If it contains time info, parse it carefully
+    if (dateInput.includes('T')) {
+      date = new Date(dateInput);
+    } else {
+      // Parse as local date without timezone conversion
+      const [year, month, day] = dateInput.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    }
+  } else {
+    date = dateInput;
+  }
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const GET = withTenant(async (req: NextRequest, context) => {
   try {
     // Get query parameters
@@ -287,13 +314,21 @@ export const POST = withTenant(async (req: NextRequest, context) => {
       console.log(`\n=== FBR DIGITAL INVOICING VALIDATION (PRE-ORDER) ===`);
       console.log(`Scenario: ${scenarioId}, Invoice Type: ${invoiceType || 'Sale Invoice'}`);
       
+      // Validate that invoice date is provided for FBR submission
+      if (!invoiceDate) {
+        return NextResponse.json({ 
+          error: 'Invoice date is required for FBR integration. Please set the invoice date in the Invoice & Validation section.',
+          step: 'validation'
+        }, { status: 400 });
+      }
+      
       try {
         // Prepare order data for FBR submission
         const orderForFbr = {
           email,
           scenarioId,
           invoiceType: invoiceType || 'Sale Invoice',
-          invoiceDate: invoiceDate ? new Date(invoiceDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          invoiceDate: invoiceDate ? formatDateForFbr(invoiceDate) : undefined,
           invoiceRefNo,
           subtotal: parseFloat(subtotal.toString()),
           totalAmount: parseFloat(totalAmount.toString()),
@@ -501,7 +536,7 @@ export const POST = withTenant(async (req: NextRequest, context) => {
       invoiceRefNo: invoiceRefNo || null,
       scenarioId: scenarioId || null,
       invoiceNumber: fbrInvoiceNumber || invoiceNumber || null,
-      invoiceDate: invoiceDate ? new Date(invoiceDate) : null,
+      invoiceDate: invoiceDate ? (typeof invoiceDate === 'string' && invoiceDate.includes('T') ? new Date(invoiceDate) : new Date(invoiceDate + 'T00:00:00.000Z')) : null,
       validationResponse: fbrResponse ? JSON.stringify(fbrResponse) : validationResponse || null,
       
       // Billing address

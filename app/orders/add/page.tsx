@@ -159,6 +159,14 @@ interface Customer {
   buyerRegistrationType?: string;
 }
 
+// Helper function to format date for FBR without timezone conversion
+const formatDateForFbr = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AddOrder() {
   const router = useRouter();
   const { currentCurrency } = useCurrency();
@@ -227,6 +235,12 @@ export default function AddOrder() {
   const [isProductionSubmission, setIsProductionSubmission] = useState(false);
   const [productionToken, setProductionToken] = useState('');
   const [showProductionConfirmation, setShowProductionConfirmation] = useState(false);
+  
+  // FBR invoice preview
+  const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
+  const [fbrPreviewData, setFbrPreviewData] = useState<any>(null);
+  const [fbrJsonPreview, setFbrJsonPreview] = useState<any>(null);
+  const [generatingPreview, setGeneratingPreview] = useState(false);
   
   const [orderData, setOrderData] = useState({
     customerId: '',
@@ -897,7 +911,10 @@ export default function AddOrder() {
 
     // Calculate total price including addons for group products
     // Use priceIncludingTax if available, otherwise fall back to base price
-    const effectivePrice = productSelection.priceIncludingTax || price;
+    const priceIncludingTax = typeof productSelection.priceIncludingTax === 'string' 
+      ? parseFloat(productSelection.priceIncludingTax) || 0 
+      : productSelection.priceIncludingTax || 0;
+    const effectivePrice = priceIncludingTax || price;
     let totalPrice = effectivePrice * finalQuantity;
     if (product.productType === 'group' && selectedAddons.length > 0) {
       const addonsPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
@@ -1029,7 +1046,10 @@ export default function AddOrder() {
     updatedItems[index].quantity = quantity;
     
     // Use priceIncludingTax if available, otherwise fall back to base price
-    const effectivePrice = item.priceIncludingTax || item.price;
+    const priceIncludingTax = typeof item.priceIncludingTax === 'string' 
+      ? parseFloat(item.priceIncludingTax) || 0 
+      : item.priceIncludingTax || 0;
+    const effectivePrice = priceIncludingTax || item.price;
     let totalPrice = effectivePrice * quantity;
     
     // Add addon prices for group products
@@ -1191,7 +1211,11 @@ export default function AddOrder() {
     // Calculate total using 'Price including tax' for each product
     const totalAmount = orderItems.reduce((sum, item) => {
       // Use priceIncludingTax if available, otherwise fall back to regular price
-      const itemPrice = item.priceIncludingTax || item.price;
+      // Ensure numeric values by parsing strings to numbers
+      const priceIncludingTax = typeof item.priceIncludingTax === 'string' 
+        ? parseFloat(item.priceIncludingTax) || 0 
+        : item.priceIncludingTax || 0;
+      const itemPrice = priceIncludingTax || item.price;
       let itemTotal = itemPrice * item.quantity;
       
       // Add addon prices for group products
@@ -1702,15 +1726,77 @@ export default function AddOrder() {
     // Don't set submitting to false on success - let it stay until redirect
   };
 
+  // Generate FBR invoice preview data
+  const generateFbrPreview = async () => {
+    setGeneratingPreview(true);
+    try {
+      const totals = calculateTotals();
+      
+      const orderForPreview = {
+        email: orderData.email,
+        scenarioId: orderData.scenarioId,
+        invoiceType: orderData.invoiceType || 'Sale Invoice',
+        invoiceDate: orderData.invoiceDate ? formatDateForFbr(orderData.invoiceDate) : undefined,
+        invoiceRefNo: orderData.invoiceRefNo,
+        subtotal: parseFloat(totals.subtotal.toString()),
+        totalAmount: parseFloat(totals.totalAmount.toString()),
+        taxAmount: parseFloat((totals.taxAmount || 0).toString()),
+        currency: orderData.currency,
+        items: orderItems,
+        buyerNTNCNIC: orderData.buyerNTNCNIC || '',
+        buyerBusinessName: orderData.buyerBusinessName || '',
+        buyerProvince: orderData.buyerProvince || '',
+        buyerAddress: orderData.buyerAddress || '',
+        buyerRegistrationType: orderData.buyerRegistrationType || '',
+        
+        // Seller fields
+        sellerNTNCNIC: sellerInfo.sellerNTNCNIC || '',
+        sellerBusinessName: sellerInfo.sellerBusinessName || '',
+        sellerProvince: sellerInfo.sellerProvince || '',
+        sellerAddress: sellerInfo.sellerAddress || '',
+        fbrSandboxToken: isProductionSubmission ? productionToken : sellerInfo.fbrSandboxToken,
+        fbrBaseUrl: sellerInfo.fbrBaseUrl || '',
+        isProductionSubmission: isProductionSubmission
+      };
+
+      // Generate FBR preview by calling the mapper
+      const response = await fetch('/api/fbr/submit?preview=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderForPreview)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setFbrPreviewData(result.fbrInvoice || result);
+        setFbrJsonPreview(result.fbrInvoice || result); // Store the raw JSON for display
+      } else {
+        console.error('Failed to generate FBR preview');
+        setFbrPreviewData(null);
+        setFbrJsonPreview(null);
+      }
+    } catch (error) {
+      console.error('Error generating FBR preview:', error);
+      setFbrPreviewData(null);
+      setFbrJsonPreview(null);
+    } finally {
+      setGeneratingPreview(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // If production mode is enabled and FBR submission is not skipped, show confirmation
+    // Generate FBR preview data if FBR submission is not skipped
+    if (!skipFbrSubmission) {
+      await generateFbrPreview();
+    }
+    
+    // Show appropriate confirmation dialog
     if (isProductionSubmission && !skipFbrSubmission) {
       setShowProductionConfirmation(true);
     } else {
-      // Direct submission for sandbox or when FBR is skipped
-      await performOrderSubmission();
+      setShowOrderConfirmation(true);
     }
   };
 
@@ -1721,6 +1807,17 @@ export default function AddOrder() {
 
   const handleProductionCancel = () => {
     setShowProductionConfirmation(false);
+  };
+
+  const handleOrderConfirm = async () => {
+    setShowOrderConfirmation(false);
+    await performOrderSubmission();
+  };
+
+  const handleOrderCancel = () => {
+    setShowOrderConfirmation(false);
+    setFbrPreviewData(null);
+    setFbrJsonPreview(null);
   };
 
   const selectedProduct = products.find(p => p.id === productSelection.selectedProductId);
@@ -2107,10 +2204,10 @@ export default function AddOrder() {
                     type="url"
                     value={sellerInfo.fbrBaseUrl}
                     onChange={(e) => setSellerInfo({...sellerInfo, fbrBaseUrl: e.target.value})}
-                    placeholder="https://sandbox-api.fbr.gov.pk/di_data/v1/di"
+                    placeholder={isProductionSubmission ? "https://gw.fbr.gov.pk/di_data/v1/di" : "https://sandbox-api.fbr.gov.pk/di_data/v1/di"}
                   />
                   <p className="text-sm text-muted-foreground">
-                    FBR API base URL (sandbox or production). Auto-filled from settings.
+                    FBR API base URL. {isProductionSubmission ? "Production: https://gw.fbr.gov.pk/di_data/v1/di" : "Sandbox: https://sandbox-api.fbr.gov.pk/di_data/v1/di"}
                   </p>
                 </div>
                 
@@ -2522,7 +2619,21 @@ export default function AddOrder() {
                   type="checkbox"
                   id="production-submission"
                   checked={isProductionSubmission}
-                  onChange={(e) => setIsProductionSubmission(e.target.checked)}
+                  onChange={(e) => {
+                    setIsProductionSubmission(e.target.checked);
+                    // Auto-set the correct base URL for production mode
+                    if (e.target.checked) {
+                      setSellerInfo(prev => ({
+                        ...prev,
+                        fbrBaseUrl: 'https://gw.fbr.gov.pk/di_data/v1/di'
+                      }));
+                    } else {
+                      setSellerInfo(prev => ({
+                        ...prev,
+                        fbrBaseUrl: 'https://sandbox-api.fbr.gov.pk/di_data/v1/di'
+                      }));
+                    }
+                  }}
                   className="rounded border-gray-300"
                   disabled={skipFbrSubmission}
                 />
@@ -3225,15 +3336,15 @@ export default function AddOrder() {
                         <Input
                           id="price-including-tax-edit"
                       type="text"
-                      value={productSelection.priceIncludingTax === 0 ? '' : productSelection.priceIncludingTax}
+                      value={productSelection.priceIncludingTax === 0 ? '' : productSelection.priceIncludingTax.toString()}
                       onChange={async (e) => {
                         const value = e.target.value;
                         // Allow empty string, numbers, and decimal point
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
                           const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
                           
-                          // Update price including tax immediately
-                          setProductSelection(prev => ({...prev, priceIncludingTax: value === '' ? 0 : value}));
+                          // Update price including tax immediately (store as number, not string)
+                          setProductSelection(prev => ({...prev, priceIncludingTax: priceIncludingTax}));
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point)
                           if (!value.endsWith('.') && value !== '') {
@@ -3268,15 +3379,15 @@ export default function AddOrder() {
                         <Input
                           id="price-excluding-tax-edit"
                       type="text"
-                      value={productSelection.priceExcludingTax === 0 ? '' : productSelection.priceExcludingTax}
+                      value={productSelection.priceExcludingTax === 0 ? '' : productSelection.priceExcludingTax.toString()}
                       onChange={async (e) => {
                         const value = e.target.value;
                         // Allow empty string, numbers, and decimal point
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
                           const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
                           
-                          // Update price excluding tax immediately
-                          setProductSelection(prev => ({...prev, priceExcludingTax: value === '' ? 0 : value}));
+                          // Update price excluding tax immediately (store as number, not string)
+                          setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point)
                           if (!value.endsWith('.') && value !== '') {
@@ -4052,24 +4163,125 @@ export default function AddOrder() {
 
       {/* Production Environment Confirmation Dialog */}
       <Dialog open={showProductionConfirmation} onOpenChange={setShowProductionConfirmation}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-orange-600">
               ⚠️ Production Environment Confirmation
             </DialogTitle>
-            <DialogDescription className="space-y-2">
-              <p>
-                You are about to submit this invoice to the <strong>production FBR environment</strong>.
-              </p>
-              <p className="text-sm bg-orange-50 p-3 rounded border border-orange-200">
-                <strong>Warning:</strong> This will create a real invoice in the FBR system and cannot be undone. 
-                Make sure all information is correct before proceeding.
-              </p>
-              <p className="text-sm">
-                Are you sure you want to continue with production submission?
-              </p>
+            <DialogDescription>
+              You are about to submit this invoice to the production FBR environment.
             </DialogDescription>
+            <div className="text-sm bg-orange-50 p-3 rounded border border-orange-200 mt-2">
+              <strong>Warning:</strong> This will create a real invoice in the FBR system and cannot be undone. 
+              Make sure all information is correct before proceeding.
+            </div>
           </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Order Summary */}
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <h3 className="font-semibold mb-2">Order Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Customer:</span> {orderData.email}
+                </div>
+                <div>
+                  <span className="font-medium">Total Amount:</span> {currentCurrency === 'USD' ? '$' : currentCurrency === 'AED' ? 'AED ' : 'Rs. '}{calculateTotals().totalAmount.toFixed(2)}
+                </div>
+                <div>
+                  <span className="font-medium">Items:</span> {orderItems.length}
+                </div>
+                <div>
+                  <span className="font-medium">Mode:</span> <span className="text-orange-600 font-semibold">Production</span>
+                </div>
+              </div>
+            </div>
+
+            {/* FBR Invoice Preview */}
+            {fbrPreviewData && (
+              <div className="border border-orange-200 rounded-lg p-3 bg-orange-50">
+                <h3 className="font-semibold mb-3 text-orange-800">🧾 FBR Production Invoice Preview</h3>
+                <div className="space-y-3">
+                  {/* Key Invoice Information */}
+                  <div className="grid grid-cols-2 gap-2 text-sm bg-white p-2 rounded">
+                    <div><span className="font-medium">Invoice Type:</span> {fbrPreviewData.invoiceType}</div>
+                    <div><span className="font-medium">Date:</span> {fbrPreviewData.invoiceDate}</div>
+                    <div><span className="font-medium">Scenario ID:</span> {fbrPreviewData.scenarioId}</div>
+                    <div><span className="font-medium">Ref No:</span> {fbrPreviewData.invoiceRefNo || 'N/A'}</div>
+                  </div>
+
+                  {/* Seller/Buyer Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div className="bg-white p-2 rounded">
+                      <div className="font-medium text-purple-700 mb-1">📤 Seller</div>
+                      <div>{fbrPreviewData.sellerBusinessName || 'Not provided'}</div>
+                      <div className="text-xs text-gray-600">{fbrPreviewData.sellerNTNCNIC || 'No NTN/CNIC'}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded">
+                      <div className="font-medium text-green-700 mb-1">📥 Buyer</div>
+                      <div>{fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
+                      <div className="text-xs text-gray-600">{fbrPreviewData.buyerNTNCNIC || 'No NTN/CNIC'}</div>
+                    </div>
+                  </div>
+
+                  {/* Items Summary */}
+                  {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                    <div className="bg-white p-2 rounded text-sm">
+                      <div className="font-medium mb-1">📦 Items Summary</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
+                        <div><span className="font-medium">Items:</span> {fbrPreviewData.items.length}</div>
+                        <div><span className="font-medium">Total Qty:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}</div>
+                        <div><span className="font-medium">Total Excl. ST:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.valueSalesExcludingST || 0), 0).toLocaleString()}</div>
+                        <div><span className="font-medium">Grand Total:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.totalValues || 0), 0).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* First Item Preview */}
+                  {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                    <div className="bg-white p-2 rounded text-sm">
+                      <div className="font-medium mb-1">🔍 First Item Details</div>
+                      <div className="text-xs space-y-1">
+                        <div><span className="font-medium">Description:</span> {fbrPreviewData.items[0].productDescription || fbrPreviewData.items[0].itemName || 'N/A'}</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          <div><span className="font-medium">HS Code:</span> {fbrPreviewData.items[0].hsCode}</div>
+                          <div><span className="font-medium">Quantity:</span> {fbrPreviewData.items[0].quantity}</div>
+                          <div><span className="font-medium">Rate:</span> {fbrPreviewData.items[0].rate}</div>
+                          <div><span className="font-medium">Sale Type:</span> {fbrPreviewData.items[0].saleType || 'N/A'}</div>
+                        </div>
+                        {fbrPreviewData.items.length > 1 && (
+                          <div className="text-gray-500">...and {fbrPreviewData.items.length - 1} more items</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FBR JSON Preview for Production */}
+                  {fbrJsonPreview && (
+                    <details className="border rounded p-2 bg-white mt-2">
+                      <summary className="cursor-pointer font-medium text-xs text-orange-700">
+                        🔍 View Production FBR JSON (Console Log Preview)
+                      </summary>
+                      <div className="mt-2">
+                        <div className="bg-black text-green-400 p-2 rounded font-mono text-xs max-h-48 overflow-y-auto">
+                          <div className="text-yellow-400">🔍 === FINAL FBR JSON PAYLOAD ===</div>
+                          <div className="text-cyan-400">📋 Generated FBR Invoice JSON:</div>
+                          <pre className="mt-1 whitespace-pre-wrap text-xs">
+                            {JSON.stringify(fbrJsonPreview, null, 2)}
+                          </pre>
+                          <div className="text-yellow-400 mt-1">===============================</div>
+                        </div>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <p className="text-sm text-center text-orange-700">
+              Are you sure you want to continue with production submission?
+            </p>
+          </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
@@ -4084,6 +4296,228 @@ export default function AddOrder() {
               className="bg-orange-600 hover:bg-orange-700"
             >
               {submitting ? 'Submitting...' : 'Yes, Submit to Production'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Confirmation Dialog with FBR Preview */}
+      <Dialog open={showOrderConfirmation} onOpenChange={setShowOrderConfirmation}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📋 Order Confirmation {isProductionSubmission && <span className="text-orange-600">- Production Mode</span>}
+            </DialogTitle>
+            <DialogDescription>
+              Please review the order details and FBR invoice data before submitting.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Order Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-2">Order Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Customer:</span> {orderData.email}
+                </div>
+                <div>
+                  <span className="font-medium">Total Amount:</span> {currentCurrency === 'USD' ? '$' : currentCurrency === 'AED' ? 'AED ' : 'Rs. '}{calculateTotals().totalAmount.toFixed(2)}
+                </div>
+                <div>
+                  <span className="font-medium">Items:</span> {orderItems.length}
+                </div>
+                <div>
+                  <span className="font-medium">Status:</span> {orderData.status}
+                </div>
+              </div>
+            </div>
+
+            {/* FBR Invoice Preview */}
+            {!skipFbrSubmission && (
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  🧾 FBR Invoice Data Preview
+                  {generatingPreview && <span className="text-sm text-gray-500">(Generating...)</span>}
+                </h3>
+                
+                {generatingPreview ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2">Generating FBR preview...</span>
+                  </div>
+                ) : fbrPreviewData ? (
+                  <div className="space-y-4">
+                    {/* Key Invoice Information */}
+                    <div className="grid grid-cols-2 gap-4 text-sm bg-blue-50 p-3 rounded">
+                      <div>
+                        <span className="font-medium">Invoice Type:</span> {fbrPreviewData.invoiceType}
+                      </div>
+                      <div>
+                        <span className="font-medium">Invoice Date:</span> {fbrPreviewData.invoiceDate}
+                      </div>
+                      <div>
+                        <span className="font-medium">Scenario ID:</span> {fbrPreviewData.scenarioId}
+                      </div>
+                      <div>
+                        <span className="font-medium">Invoice Ref No:</span> {fbrPreviewData.invoiceRefNo || 'N/A'}
+                      </div>
+                    </div>
+
+                    {/* Seller Information */}
+                    <div className="bg-purple-50 p-3 rounded">
+                      <h4 className="font-medium text-purple-800 mb-2">📤 Seller Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.sellerNTNCNIC || 'Not provided'}</div>
+                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.sellerBusinessName || 'Not provided'}</div>
+                        <div><span className="font-medium">Province:</span> {fbrPreviewData.sellerProvince || 'Not provided'}</div>
+                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.sellerAddress || 'Not provided'}</div>
+                      </div>
+                    </div>
+
+                    {/* Buyer Information */}
+                    <div className="bg-green-50 p-3 rounded">
+                      <h4 className="font-medium text-green-800 mb-2">📥 Buyer Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.buyerNTNCNIC || 'Not provided'}</div>
+                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
+                        <div><span className="font-medium">Registration Type:</span> {fbrPreviewData.buyerRegistrationType || 'Not provided'}</div>
+                        <div><span className="font-medium">Province:</span> {fbrPreviewData.buyerProvince || 'Not provided'}</div>
+                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.buyerAddress || 'Not provided'}</div>
+                      </div>
+                    </div>
+
+                    {/* Items Details */}
+                    {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                      <div className="bg-gray-50 p-3 rounded">
+                        <h4 className="font-medium mb-3">📦 Invoice Items ({fbrPreviewData.items.length})</h4>
+                        <div className="space-y-3">
+                          {fbrPreviewData.items.map((item: any, index: number) => (
+                            <div key={index} className="bg-white p-3 rounded border border-gray-200">
+                              <div className="font-medium text-sm mb-2">
+                                {item.productDescription || item.itemName || `Item ${index + 1}`}
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                <div><span className="font-medium">HS Code:</span> {item.hsCode}</div>
+                                <div><span className="font-medium">Quantity:</span> {item.quantity}</div>
+                                <div><span className="font-medium">UoM:</span> {item.uoM || item.uom || 'N/A'}</div>
+                                <div><span className="font-medium">Rate:</span> {item.rate}</div>
+                                {item.priceIncludingTax !== undefined && item.priceIncludingTax !== null && (
+                                  <div><span className="font-medium">Price Incl. Tax:</span> {item.priceIncludingTax?.toLocaleString()}</div>
+                                )}
+                                {item.priceExcludingTax !== undefined && item.priceExcludingTax !== null && (
+                                  <div><span className="font-medium">Price Excl. Tax:</span> {item.priceExcludingTax?.toLocaleString()}</div>
+                                )}
+                                {item.taxPercentage !== undefined && item.taxPercentage !== null && (
+                                  <div><span className="font-medium">Tax %:</span> {item.taxPercentage}%</div>
+                                )}
+                                <div><span className="font-medium">Value Excl. ST:</span> {item.valueSalesExcludingST?.toLocaleString()}</div>
+                                <div><span className="font-medium">Sales Tax:</span> {item.salesTaxApplicable?.toLocaleString()}</div>
+                                <div><span className="font-medium">FED Payable:</span> {item.fedPayable?.toLocaleString() || 0}</div>
+                                <div><span className="font-medium">Total Value:</span> {item.totalValues?.toLocaleString()}</div>
+                                {item.saleType && (
+                                  <div className="md:col-span-2"><span className="font-medium">Sale Type:</span> {item.saleType}</div>
+                                )}
+                                {item.discount > 0 && (
+                                  <div><span className="font-medium">Discount:</span> {item.discount}</div>
+                                )}
+                                {item.extraTax && (
+                                  <div><span className="font-medium">Extra Tax:</span> {item.extraTax}</div>
+                                )}
+                                {item.furtherTax > 0 && (
+                                  <div><span className="font-medium">Further Tax:</span> {item.furtherTax}</div>
+                                )}
+                                {item.sroScheduleNo && (
+                                  <div><span className="font-medium">SRO Schedule:</span> {item.sroScheduleNo}</div>
+                                )}
+                                {item.sroItemSerialNo && (
+                                  <div><span className="font-medium">SRO Item Serial:</span> {item.sroItemSerialNo}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Summary Totals */}
+                    {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                      <div className="bg-indigo-50 p-3 rounded">
+                        <h4 className="font-medium text-indigo-800 mb-2">💰 Invoice Summary</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                          <div>
+                            <span className="font-medium">Total Items:</span> {fbrPreviewData.items.length}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Quantity:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Excl. ST:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.valueSalesExcludingST || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Sales Tax:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.salesTaxApplicable || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total FED:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.fedPayable || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Grand Total:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.totalValues || 0), 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* FBR JSON Preview - Same as Console Log */}
+                    <details className="border rounded p-2 bg-slate-50">
+                      <summary className="cursor-pointer font-medium text-sm text-blue-800">
+                        🔍 FBR JSON Preview (Same as Console Log)
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-gray-600 italic">
+                          This is the exact JSON that will be sent to FBR and logged in the console:
+                        </div>
+                        <div className="bg-black text-green-400 p-3 rounded font-mono text-xs max-h-80 overflow-y-auto">
+                          <div className="text-yellow-400">🔍 === FINAL FBR JSON PAYLOAD ===</div>
+                          <div className="text-cyan-400">📋 Generated FBR Invoice JSON:</div>
+                          <pre className="mt-2 whitespace-pre-wrap">
+                            {fbrJsonPreview ? JSON.stringify(fbrJsonPreview, null, 2) : 'No JSON data available'}
+                          </pre>
+                          <div className="text-yellow-400 mt-2">===============================</div>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-sm">
+                    FBR preview could not be generated. The order will be submitted without preview.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {skipFbrSubmission && (
+              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                <p className="text-yellow-800 text-sm">
+                  ⚠️ FBR submission is disabled for this order.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleOrderCancel}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOrderConfirm}
+              disabled={submitting}
+              className={isProductionSubmission ? "bg-orange-600 hover:bg-orange-700" : ""}
+            >
+              {submitting ? 'Creating Order...' : 'Confirm & Create Order'}
             </Button>
           </DialogFooter>
         </DialogContent>
