@@ -281,6 +281,7 @@ export default function AddOrder() {
 
   // State for custom province input
   const [isCustomProvince, setIsCustomProvince] = useState(false);
+  const [isCustomSellerProvince, setIsCustomSellerProvince] = useState(false);
 
   // Customer/shipping information
   const [customerInfo, setCustomerInfo] = useState({
@@ -560,6 +561,12 @@ export default function AddOrder() {
       if (sellerInfoData && !sellerInfoData.error) {
         console.log('Setting seller info:', sellerInfoData);
         setSellerInfo(sellerInfoData);
+        
+        // Set custom seller province flag if the loaded province is not in predefined list
+        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
+        if (sellerInfoData.sellerProvince && !predefinedSellerProvinces.includes(sellerInfoData.sellerProvince)) {
+          setIsCustomSellerProvince(true);
+        }
       } else {
         console.log('Seller info fetch failed or empty:', sellerInfoData);
       }
@@ -2180,21 +2187,47 @@ export default function AddOrder() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="seller-province">Province</Label>
-                  <Select value={sellerInfo.sellerProvince} onValueChange={(value) => setSellerInfo({...sellerInfo, sellerProvince: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Province" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Punjab">Punjab</SelectItem>
-                      <SelectItem value="Sindh">Sindh</SelectItem>
-                      <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
-                      <SelectItem value="Balochistan">Balochistan</SelectItem>
-                      <SelectItem value="Islamabad">Islamabad</SelectItem>
-                      <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
-                      <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
-                      <SelectItem value="N/A">N/A</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select 
+                      value={
+                        isCustomSellerProvince ? "custom" :
+                        ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
+                          ? sellerInfo.sellerProvince 
+                          : ""
+                      } 
+                      onValueChange={(value) => {
+                        if (value === "custom") {
+                          setIsCustomSellerProvince(true);
+                          setSellerInfo({...sellerInfo, sellerProvince: ""});
+                        } else {
+                          setIsCustomSellerProvince(false);
+                          setSellerInfo({...sellerInfo, sellerProvince: value});
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Province" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Punjab">Punjab</SelectItem>
+                        <SelectItem value="Sindh">Sindh</SelectItem>
+                        <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
+                        <SelectItem value="Balochistan">Balochistan</SelectItem>
+                        <SelectItem value="Islamabad">Islamabad</SelectItem>
+                        <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
+                        <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
+                        <SelectItem value="N/A">N/A</SelectItem>
+                        <SelectItem value="custom">Other (Type below)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {isCustomSellerProvince && (
+                      <Input
+                        placeholder="Enter custom province"
+                        value={sellerInfo.sellerProvince || ""}
+                        onChange={(e) => setSellerInfo({...sellerInfo, sellerProvince: e.target.value})}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="seller-address">Business Address</Label>
