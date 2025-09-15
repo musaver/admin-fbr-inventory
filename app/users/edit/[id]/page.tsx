@@ -194,7 +194,7 @@ export default function EditUser() {
               <SelectItem value="Sindh">Sindh</SelectItem>
               <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
               <SelectItem value="Balochistan">Balochistan</SelectItem>
-              <SelectItem value="Islamabad Capital Territory (ICT)">Islamabad Capital Territory (ICT)</SelectItem>
+              <SelectItem value="Islamabad">Islamabad</SelectItem>
               <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
               <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
             </SelectContent>
