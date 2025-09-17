@@ -386,6 +386,29 @@ export default function AddOrder() {
   const [addingUser, setAddingUser] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
 
+  // Normalize HS Code to pattern XXXX.YYYY (pad or insert zeros as needed)
+  const normalizeHsCode = (raw: string | number | null | undefined): string => {
+    if (raw === null || raw === undefined) return '';
+    const str = String(raw).trim();
+    if (!str) return '';
+    // If contains a dot, pad decimals to 4 and cap integer part to 4 digits
+    if (str.includes('.')) {
+      const [left, right = ''] = str.split('.');
+      const intDigits = (left || '').replace(/\D/g, '');
+      const decDigits = right.replace(/\D/g, '');
+      const intPart = (intDigits + '0000').slice(0, 4);
+      const decPart = (decDigits + '0000').slice(0, 4);
+      return `${intPart}.${decPart}`;
+    }
+    // No dot: use first 4 as left, remaining as right, then pad right to 4
+    const digitsOnly = str.replace(/\D/g, '');
+    if (!digitsOnly) return '';
+    const intPart = (digitsOnly + '0000').slice(0, 4);
+    const rest = digitsOnly.slice(4, 8);
+    const decPart = (rest + '0000').slice(0, 4);
+    return `${intPart}.${decPart}`;
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -404,10 +427,11 @@ export default function AddOrder() {
     if (productSelection.selectedProductId) {
       const product = products.find(p => p.id === productSelection.selectedProductId);
       if (product) {
+        const normalizedHs = normalizeHsCode(product.hsCode || '');
         setProductSelection(prev => ({
           ...prev,
           // Populate additional fields from product
-          hsCode: product.hsCode || '',
+          hsCode: normalizedHs,
           productName: product.name || '',
           productDescription: product.description || product.name || '', // Use description if available, fallback to name
           // Keep existing values for fields that should be manually entered
