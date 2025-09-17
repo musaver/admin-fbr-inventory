@@ -320,7 +320,7 @@ export default function BulkUserUpload() {
                     <li><strong>Required fields:</strong> SKU, Unit Price</li>
                     <li><strong>Optional fields:</strong> Price Including Tax, Description, GST Amount, GST Percentage, HS Code, Stock Quantity, Serial Number, List Number, BC Number, Lot Number, Expiry Date, UOM</li>
                     <li>Supports up to 100MB files (~300,000 products)</li>
-                    <li>Duplicate SKUs within your tenant will be skipped</li>
+                    <li>Duplicate SKUs are allowed; each row creates a new product</li>
                     <li>Processing happens in background with real-time progress</li>
                   </ul>
                 </AlertDescription>

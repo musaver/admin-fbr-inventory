@@ -547,25 +547,8 @@ async function processProductChunk(
         continue;
       }
 
-      // Check if product with same SKU already exists in this tenant
-      const existingProduct = await db.select({ id: products.id })
-        .from(products)
-        .where(and(
-          eq(products.sku, productData.sku.trim()),
-          eq(products.tenantId, tenantId)
-        ))
-        .limit(1);
-
-      if (existingProduct.length > 0) {
-        console.log(`⚠️ Product with SKU ${productData.sku} already exists, skipping...`);
-        result.errors.push({
-          row: globalRowIndex,
-          identifier: productData.sku,
-          message: 'Product with this SKU already exists'
-        });
-        result.failed++;
-        continue;
-      }
+      // NOTE: Allow duplicate SKUs during import. We no longer skip rows if a
+      // product with the same SKU exists. Slugs remain unique per record.
 
       // Create new product with only the 14 specified fields
       const newProductId = uuidv4();

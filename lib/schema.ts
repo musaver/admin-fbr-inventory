@@ -167,10 +167,10 @@ export const products = mysqlTable("products", {
   id: varchar("id", { length: 255 }).primaryKey(),
   tenantId: varchar("tenant_id", { length: 255 }).notNull(), // Multi-tenant support
   name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  slug: varchar("slug", { length: 255 }).notNull(),
   description: text("description"),
   shortDescription: text("short_description"),
-  sku: varchar("sku", { length: 100 }).unique(),
+  sku: varchar("sku", { length: 100 }),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   comparePrice: decimal("compare_price", { precision: 10, scale: 2 }),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),

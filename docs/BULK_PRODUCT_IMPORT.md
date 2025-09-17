@@ -182,8 +182,11 @@ SKU,Unit Price,Stock Quantity,Status
 - Invalid stock quantity format
 - Missing required fields
 - Database constraint violations
-- Duplicate SKU handling
 - File parsing errors
+
+### Duplicate SKU Behavior
+- Duplicate SKUs are allowed during bulk import; each row creates a new product record even if an existing product with the same SKU is present.
+- Slugs remain unique per product record and are auto-generated to avoid conflicts.
 
 ### Progress Tracking
 - Total records count
