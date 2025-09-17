@@ -559,12 +559,10 @@ export default function OrderInvoice() {
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width: 35%;">Product Name</th>
-                <th style="width: 12%;">HS Code</th>
-                <th style="width: 10%;">Quantity</th>
-                <th style="width: 10%;">UOM</th>
+                <th style="width: 50%;">Product Name</th>
+                <th style="width: 15%;">Quantity</th>
                 <th style="width: 15%;">Price Inc. Tax</th>
-                <th style="width: 18%;">Total</th>
+                <th style="width: 20%;">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -581,20 +579,18 @@ export default function OrderInvoice() {
                     ${item.sku ? `<div class="product-details">SKU: ${item.sku}</div>` : ''}
                     ${item.isWeightBased && item.weightQuantity ? `<div class="product-details">Weight: ${formatWeightAuto(item.weightQuantity).formattedString}</div>` : ''}
                   </td>
-                  <td class="text-center">${item.hsCode || '-'}</td>
                   <td class="text-center">
                     ${item.isWeightBased && item.weightQuantity ? 
                       formatWeightAuto(item.weightQuantity).formattedString : 
                       item.quantity
                     }
                   </td>
-                  <td class="text-center">${item.isWeightBased ? 'Weight-based' : (item.uom || '-')}</td>
                   <td class="text-right"><span class="price-highlight">${formatAmountForPrint(item.priceIncludingTax || item.price)}</span></td>
                   <td class="text-right"><strong class="price-highlight">${formatAmountForPrint(item.totalPrice)}</strong></td>
                 </tr>
                 ${(item.taxAmount || item.taxPercentage || item.discount || item.extraTax || item.furtherTax || item.fedPayableTax || item.priceIncludingTax || item.priceExcludingTax || item.fixedNotifiedValueOrRetailPrice || item.saleType) ? `
                 <tr class="tax-details-row">
-                  <td colspan="6">
+                  <td colspan="4">
                     <div class="tax-details-title">💰 Tax & Discount Details:</div>
                     <div class="tax-details-grid">
                       ${(Number(item.taxAmount) || 0) > 0 ? `
