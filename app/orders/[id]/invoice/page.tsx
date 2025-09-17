@@ -145,42 +145,42 @@ export default function OrderInvoice() {
             
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              line-height: 1.5;
+              line-height: 1.35;
               color: #1a1a1a;
               background: white;
-              padding: 20px;
+              padding: 12px;
             }
             
             .invoice-header {
               background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
               color: white;
-              padding: 30px;
-              margin: -20px -20px 30px -20px;
-              border-radius: 0 0 15px 15px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              padding: 16px;
+              margin: -12px -12px 16px -12px;
+              border-radius: 0 0 10px 10px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.12);
               display: flex;
               justify-content: space-between;
               align-items: flex-start;
             }
             
             .invoice-title h1 {
-              font-size: 42px;
+              font-size: 28px;
               font-weight: 700;
-              margin-bottom: 12px;
+              margin-bottom: 6px;
               letter-spacing: 2px;
-              text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+              text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
             }
             
             .order-info {
               background: rgba(255,255,255,0.1);
-              padding: 15px;
-              border-radius: 8px;
-              margin-top: 10px;
+              padding: 8px;
+              border-radius: 6px;
+              margin-top: 6px;
             }
             
             .order-info p {
-              margin: 5px 0;
-              font-size: 15px;
+              margin: 3px 0;
+              font-size: 12px;
               font-weight: 500;
             }
             
@@ -189,29 +189,29 @@ export default function OrderInvoice() {
             }
             
             .company-info h2 {
-              font-size: 32px;
-              margin-bottom: 15px;
+              font-size: 20px;
+              margin-bottom: 8px;
               font-weight: 700;
-              text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+              text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
             }
             
             .company-info p {
-              margin: 8px 0;
-              font-size: 14px;
+              margin: 4px 0;
+              font-size: 11px;
               opacity: 0.9;
             }
             
             .fbr-notice {
-              margin: 30px 0;
-              padding: 20px;
+              margin: 12px 0;
+              padding: 10px;
               background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
               border: 2px solid #10b981;
-              border-radius: 10px;
-              box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+              border-radius: 8px;
+              box-shadow: 0 1px 6px rgba(16, 185, 129, 0.2);
             }
             
             .fbr-notice strong {
-              font-size: 16px;
+              font-size: 13px;
               color: #047857;
               display: block;
               text-align: center;
@@ -220,21 +220,21 @@ export default function OrderInvoice() {
             .info-section {
               display: grid;
               grid-template-columns: 1fr 1fr;
-              gap: 40px;
-              margin-bottom: 40px;
+              gap: 16px;
+              margin-bottom: 16px;
             }
             
             .info-box {
               background: #f8fafc;
               border: 2px solid #e2e8f0;
-              border-radius: 12px;
-              padding: 25px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+              border-radius: 8px;
+              padding: 10px;
+              box-shadow: 0 1px 6px rgba(0,0,0,0.05);
             }
             
             .info-box h3 {
-              font-size: 20px;
-              margin-bottom: 20px;
+              font-size: 14px;
+              margin-bottom: 8px;
               color: #1e293b;
               border-bottom: 2px solid #3b82f6;
               padding-bottom: 8px;
@@ -242,42 +242,42 @@ export default function OrderInvoice() {
             }
             
             .info-box p {
-              margin: 8px 0;
-              font-size: 14px;
+              margin: 4px 0;
+              font-size: 12px;
               color: #374151;
-              line-height: 1.6;
+              line-height: 1.4;
             }
             
             .contact-info {
-              margin-top: 20px;
-              padding-top: 15px;
+              margin-top: 8px;
+              padding-top: 8px;
               border-top: 1px solid #d1d5db;
             }
             
             .items-table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 40px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-              border-radius: 12px;
+              margin-bottom: 14px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+              border-radius: 8px;
               overflow: hidden;
             }
             
             .items-table th {
               background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
               color: white;
-              padding: 18px 12px;
+              padding: 8px 8px;
               text-align: center;
               font-weight: 600;
-              font-size: 14px;
+              font-size: 11px;
               letter-spacing: 0.5px;
               text-transform: uppercase;
             }
             
             .items-table td {
-              padding: 16px 12px;
+              padding: 8px 8px;
               border-bottom: 1px solid #e5e7eb;
-              font-size: 14px;
+              font-size: 12px;
               background: white;
             }
             
@@ -300,20 +300,20 @@ export default function OrderInvoice() {
             
             .product-name {
               font-weight: 700;
-              margin-bottom: 6px;
+              margin-bottom: 2px;
               color: #1f2937;
-              font-size: 15px;
+              font-size: 12px;
             }
             
             .product-details {
-              font-size: 12px;
+              font-size: 10px;
               color: #6b7280;
               line-height: 1.4;
-              margin-top: 4px;
+              margin-top: 2px;
             }
             
             .product-identification {
-              font-size: 11px;
+              font-size: 9px;
               font-weight: 600;
               line-height: 1.3;
               margin-bottom: 3px;
@@ -325,28 +325,28 @@ export default function OrderInvoice() {
             }
             
             .tax-details-row td {
-              padding: 12px !important;
-              font-size: 11px !important;
+              padding: 8px !important;
+              font-size: 10px !important;
               color: #374151 !important;
             }
             
             .tax-details-title {
               font-weight: 600;
-              margin-bottom: 8px;
+              margin-bottom: 4px;
               color: #1f2937;
-              font-size: 12px;
+              font-size: 11px;
             }
             
             .tax-details-grid {
               display: grid;
               grid-template-columns: 1fr 1fr;
-              gap: 8px 24px;
+              gap: 4px 12px;
             }
             
             .tax-detail-item {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 4px;
+              margin-bottom: 2px;
             }
             
             .tax-detail-value {
@@ -356,23 +356,23 @@ export default function OrderInvoice() {
             .price-highlight {
               color: #059669;
               font-weight: 700;
-              font-size: 15px;
+              font-size: 12px;
             }
             
             .totals-section {
               display: flex;
               justify-content: space-between;
               align-items: flex-start;
-              margin-bottom: 40px;
+              margin-bottom: 16px;
             }
             
             .fbr-logos {
               display: flex;
-              gap: 25px;
+              gap: 12px;
               align-items: center;
               background: #f8fafc;
-              padding: 20px;
-              border-radius: 12px;
+              padding: 10px;
+              border-radius: 8px;
               border: 2px solid #e2e8f0;
             }
             
@@ -523,24 +523,17 @@ export default function OrderInvoice() {
                 ${order.buyerRegistrationType ? `<p>Registration Type: ${order.buyerRegistrationType}</p>` : ''}
                 ${order.buyerAddress ? `<p>${order.buyerAddress}</p>` : ''}
                 ${order.buyerProvince ? `<p>${order.buyerProvince} Province</p>` : ''}
-                ${(order.email || order.phone) ? `
-                <div class="contact-info hidden">
-                  ${order.email ? `<p>${order.email}</p>` : ''}
-                  ${order.phone ? `<p>Phone: ${order.phone}</p>` : ''}
-                </div>
-                ` : ''}
+                
               ` : order.user ? `
                 ${(order.user.name || order.user.firstName || order.user.lastName) ? `
                 <p><strong>${order.user.name || `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim()}</strong></p>
                 ` : ''}
-                ${order.user.email ? `<p>${order.user.email}</p>` : ''}
-                ${order.user.phone ? `<p>Phone: ${order.user.phone}</p>` : ''}
+                
                 ${order.user.buyerNTNCNIC ? `<p>NTN/CNIC: ${order.user.buyerNTNCNIC}</p>` : ''}
                 ${order.user.buyerAddress ? `<p>Address: ${order.user.buyerAddress}</p>` : ''}
               ` : `
                 <p><strong>${order.billingFirstName} ${order.billingLastName}</strong></p>
-                ${order.email ? `<p>${order.email}</p>` : ''}
-                ${order.phone ? `<p>Phone: ${order.phone}</p>` : ''}
+                
               `}
             </div>
             
