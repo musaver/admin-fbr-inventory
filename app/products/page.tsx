@@ -71,7 +71,15 @@ export default function ProductsList() {
     try {
       const res = await fetch('/api/products');
       const data = await res.json();
-      setProducts(data);
+      // Sort by createdAt desc (latest first)
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => {
+            const aTime = a?.product?.createdAt ? new Date(a.product.createdAt).getTime() : 0;
+            const bTime = b?.product?.createdAt ? new Date(b.product.createdAt).getTime() : 0;
+            return bTime - aTime;
+          })
+        : data;
+      setProducts(sorted);
     } catch (err) {
       console.error(err);
     } finally {
@@ -120,22 +128,23 @@ export default function ProductsList() {
     if (confirm(`Are you sure you want to delete ${selectedProducts.size} selected product(s)? This action cannot be undone.`)) {
       try {
         setLoading(true);
-        const deletePromises = Array.from(selectedProducts).map(productId =>
-          fetch(`/api/products/${productId}`, { method: 'DELETE' })
-        );
-        
-        const results = await Promise.all(deletePromises);
-        const failedDeletes = results.filter(res => !res.ok);
-        
-        if (failedDeletes.length === 0) {
+        const ids = Array.from(selectedProducts);
+        const res = await fetch('/api/products/delete-batch', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        });
+
+        if (res.ok) {
           // Remove deleted products from state
-          const remainingProducts = products.filter(item => !selectedProducts.has(item.product.id));
+          const remainingProducts = products.filter(item => !ids.includes(item.product.id));
           setProducts(remainingProducts);
           setSelectedProducts(new Set());
           setSelectAll(false);
-          alert(`${selectedProducts.size} product(s) deleted successfully.`);
+          alert(`${ids.length} product(s) deleted successfully.`);
         } else {
-          alert(`Failed to delete ${failedDeletes.length} product(s). Please try again.`);
+          const data = await res.json().catch(() => ({}));
+          alert(`Failed to delete selected products. ${data?.error || ''}`);
         }
       } catch (error) {
         console.error('Error deleting selected products:', error);

@@ -44,6 +44,8 @@ export default function UsersList() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -53,7 +55,13 @@ export default function UsersList() {
       
       // Ensure data is an array
       if (Array.isArray(data)) {
-        setUsers(data);
+        // Sort by createdAt desc (latest first)
+        const sorted = [...data].sort((a, b) => {
+          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+        setUsers(sorted);
       } else {
         console.error('API returned non-array data:', data);
         setUsers([]); // Fallback to empty array
@@ -78,6 +86,43 @@ export default function UsersList() {
       } catch (error) {
         console.error('Error deleting user:', error);
       }
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    setSelected(checked ? new Set(users.map(u => u.id)) : new Set());
+  };
+
+  const handleSelect = (id: string, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) next.add(id); else next.delete(id);
+    setSelected(next);
+    setSelectAll(next.size === users.length && users.length > 0);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected user(s)? This cannot be undone.`)) return;
+    try {
+      setLoading(true);
+      const ids = Array.from(selected);
+      const res = await fetch('/api/users/delete-batch', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => !ids.includes(u.id)));
+        setSelected(new Set());
+        setSelectAll(false);
+        alert(`${ids.length} user(s) deleted successfully.`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(`Failed to delete selected users. ${data?.error || ''}`);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -159,6 +204,26 @@ export default function UsersList() {
   const stats = getStats();
 
   const columns = [
+    {
+      key: 'select',
+      title: (
+        <input
+          type="checkbox"
+          checked={selectAll}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      width: '50px',
+      render: (_: any, u: User) => (
+        <input
+          type="checkbox"
+          checked={selected.has(u.id)}
+          onChange={(e) => handleSelect(u.id, e.target.checked)}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      )
+    },
     {
       key: 'name',
       title: 'User',
@@ -312,6 +377,9 @@ export default function UsersList() {
           <Button onClick={fetchUsers} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button onClick={handleDeleteSelected} disabled={loading || selected.size === 0} variant="destructive" size="sm">
+            Delete Selected ({selected.size})
           </Button>
           <Button asChild>
             <Link href="/users/add">
