@@ -80,7 +80,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       invoiceRefNo,
       scenarioId,
       invoiceNumber,
-      validationResponse
+      validationResponse,
+      isProductionSubmission
     } = body;
 
     // Get current order and items for stock management
@@ -151,6 +152,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (scenarioId !== undefined) updateData.scenarioId = scenarioId;
     if (invoiceNumber !== undefined) updateData.invoiceNumber = invoiceNumber;
     if (validationResponse !== undefined) updateData.validationResponse = validationResponse;
+    if (isProductionSubmission !== undefined) updateData.fbrEnvironment = isProductionSubmission ? 'production' : 'sandbox';
     if (newTotalAmount !== Number(order.totalAmount)) updateData.totalAmount = newTotalAmount;
 
     await db

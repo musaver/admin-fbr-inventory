@@ -458,6 +458,7 @@ export const orders = mysqlTable("orders", {
   invoiceNumber: varchar("invoice_number", { length: 255 }),
   invoiceDate: datetime("invoice_date"),
   validationResponse: text("validation_response"),
+  fbrEnvironment: varchar("fbr_environment", { length: 20 }).default("sandbox"), // 'sandbox' or 'production'
   
   // Buyer Information (from selected user/customer)
   buyerNTNCNIC: varchar("buyer_ntn_cnic", { length: 100 }),

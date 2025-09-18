@@ -538,6 +538,7 @@ export const POST = withTenant(async (req: NextRequest, context) => {
       invoiceNumber: fbrInvoiceNumber || invoiceNumber || null,
       invoiceDate: invoiceDate ? (typeof invoiceDate === 'string' && invoiceDate.includes('T') ? new Date(invoiceDate) : new Date(invoiceDate + 'T00:00:00.000Z')) : null,
       validationResponse: fbrResponse ? JSON.stringify(fbrResponse) : validationResponse || null,
+      fbrEnvironment: isProductionSubmission ? 'production' : 'sandbox',
       
       // Billing address
       billingFirstName: billingFirstName || null,

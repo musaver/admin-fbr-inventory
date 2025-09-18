@@ -65,6 +65,7 @@ interface Order {
   discountAmount: number;
   totalAmount: number;
   currency: string;
+  fbrEnvironment?: string;
   shippingFirstName?: string;
   shippingLastName?: string;
   shippingAddress1?: string;
@@ -629,6 +630,24 @@ export default function OrdersList() {
       mobileLabel: 'Payment'
     },
     {
+      key: 'fbrEnvironment',
+      title: 'FBR Type',
+      width: '90px',
+      render: (_: any, order: Order) => {
+        if (!order.fbrEnvironment) return <span className="text-xs text-gray-400">-</span>;
+        return (
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            order.fbrEnvironment === 'production' 
+              ? 'bg-orange-100 text-orange-800' 
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {order.fbrEnvironment === 'production' ? '🚨 Prod' : '🧪 Sand'}
+          </span>
+        );
+      },
+      mobileHidden: true
+    },
+    {
       key: 'driver',
       title: 'Assigned Driver',
       width: '180px',
@@ -717,6 +736,7 @@ export default function OrdersList() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+
           <Link href={`/orders/edit/${order.id}`} className="flex items-center">
             <EditIcon className="h-4 w-4 mr-2" />
             Edit

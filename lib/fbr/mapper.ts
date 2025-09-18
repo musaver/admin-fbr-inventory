@@ -145,24 +145,24 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
     baseAmount = 0;
   }
   
-  // Prioritize user-provided tax amounts, then calculate if not provided
+  // Calculate sales tax based on base amount and rate; if only a per-unit tax amount is provided, scale by quantity
   let salesTaxApplicable = 0;
   let salesTaxWithheldAtSource = 0;
   let fedPayable = 0;
   
-  // Use user-provided tax amount if available, otherwise calculate
-  if (item.taxAmount !== undefined && item.taxAmount !== null && item.taxAmount > 0) {
-    salesTaxApplicable = item.taxAmount;
-  } else {
-    // Calculate based on tax rate
-    const taxRate = item.taxPercentage !== undefined && item.taxPercentage !== null 
-      ? item.taxPercentage / 100 
-      : parseRate(getDefaultRateForScenario(scenarioId));
-    
-    // Only apply tax if not exempt/zero-rated, unless user explicitly provided tax amount
-    if (!isExemptOrZeroRated(scenarioId) || (item.taxPercentage !== undefined && item.taxPercentage > 0)) {
-      salesTaxApplicable = baseAmount * taxRate;
-    }
+  // Calculate based on tax rate (preferred path to avoid per-unit/total ambiguity)
+  const taxRate = item.taxPercentage !== undefined && item.taxPercentage !== null 
+    ? (typeof item.taxPercentage === 'string' ? parseFloat(item.taxPercentage as any) : item.taxPercentage) / 100 
+    : parseRate(getDefaultRateForScenario(scenarioId));
+
+  if (!isExemptOrZeroRated(scenarioId) || (item.taxPercentage !== undefined && Number(item.taxPercentage) > 0)) {
+    salesTaxApplicable = baseAmount * taxRate;
+  }
+
+  // If there is an explicit taxAmount but no percentage, treat it as per-unit and multiply by quantity
+  if ((item.taxPercentage === undefined || Number(item.taxPercentage) === 0) && item.taxAmount !== undefined && item.taxAmount !== null && Number(item.taxAmount) > 0) {
+    const perUnitTax = typeof item.taxAmount === 'string' ? parseFloat(item.taxAmount as any) : Number(item.taxAmount);
+    salesTaxApplicable = perUnitTax * (Number(item.quantity) || 1);
   }
   
   // Calculate withholding tax - only use user-provided value or 0
@@ -333,10 +333,12 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   
   // Add display fields for preview purposes (not sent to FBR API)
   if (item.priceIncludingTax !== undefined && item.priceIncludingTax !== null) {
-    fbrItem.priceIncludingTax = item.priceIncludingTax;
+    const unitInc = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax as any) : Number(item.priceIncludingTax);
+    fbrItem.priceIncludingTax = unitInc * (Number(item.quantity) || 1);
   }
   if (item.priceExcludingTax !== undefined && item.priceExcludingTax !== null) {
-    fbrItem.priceExcludingTax = item.priceExcludingTax;
+    const unitEx = typeof item.priceExcludingTax === 'string' ? parseFloat(item.priceExcludingTax as any) : Number(item.priceExcludingTax);
+    fbrItem.priceExcludingTax = unitEx * (Number(item.quantity) || 1);
   }
   if (item.taxPercentage !== undefined && item.taxPercentage !== null) {
     fbrItem.taxPercentage = item.taxPercentage;

@@ -1,11 +1,158 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import CurrencySymbol from '../../../components/CurrencySymbol';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Check, ChevronsUpDown, Plus, UserPlus, PackagePlus, Loader } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { format } from "date-fns";
 import { 
   formatWeightAuto, 
-  isWeightBasedProduct 
+  parseWeightInput,
+  calculateWeightBasedPrice
 } from '@/utils/weightUtils';
+import { useCurrency } from '@/app/contexts/CurrencyContext';
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  sku?: string;
+  price: number;
+  productType: string;
+  isActive: boolean;
+  supplierId?: string;
+  variants?: ProductVariant[];
+  addons?: ProductAddon[];
+  hsCode?: string;
+  stockManagementType?: string;
+  pricePerUnit?: number;
+  baseWeightUnit?: string;
+  uom?: string;
+  taxAmount?: number;
+  taxPercentage?: number;
+  priceIncludingTax?: number;
+  priceExcludingTax?: number;
+  extraTax?: number;
+  furtherTax?: number;
+  fedPayableTax?: number;
+  discount?: number;
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+  fixedNotifiedValueOrRetailPrice?: number;
+  saleType?: string;
+}
+
+interface ProductVariant {
+  id: string;
+  title: string;
+  sku?: string;
+  price: number;
+  isActive: boolean;
+  inventoryQuantity: number;
+}
+
+interface Addon {
+  id: string;
+  title: string;
+  price: number;
+  description?: string;
+  image?: string;
+  isActive: boolean;
+}
+
+interface ProductAddon {
+  id: string;
+  productId: string;
+  addonId: string;
+  price: number;
+  isRequired: boolean;
+  sortOrder: number;
+  isActive: boolean;
+  addon: Addon;
+}
+
+interface SelectedAddon {
+  addonId: string;
+  addonTitle: string;
+  price: number;
+  quantity: number;
+}
+
+interface OrderItem {
+  id?: string;
+  productId: string;
+  variantId?: string;
+  productName: string;
+  productDescription?: string;
+  variantTitle?: string;
+  sku?: string;
+  hsCode?: string;
+  price: number;
+  quantity: number;
+  totalPrice: number;
+  addons?: SelectedAddon[];
+  weightQuantity?: number;
+  weightUnit?: string;
+  isWeightBased?: boolean;
+  uom?: string;
+  itemSerialNumber?: string;
+  sroScheduleNumber?: string;
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+  taxAmount?: number | string;
+  taxPercentage?: number | string;
+  priceIncludingTax?: number | string;
+  priceExcludingTax?: number | string;
+  extraTax?: number | string;
+  furtherTax?: number | string;
+  fedPayableTax?: number | string;
+  discount?: number | string;
+  fixedNotifiedValueOrRetailPrice?: number | string;
+  saleType?: string;
+}
+
+interface Customer {
+  id: string;
+  name?: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  buyerNTNCNIC?: string;
+  buyerBusinessName?: string;
+  buyerProvince?: string;
+  buyerAddress?: string;
+  buyerRegistrationType?: string;
+  userType?: string;
+  tenantId?: string;
+  loyaltyPoints?: {
+    availablePoints: number;
+    pendingPoints: number;
+    totalPointsEarned: number;
+    totalPointsRedeemed: number;
+    pointsExpiringSoon: number;
+  };
+}
 
 interface Order {
   id: string;
@@ -24,7 +171,6 @@ interface Order {
   currency: string;
   notes?: string;
   
-  // Billing address
   billingFirstName?: string;
   billingLastName?: string;
   billingAddress1?: string;
@@ -34,7 +180,6 @@ interface Order {
   billingPostalCode?: string;
   billingCountry?: string;
   
-  // Shipping address
   shippingFirstName?: string;
   shippingLastName?: string;
   shippingAddress1?: string;
@@ -48,12 +193,12 @@ interface Order {
   trackingNumber?: string;
   cancelReason?: string;
   
-  // Invoice and validation fields
   invoiceType?: string;
   invoiceRefNo?: string;
   scenarioId?: string;
   invoiceNumber?: string;
   validationResponse?: string;
+  fbrEnvironment?: string;
   
   createdAt: string;
   updatedAt: string;
@@ -63,63 +208,59 @@ interface Order {
     id: string;
     name?: string;
     email: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    buyerNTNCNIC?: string;
+    buyerBusinessName?: string;
+    buyerProvince?: string;
+    buyerAddress?: string;
+    buyerRegistrationType?: string;
   };
+  
+  assignedDriverId?: string;
+  deliveryStatus?: string;
+  pointsToRedeem?: number;
+  pointsDiscountAmount?: number;
+  supplierId?: string;
+  invoiceDate?: string;
+  buyerFirstName?: string;
+  buyerLastName?: string;
+  buyerFullName?: string;
+  buyerNTNCNIC?: string;
+  buyerBusinessName?: string;
+  buyerProvince?: string;
+  buyerAddress?: string;
+  buyerRegistrationType?: string;
 }
 
-interface OrderItem {
-  id: string;
-  productId: string;
-  variantId?: string;
-  productName: string;
-  variantTitle?: string;
-  sku?: string;
-  hsCode?: string; // Harmonized System Code
-  quantity: number;
-  price: number;
-  totalPrice: number;
-  productImage?: string;
-  // Weight-based fields
-  isWeightBased?: boolean;
-  weightQuantity?: number; // Weight in grams
-  weightUnit?: string; // Display unit (grams, kg)
-  // Tax and discount fields
-  taxAmount?: number;
-  taxPercentage?: number;
-  priceIncludingTax?: number;
-  priceExcludingTax?: number;
-  extraTax?: number;
-  furtherTax?: number;
-  fedPayableTax?: number;
-  discount?: number;
-  addons?: Array<{
-    addonId: string;
-    addonTitle?: string;
-    title?: string;
-    name?: string;
-    price: number;
-    quantity: number;
-  }>;
-}
 
 export default function EditOrder() {
   const router = useRouter();
-  const [orderId, setOrderId] = useState('');
+  const params = useParams();
+  const { currentCurrency } = useCurrency();
+  const [orderId, setOrderId] = useState<string>('');
   const [order, setOrder] = useState<Order | null>(null);
-  const [addons, setAddons] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
-  const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
+  
+  // Error scroll reference
+  const errorRef = useRef<HTMLDivElement>(null);
+  
+  const sidebarContainerRef = useRef<HTMLDivElement>(null);
   
   // Loyalty points state
   const [loyaltySettings, setLoyaltySettings] = useState({
     enabled: false,
+    earningRate: 1,
+    earningBasis: 'subtotal',
     redemptionValue: 0.01,
     maxRedemptionPercent: 50,
     redemptionMinimum: 100,
-    earningRate: 1,
-    earningBasis: 'subtotal',
     minimumOrder: 0
   });
   const [customerPoints, setCustomerPoints] = useState({
@@ -128,123 +269,633 @@ export default function EditOrder() {
     totalPointsRedeemed: 0
   });
   
-  // Edit states
-  const [editData, setEditData] = useState({
-    status: '',
-    paymentStatus: '',
-    fulfillmentStatus: '',
-    shippingAmount: 0,
-    discountAmount: 0,
+  
+  // Seller information (auto-filled from env but editable)
+  const [sellerInfo, setSellerInfo] = useState({
+    sellerNTNCNIC: '',
+    sellerBusinessName: '',
+    sellerProvince: '',
+    sellerAddress: '',
+    fbrSandboxToken: '',
+    fbrBaseUrl: ''
+  });
+
+  const [skipCustomerEmail, setSkipCustomerEmail] = useState(true);
+  const [skipSellerEmail, setSkipSellerEmail] = useState(true);
+  const [skipFbrSubmission, setSkipFbrSubmission] = useState(false);
+  const [isProductionSubmission, setIsProductionSubmission] = useState(false);
+  const [productionToken, setProductionToken] = useState('');
+  
+  // Order form data
+  const [orderData, setOrderData] = useState({
+    customerId: '',
+    email: '',
+    phone: '',
+    status: 'pending',
+    paymentStatus: 'pending',
     notes: '',
-    shippingMethod: '',
-    trackingNumber: '',
-    cancelReason: '',
+    shippingAmount: 0,
+    taxRate: 0,
+    discountAmount: 0,
+    discountType: 'amount',
+    currency: currentCurrency,
     assignedDriverId: '',
     deliveryStatus: 'pending',
-    // Loyalty points fields
+    assignmentType: 'manual',
     pointsToRedeem: 0,
     pointsDiscountAmount: 0,
     useAllPoints: false,
-    // Invoice and validation fields
-    invoiceType: '',
+    supplierId: '' as string,
+    invoiceType: 'Sale Invoice',
     invoiceRefNo: '',
     scenarioId: '',
     invoiceNumber: '',
-    validationResponse: ''
+    invoiceDate: new Date() as Date | undefined,
+    validationResponse: '',
+    buyerFullName: '',
+    buyerNTNCNIC: '',
+    buyerBusinessName: '',
+    buyerProvince: '',
+    buyerAddress: '',
+    buyerRegistrationType: ''
   });
 
-  const orderStatuses = [
-    { value: 'pending', label: 'Pending', description: 'Order received, awaiting confirmation' },
-    { value: 'confirmed', label: 'Confirmed', description: 'Order confirmed, awaiting processing' },
-    { value: 'processing', label: 'Processing', description: 'Order is being prepared' },
-    { value: 'completed', label: 'Completed', description: 'Order has been completed' },
-    { value: 'cancelled', label: 'Cancelled', description: 'Order has been cancelled' }
-  ];
+  const [isCustomProvince, setIsCustomProvince] = useState(false);
+  const [isCustomSellerProvince, setIsCustomSellerProvince] = useState(false);
 
-  const paymentStatuses = [
-    { value: 'pending', label: 'Pending', description: 'Payment not yet received' },
-    { value: 'paid', label: 'Paid', description: 'Payment completed successfully' },
-    { value: 'failed', label: 'Failed', description: 'Payment attempt failed' },
-    { value: 'refunded', label: 'Refunded', description: 'Payment has been refunded' }
-  ];
+  // Customer/shipping information
+  const [customerInfo, setCustomerInfo] = useState({
+    isGuest: true,
+    billingFirstName: '',
+    billingLastName: '',
+    billingAddress1: '',
+    billingAddress2: '',
+    billingCity: '',
+    billingState: '',
+    billingPostalCode: '',
+    billingCountry: 'US',
+    shippingFirstName: '',
+    shippingLastName: '',
+    shippingAddress1: '',
+    shippingAddress2: '',
+    shippingCity: '',
+    shippingState: '',
+    shippingPostalCode: '',
+    shippingCountry: 'US',
+    shippingMethod: '',
+    useShippingAsBilling: false,
+  });
 
-  const fulfillmentStatuses = [
-    { value: 'pending', label: 'Pending', description: 'Awaiting fulfillment' },
-    { value: 'fulfilled', label: 'Fulfilled', description: 'Order completely fulfilled' },
-    { value: 'partially_fulfilled', label: 'Partially Fulfilled', description: 'Some items fulfilled' }
-  ];
+  // Search and filter states
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [selectedProductCategory, setSelectedProductCategory] = useState('all');
 
-  const deliveryStatuses = [
-    { value: 'pending', label: 'Pending', description: 'Delivery not yet assigned' },
-    { value: 'assigned', label: 'Assigned', description: 'Driver assigned to delivery' },
-    { value: 'picked_up', label: 'Picked Up', description: 'Order picked up by driver' },
-    { value: 'out_for_delivery', label: 'Out for Delivery', description: 'Order out for delivery' },
-    { value: 'delivered', label: 'Delivered', description: 'Order successfully delivered' },
-    { value: 'failed', label: 'Failed', description: 'Delivery attempt failed' }
-  ];
+  // Product selection state for detailed entry
+  const [productSelection, setProductSelection] = useState({
+    selectedProductId: '',
+    selectedVariantId: '',
+    quantity: 1,
+    customPrice: '',
+    weightInput: '',
+    weightUnit: 'grams' as 'grams' | 'kg',
+    uom: '',
+    hsCode: '',
+    itemSerialNumber: '',
+    sroScheduleNumber: '',
+    productName: '',
+    productDescription: '',
+    taxAmount: 0 as string | number,
+    taxPercentage: 0 as string | number,
+    priceIncludingTax: 0 as string | number,
+    priceExcludingTax: 0 as string | number,
+    extraTax: 0 as string | number,
+    furtherTax: 0 as string | number,
+    fedPayableTax: 0 as string | number,
+    discountAmount: 0 as string | number,
+    fixedNotifiedValueOrRetailPrice: 0 as string | number,
+    saleType: 'Goods at standard rate',
+    serialNumber: '',
+    listNumber: '',
+    bcNumber: '',
+    lotNumber: '',
+    expiryDate: ''
+  });
 
-  // Format date and time to "Aug 5, 2025 at 5:57 PM" format
-  const formatDateTime = (dateString: string) => {
+  // Loading states
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [isTaxCalculating, setIsTaxCalculating] = useState(false);
+
+  // FBR scenario management
+  const [isCustomScenario, setIsCustomScenario] = useState(false);
+
+  // FBR preview and confirmation states
+  const [fbrPreviewData, setFbrPreviewData] = useState<any>(null);
+  const [fbrJsonPreview, setFbrJsonPreview] = useState<any>(null);
+  const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
+  const [showProductionConfirmation, setShowProductionConfirmation] = useState(false);
+  const [generatingPreview, setGeneratingPreview] = useState(false);
+  const [showJsonPreview, setShowJsonPreview] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+
+  // Helper function to format date for FBR
+  const formatDateForFbr = (dateString: string): string => {
+    if (!dateString) return new Date().toISOString().split('T')[0];
     const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    };
-    return date.toLocaleDateString('en-US', options).replace(',', ' at');
+    return date.toISOString().split('T')[0];
   };
 
+  // Helper function to safely format price
+  const safeFormatPrice = (price: number | string | undefined | null): string => {
+    if (price === null || price === undefined) return '0.00';
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
+  };
+
+  // Generate FBR invoice preview data
+  const generateFbrPreview = async () => {
+    setGeneratingPreview(true);
+    try {
+      const totals = calculateTotals();
+      
+      const orderForPreview = {
+        email: orderData.email,
+        scenarioId: orderData.scenarioId,
+        invoiceType: orderData.invoiceType || 'Sale Invoice',
+        invoiceDate: orderData.invoiceDate ? formatDateForFbr(orderData.invoiceDate.toString()) : undefined,
+        invoiceRefNo: orderData.invoiceRefNo,
+        subtotal: parseFloat(totals.subtotal.toString()),
+        totalAmount: parseFloat(totals.total.toString()),
+        taxAmount: parseFloat((totals.taxAmount || 0).toString()),
+        currency: orderData.currency,
+        items: orderItems,
+        buyerFirstName: customerInfo.billingFirstName || customerInfo.shippingFirstName || '',
+        buyerLastName: customerInfo.billingLastName || customerInfo.shippingLastName || '',
+        buyerFullName: `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim(),
+        buyerNTNCNIC: '',
+        buyerBusinessName: '',
+        buyerProvince: orderData.buyerProvince || '',
+        buyerAddress: orderData.buyerAddress || '',
+        buyerRegistrationType: orderData.buyerRegistrationType || '',
+        
+        // Seller fields
+        sellerNTNCNIC: sellerInfo.sellerNTNCNIC || '',
+        sellerBusinessName: sellerInfo.sellerBusinessName || '',
+        sellerProvince: sellerInfo.sellerProvince || '',
+        sellerAddress: sellerInfo.sellerAddress || '',
+        fbrSandboxToken: isProductionSubmission ? productionToken : sellerInfo.fbrSandboxToken,
+        fbrBaseUrl: sellerInfo.fbrBaseUrl || '',
+        isProductionSubmission: isProductionSubmission
+      };
+      
+      // Make preview request to get FBR formatted data
+      console.log('🚀 Sending FBR Preview Request:', orderForPreview);
+      const response = await fetch('/api/fbr/submit?preview=true', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderForPreview)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🔍 FBR Preview API Response:', result);
+        
+        const raw = result.fbrInvoice || result;
+        // Enhance preview with quantity-adjusted totals for display
+        const enhanced = { ...raw } as any;
+        
+        // Ensure buyer name exists in preview
+        const computedBuyerName = (orderData.buyerFullName || `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim()) || '';
+        if (!enhanced.buyerFullName) enhanced.buyerFullName = computedBuyerName;
+        if (!enhanced.buyerFirstName) enhanced.buyerFirstName = customerInfo.billingFirstName || customerInfo.shippingFirstName || '';
+        if (!enhanced.buyerLastName) enhanced.buyerLastName = customerInfo.billingLastName || customerInfo.shippingLastName || '';
+        
+        if (Array.isArray(enhanced.items)) {
+          enhanced.items = enhanced.items.map((it: any, idx: number) => {
+            const src = orderItems[idx] || {} as any;
+            const qty = Number(src.quantity ?? it.quantity ?? 1) || 1;
+            const pct = Number(src.taxPercentage ?? it.taxPercentage ?? 0) || 0;
+            const unitEx = (() => {
+              const ex = Number(src.priceExcludingTax ?? it.priceExcludingTax ?? 0) || 0;
+              if (ex > 0) return ex;
+              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
+              if (inc > 0 && pct > 0) return inc / (1 + pct / 100);
+              return Number(src.price ?? it.rate ?? 0) || 0;
+            })();
+            const unitTax = (() => {
+              const t = Number(src.taxAmount ?? it.taxAmount ?? 0) || 0;
+              if (t > 0) return t;
+              if (pct > 0 && unitEx > 0) return (unitEx * pct) / 100;
+              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
+              if (inc > 0 && unitEx > 0) return inc - unitEx;
+              return 0;
+            })();
+            const unitInc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || (unitEx + unitTax);
+            return {
+              ...it,
+              quantity: qty,
+              priceExcludingTaxTotal: unitEx * qty,
+              priceIncludingTaxTotal: unitInc * qty,
+              salesTaxApplicable: unitTax * qty, // for display
+              valueSalesExcludingST: unitEx * qty,
+              totalValues: unitInc * qty,
+            };
+          });
+        }
+        setFbrPreviewData(enhanced);
+        setFbrJsonPreview(enhanced); // Store adjusted JSON for display
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to generate FBR preview:', response.status, response.statusText, errorText);
+        setError(`Failed to generate FBR preview: ${response.status} ${response.statusText} - ${errorText}`);
+        setFbrPreviewData(null);
+        setFbrJsonPreview(null);
+      }
+      
+    } catch (error) {
+      console.error('Error generating FBR preview:', error);
+      setError(`Failed to generate FBR preview: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setFbrPreviewData(null);
+      setFbrJsonPreview(null);
+    } finally {
+      setGeneratingPreview(false);
+    }
+  };
+
+  // Function to preview JSON without submitting
+  const handlePreviewJson = () => {
+    if (orderItems.length === 0) {
+      setError('Please add at least one product to preview JSON');
+      // Scroll to error
+      setTimeout(() => {
+        if (errorRef.current) {
+          errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
+      return;
+    }
+    
+    setError('');
+    generateFbrPreview().then(() => {
+      if (fbrPreviewData) {
+        setShowJsonPreview(true);
+      }
+    });
+  };
+
+  // Duplicate order handler
+  const handleDuplicateOrder = async () => {
+    if (!order) {
+      setError('No order data available to duplicate');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to create a duplicate of this order? This will create a new order with a new order number.')) {
+      return;
+    }
+
+    setDuplicating(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/orders/${orderId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to duplicate order');
+      }
+
+      const result = await response.json();
+      
+      // Redirect to the new duplicated order
+      router.push(`/orders/edit/${result.newOrderId}`);
+    } catch (err: any) {
+      setError(`Failed to duplicate order: ${err.message}`);
+      if (errorRef.current) {
+        errorRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  // Helper functions for product management
+  const isWeightBasedProduct = (stockManagementType: string) => {
+    return stockManagementType === 'weight';
+  };
+
+  const convertToGrams = (weight: number, unit: 'grams' | 'kg'): number => {
+    return unit === 'kg' ? weight * 1000 : weight;
+  };
+
+  const getPricePerGram = (product: Product): number => {
+    const pricePerUnit = Number(product.pricePerUnit) || 0;
+    if (product.baseWeightUnit === 'kg') {
+      return pricePerUnit / 1000;
+    }
+    return pricePerUnit;
+  };
+
+  const calculateTaxAmount = async (priceExcludingTax: number, taxPercentage: number) => {
+    if (priceExcludingTax <= 0 || taxPercentage <= 0) {
+      return 0;
+    }
+    setIsTaxCalculating(true);
+    
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const taxAmount = (priceExcludingTax * taxPercentage) / 100;
+    const roundedTaxAmount = Math.round(taxAmount * 100) / 100;
+    
+    setIsTaxCalculating(false);
+    return roundedTaxAmount;
+  };
+
+
   useEffect(() => {
-    // Get order ID from URL
-    const pathParts = window.location.pathname.split('/');
-    const id = pathParts[pathParts.length - 1];
+    const id = params.id as string;
     setOrderId(id);
     
     if (id) {
       fetchOrder(id);
     }
     
-    // Fetch stock management setting, addons, drivers, and loyalty settings
-    fetchStockManagementSetting();
-    fetchAddons();
-    fetchDrivers();
+    fetchProducts();
+    fetchCustomers();
     fetchLoyaltySettings();
-  }, []);
+    fetchSellerInfo();
+  }, [params.id]);
 
-  const fetchStockManagementSetting = async () => {
+  // Populate product selection form when product is selected
+  useEffect(() => {
+    if (productSelection.selectedProductId && products.length > 0) {
+      const product = products.find(p => p.id === productSelection.selectedProductId);
+      if (product) {
+        setProductSelection(prev => ({
+          ...prev,
+          hsCode: product.hsCode || '',
+          productName: product.name || '',
+          productDescription: product.description || product.name || '',
+          taxAmount: product.taxAmount || 0,
+          taxPercentage: product.taxPercentage || 0,
+          priceIncludingTax: product.priceIncludingTax || 0,
+          priceExcludingTax: product.priceExcludingTax || 0,
+          extraTax: product.extraTax || 0,
+          furtherTax: product.furtherTax || 0,
+          fedPayableTax: product.fedPayableTax || 0,
+          discountAmount: product.discount || 0,
+          fixedNotifiedValueOrRetailPrice: 0,
+          saleType: 'Goods at standard rate',
+          serialNumber: product.serialNumber || '',
+          listNumber: product.listNumber || '',
+          bcNumber: product.bcNumber || '',
+          lotNumber: product.lotNumber || '',
+          expiryDate: product.expiryDate || '',
+          uom: product.uom || ''
+        }));
+      }
+    }
+  }, [productSelection.selectedProductId, products]);
+
+  const fetchOrder = async (id: string) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/settings/stock-management');
-      const data = await res.json();
-      setStockManagementEnabled(data.stockManagementEnabled);
-    } catch (err) {
-      console.error('Error fetching stock management setting:', err);
+      const response = await fetch(`/api/orders/${id}`);
+      if (!response.ok) {
+        throw new Error('Order not found');
+      }
+      
+      const orderData = await response.json();
+      setOrder(orderData);
+      
+      // Pre-populate all form data from existing order
+      // Standard FBR scenario IDs
+      const standardScenarios = [
+        'SN001', 'SN002', 'SN003', 'SN004', 'SN005', 'SN006', 'SN007', 'SN008',
+        'SN009', 'SN010', 'SN011', 'SN012', 'SN013', 'SN014', 'SN015', 'SN016',
+        'SN017', 'SN018', 'SN019', 'SN020', 'SN021', 'SN022', 'SN023', 'SN024',
+        'SN025', 'SN026', 'SN027', 'SN028'
+      ];
+      
+      // Check if scenario ID is custom (not in standard list)
+      const currentScenarioId = orderData.scenarioId || '';
+      const isCustom = currentScenarioId && !standardScenarios.includes(currentScenarioId);
+      setIsCustomScenario(isCustom);
+      
+      // Initialize FBR submission settings from order data
+      if (orderData.skipFbrSubmission !== undefined) {
+        setSkipFbrSubmission(orderData.skipFbrSubmission);
+      }
+      if (orderData.isProductionSubmission !== undefined) {
+        setIsProductionSubmission(orderData.isProductionSubmission);
+      }
+      if (orderData.productionToken) {
+        setProductionToken(orderData.productionToken);
+      }
+      
+      // Initialize province dropdown states
+      const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+      if (orderData.buyerProvince && !predefinedProvinces.includes(orderData.buyerProvince)) {
+        setIsCustomProvince(true);
+      }
+
+      setOrderData({
+        customerId: orderData.userId || '',
+        email: orderData.email || '',
+        phone: orderData.phone || '',
+        status: orderData.status || 'pending',
+        paymentStatus: orderData.paymentStatus || 'pending',
+        notes: orderData.notes || '',
+        shippingAmount: Number(orderData.shippingAmount) || 0,
+        taxRate: 0,
+        discountAmount: Number(orderData.discountAmount) || 0,
+        discountType: 'amount',
+        currency: orderData.currency || currentCurrency,
+        assignedDriverId: orderData.assignedDriverId || '',
+        deliveryStatus: orderData.deliveryStatus || 'pending',
+        assignmentType: 'manual',
+        pointsToRedeem: Number(orderData.pointsToRedeem) || 0,
+        pointsDiscountAmount: Number(orderData.pointsDiscountAmount) || 0,
+        useAllPoints: false,
+        supplierId: orderData.supplierId || '',
+        invoiceType: orderData.invoiceType || 'Sale Invoice',
+        invoiceRefNo: orderData.invoiceRefNo || '',
+        scenarioId: currentScenarioId,
+        invoiceNumber: orderData.invoiceNumber || '',
+        invoiceDate: orderData.invoiceDate ? new Date(orderData.invoiceDate) : new Date(),
+        validationResponse: orderData.validationResponse || '',
+        buyerFullName: orderData.buyerFullName || orderData.user?.name || '',
+        buyerNTNCNIC: orderData.buyerNTNCNIC || orderData.user?.buyerNTNCNIC || '',
+        buyerBusinessName: orderData.buyerBusinessName || orderData.user?.buyerBusinessName || '',
+        buyerProvince: orderData.buyerProvince || orderData.user?.buyerProvince || '',
+        buyerAddress: orderData.buyerAddress || orderData.user?.buyerAddress || '',
+        buyerRegistrationType: orderData.buyerRegistrationType || orderData.user?.buyerRegistrationType || ''
+      });
+
+      // Pre-populate customer information
+      setCustomerInfo({
+        isGuest: !orderData.userId,
+        billingFirstName: orderData.billingFirstName || '',
+        billingLastName: orderData.billingLastName || '',
+        billingAddress1: orderData.billingAddress1 || '',
+        billingAddress2: orderData.billingAddress2 || '',
+        billingCity: orderData.billingCity || '',
+        billingState: orderData.billingState || '',
+        billingPostalCode: orderData.billingPostalCode || '',
+        billingCountry: orderData.billingCountry || 'US',
+        shippingFirstName: orderData.shippingFirstName || '',
+        shippingLastName: orderData.shippingLastName || '',
+        shippingAddress1: orderData.shippingAddress1 || '',
+        shippingAddress2: orderData.shippingAddress2 || '',
+        shippingCity: orderData.shippingCity || '',
+        shippingState: orderData.shippingState || '',
+        shippingPostalCode: orderData.shippingPostalCode || '',
+        shippingCountry: orderData.shippingCountry || 'US',
+        shippingMethod: orderData.shippingMethod || '',
+        useShippingAsBilling: false,
+      });
+
+      // Pre-populate order items
+      if (orderData.items) {
+        const processedItems = orderData.items.map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          productName: item.productName,
+          productDescription: item.productDescription,
+          variantTitle: item.variantTitle,
+          sku: item.sku,
+          hsCode: item.hsCode,
+          price: Number(item.price),
+          quantity: Number(item.quantity),
+          totalPrice: Number(item.totalPrice),
+          addons: item.addons ? (Array.isArray(item.addons) ? item.addons : JSON.parse(item.addons || '[]')) : [],
+          weightQuantity: item.weightQuantity ? Number(item.weightQuantity) : undefined,
+          weightUnit: item.weightUnit,
+          isWeightBased: item.isWeightBased || (item.weightQuantity && Number(item.weightQuantity) > 0),
+          uom: item.uom,
+          itemSerialNumber: item.itemSerialNumber,
+          sroScheduleNumber: item.sroScheduleNumber,
+          serialNumber: item.serialNumber,
+          listNumber: item.listNumber,
+          bcNumber: item.bcNumber,
+          lotNumber: item.lotNumber,
+          expiryDate: item.expiryDate,
+          taxAmount: Number(item.taxAmount) || 0,
+          taxPercentage: Number(item.taxPercentage) || 0,
+          priceIncludingTax: Number(item.priceIncludingTax) || 0,
+          priceExcludingTax: Number(item.priceExcludingTax) || 0,
+          extraTax: Number(item.extraTax) || 0,
+          furtherTax: Number(item.furtherTax) || 0,
+          fedPayableTax: Number(item.fedPayableTax) || 0,
+          discount: Number(item.discount) || 0,
+          fixedNotifiedValueOrRetailPrice: Number(item.fixedNotifiedValueOrRetailPrice) || 0,
+          saleType: item.saleType
+        }));
+        setOrderItems(processedItems);
+      }
+
+      // Fetch customer points if loyalty is enabled and customer exists
+      if (orderData.userId && loyaltySettings.enabled) {
+        fetchCustomerPoints(orderData.userId);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchAddons = async () => {
+  const fetchProducts = async () => {
     try {
-      const addonsRes = await fetch('/api/addons');
-      if (addonsRes.ok) {
-        const addonsData = await addonsRes.json();
-        setAddons(addonsData);
+      const response = await fetch('/api/products');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Raw products data:', data.length, 'products');
+        
+        // Process products to include variants and addons
+        const processedProducts = await Promise.all(
+          data.map(async (productItem: any) => {
+            const product = {
+              ...productItem.product,
+              category: productItem.category,
+              subcategory: productItem.subcategory,
+              supplier: productItem.supplier
+            };
+            
+            // Convert price to number
+            product.price = Number(product.price) || 0;
+            
+            if (product.productType === 'variable') {
+              try {
+                const variantsRes = await fetch(`/api/product-variants?productId=${product.id}`);
+                if (variantsRes.ok) {
+                  const variantsData = await variantsRes.json();
+                  product.variants = variantsData.map((v: any) => ({
+                    ...v.variant,
+                    price: Number(v.variant.price) || 0
+                  }));
+                }
+              } catch (err) {
+                console.error('Error fetching variants for product', product.id, err);
+                product.variants = [];
+              }
+            } else if (product.productType === 'group') {
+              try {
+                const addonsRes = await fetch(`/api/product-addons?productId=${product.id}`);
+                if (addonsRes.ok) {
+                  const addonsData = await addonsRes.json();
+                  product.addons = addonsData.map((a: any) => ({
+                    ...a,
+                    price: Number(a.price) || 0
+                  }));
+                }
+              } catch (err) {
+                console.error('Error fetching addons for product', product.id, err);
+                product.addons = [];
+              }
+            }
+            
+            return product;
+          })
+        );
+        
+        console.log('Processed products:', processedProducts.length, 'products');
+        setProducts(processedProducts);
+      } else {
+        console.error('Failed to fetch products, status:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch addons:', err);
+      console.error('Failed to fetch products:', err);
     }
   };
 
-  const fetchDrivers = async () => {
+  const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/drivers/available?includeAll=true');
-      const data = await res.json();
-      setAvailableDrivers(data.drivers || []);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to only get customers (users with userType 'customer' or null)
+        const customers = data.filter((user: any) => 
+          user.userType === 'customer' || user.userType === null
+        );
+        console.log('Customers fetched:', customers.length, 'customers');
+        setCustomers(customers);
+      } else {
+        console.error('Failed to fetch customers, status:', response.status);
+      }
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
     }
   };
+
 
   const fetchLoyaltySettings = async () => {
     try {
@@ -268,6 +919,34 @@ export default function EditOrder() {
     }
   };
 
+  const fetchSellerInfo = async () => {
+    try {
+      const response = await fetch('/api/seller-info');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Seller info fetched:', data);
+        setSellerInfo({
+          sellerNTNCNIC: data.sellerNTNCNIC || '',
+          sellerBusinessName: data.sellerBusinessName || '',
+          sellerProvince: data.sellerProvince || '',
+          sellerAddress: data.sellerAddress || '',
+          fbrSandboxToken: data.fbrSandboxToken || '',
+          fbrBaseUrl: data.fbrBaseUrl || ''
+        });
+        
+        // Set custom seller province flag if the loaded province is not in predefined list
+        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
+        if (data.sellerProvince && !predefinedSellerProvinces.includes(data.sellerProvince)) {
+          setIsCustomSellerProvince(true);
+        }
+      } else {
+        console.error('Failed to fetch seller info, status:', response.status);
+      }
+    } catch (err) {
+      console.error('Error fetching seller info:', err);
+    }
+  };
+
   const fetchCustomerPoints = async (customerId: string) => {
     try {
       const response = await fetch(`/api/loyalty/points?userId=${customerId}`);
@@ -286,6 +965,403 @@ export default function EditOrder() {
     }
   };
 
+  // Customer selection functions
+  const handleCustomerSelect = (customer: Customer) => {
+    setOrderData(prev => ({
+      ...prev,
+      customerId: customer.id,
+      email: customer.email,
+      phone: customer.phone || '',
+      buyerFullName: customer.name || '',
+      buyerNTNCNIC: customer.buyerNTNCNIC || '',
+      buyerBusinessName: customer.buyerBusinessName || '',
+      buyerProvince: customer.buyerProvince || '',
+      buyerAddress: customer.buyerAddress || '',
+      buyerRegistrationType: customer.buyerRegistrationType || ''
+    }));
+    
+    // Set custom province flag if the selected customer's province is not in predefined list
+    const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+    if (customer.buyerProvince && !predefinedProvinces.includes(customer.buyerProvince)) {
+      setIsCustomProvince(true);
+    } else {
+      setIsCustomProvince(false);
+    }
+
+    setCustomerInfo(prev => ({
+      ...prev,
+      isGuest: false,
+      billingFirstName: customer.name?.split(' ')[0] || '',
+      billingLastName: customer.name?.split(' ').slice(1).join(' ') || '',
+      billingAddress1: customer.address || '',
+      billingCity: customer.city || '',
+      billingState: customer.state || '',
+      billingPostalCode: customer.postalCode || '',
+      billingCountry: customer.country || 'US'
+    }));
+
+    // Set loyalty points from customer data if available
+    if (loyaltySettings.enabled && customer.loyaltyPoints) {
+      setCustomerPoints({
+        availablePoints: customer.loyaltyPoints.availablePoints || 0,
+        totalPointsEarned: customer.loyaltyPoints.totalPointsEarned || 0,
+        totalPointsRedeemed: customer.loyaltyPoints.totalPointsRedeemed || 0
+      });
+    } else if (loyaltySettings.enabled) {
+      // Fallback to fetching points if not included in customer data
+      fetchCustomerPoints(customer.id);
+    }
+
+    setCustomerSearchOpen(false);
+  };
+
+  // Product search and filter functions
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = (product.name && product.name.toLowerCase().includes(productSearchTerm.toLowerCase())) ||
+                         (product.sku && product.sku.toLowerCase().includes(productSearchTerm.toLowerCase()));
+    const matchesCategory = selectedProductCategory === 'all' || product.productType === selectedProductCategory;
+    return matchesSearch && matchesCategory && product.isActive;
+  });
+
+  const productCategories = Array.from(new Set(products.map(p => p.productType).filter(Boolean)));
+
+  // Quick add product to order (from search dropdown)
+  const quickAddProductToOrder = (product: Product, variant?: ProductVariant) => {
+    setProductSelection({
+      selectedProductId: product.id,
+      selectedVariantId: variant?.id || '',
+      quantity: 1,
+      customPrice: '',
+      weightInput: '',
+      weightUnit: 'grams',
+      uom: '',
+      hsCode: product.hsCode || '',
+      itemSerialNumber: '',
+      sroScheduleNumber: '',
+      productName: product.name || '',
+      productDescription: product.description || product.name || '',
+      taxAmount: product.taxAmount || 0,
+      taxPercentage: product.taxPercentage || 0,
+      priceIncludingTax: product.priceIncludingTax || 0,
+      priceExcludingTax: product.priceExcludingTax || 0,
+      extraTax: product.extraTax || 0,
+      furtherTax: product.furtherTax || 0,
+      fedPayableTax: product.fedPayableTax || 0,
+      discountAmount: product.discount || 0,
+      fixedNotifiedValueOrRetailPrice: 0,
+      saleType: 'Goods at standard rate',
+      serialNumber: product.serialNumber || '',
+      listNumber: product.listNumber || '',
+      bcNumber: product.bcNumber || '',
+      lotNumber: product.lotNumber || '',
+      expiryDate: product.expiryDate || ''
+    });
+    setProductSearchOpen(false);
+  };
+
+  // Add product with full details
+  const handleAddProduct = async () => {
+    const { selectedProductId, selectedVariantId, quantity, customPrice, weightInput, weightUnit } = productSelection;
+    
+    if (!selectedProductId) {
+      alert('Please select a product');
+      return;
+    }
+
+    setIsAddingProduct(true);
+    
+    try {
+      const product = products.find(p => p.id === selectedProductId);
+      if (!product) {
+        setIsAddingProduct(false);
+        return;
+      }
+
+      const isWeightBased = isWeightBasedProduct(product.stockManagementType || 'quantity');
+
+      if (isWeightBased) {
+        if (!weightInput || parseFloat(weightInput) <= 0) {
+          alert('Please enter a valid weight');
+          setIsAddingProduct(false);
+          return;
+        }
+      } else {
+        if (quantity <= 0) {
+          alert('Please enter a valid quantity');
+          setIsAddingProduct(false);
+          return;
+        }
+      }
+
+      let variant = null;
+      let price = Number(product.price) || 0;
+      let productName = product.name;
+      let variantTitle = '';
+      let sku = product.sku || '';
+      let weightInGrams = 0;
+      let finalQuantity = quantity;
+
+      if (selectedVariantId && product.variants) {
+        variant = product.variants.find(v => v.id === selectedVariantId);
+        if (variant) {
+          price = Number(variant.price) || 0;
+          variantTitle = variant.title;
+          sku = variant.sku || sku;
+        }
+      }
+
+      if (isWeightBased) {
+        weightInGrams = convertToGrams(parseFloat(weightInput), weightUnit);
+        const pricePerGram = getPricePerGram(product);
+        price = calculateWeightBasedPrice(weightInGrams, pricePerGram);
+        finalQuantity = 1;
+      }
+
+      if (customPrice) {
+        price = parseFloat(customPrice);
+      }
+
+      const priceIncludingTax = typeof productSelection.priceIncludingTax === 'string' 
+        ? parseFloat(productSelection.priceIncludingTax) || 0 
+        : productSelection.priceIncludingTax || 0;
+      const effectivePrice = priceIncludingTax || price;
+      
+      // Calculate total price including all taxes and discounts
+      let totalPrice = effectivePrice * finalQuantity;
+      
+      // Add additional taxes and subtract discounts
+      const extraTax = Number(productSelection.extraTax) || 0;
+      const furtherTax = Number(productSelection.furtherTax) || 0;
+      const fedPayableTax = Number(productSelection.fedPayableTax) || 0;
+      const discount = Number(productSelection.discountAmount) || 0;
+      
+      if (extraTax > 0 || furtherTax > 0 || fedPayableTax > 0 || discount > 0) {
+        totalPrice += (extraTax + furtherTax + fedPayableTax - discount) * finalQuantity;
+      }
+
+      const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      
+      const newItem: OrderItem = {
+        id: itemId,
+        productId: selectedProductId,
+        variantId: selectedVariantId || undefined,
+        productName: productSelection.productName || productName,
+        productDescription: productSelection.productDescription || undefined,
+        variantTitle: variantTitle || undefined,
+        sku,
+        hsCode: productSelection.hsCode || product.hsCode,
+        price,
+        quantity: finalQuantity,
+        totalPrice,
+        addons: [],
+        isWeightBased,
+        weightQuantity: isWeightBased ? weightInGrams : undefined,
+        weightUnit: isWeightBased ? weightUnit : undefined,
+        uom: !isWeightBased ? productSelection.uom : undefined,
+        itemSerialNumber: productSelection.itemSerialNumber || undefined,
+        sroScheduleNumber: productSelection.sroScheduleNumber || undefined,
+        serialNumber: productSelection.serialNumber || undefined,
+        listNumber: productSelection.listNumber || undefined,
+        bcNumber: productSelection.bcNumber || undefined,
+        lotNumber: productSelection.lotNumber || undefined,
+        expiryDate: productSelection.expiryDate || undefined,
+        taxAmount: productSelection.taxAmount || 0,
+        taxPercentage: productSelection.taxPercentage || 0,
+        priceIncludingTax: productSelection.priceIncludingTax || 0,
+        priceExcludingTax: productSelection.priceExcludingTax || 0,
+        extraTax: productSelection.extraTax || 0,
+        furtherTax: productSelection.furtherTax || 0,
+        fedPayableTax: productSelection.fedPayableTax || 0,
+        discount: productSelection.discountAmount || 0,
+        fixedNotifiedValueOrRetailPrice: productSelection.fixedNotifiedValueOrRetailPrice || 0,
+        saleType: productSelection.saleType || 'Goods at standard rate'
+      };
+
+      setOrderItems([...orderItems, newItem]);
+      
+      // Reset selection
+      setProductSelection({
+        selectedProductId: '',
+        selectedVariantId: '',
+        quantity: 1,
+        customPrice: '',
+        weightInput: '',
+        weightUnit: 'grams',
+        uom: '',
+        hsCode: '',
+        itemSerialNumber: '',
+        sroScheduleNumber: '',
+        productName: '',
+        productDescription: '',
+        taxAmount: 0,
+        taxPercentage: 0,
+        priceIncludingTax: 0,
+        priceExcludingTax: 0,
+        extraTax: 0,
+        furtherTax: 0,
+        fedPayableTax: 0,
+        discountAmount: 0,
+        fixedNotifiedValueOrRetailPrice: 0,
+        saleType: 'Goods at standard rate',
+        serialNumber: '',
+        listNumber: '',
+        bcNumber: '',
+        lotNumber: '',
+        expiryDate: ''
+      });
+      
+    } catch (error) {
+      console.error('Error adding product:', error);
+      alert('Failed to add product. Please try again.');
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  // Update order item
+  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
+    const updatedItems = [...orderItems];
+    const item = updatedItems[index];
+    
+    if (field === 'quantity' && item.isWeightBased) {
+      // For weight-based products, don't update quantity directly
+      return;
+    }
+    
+    if (field === 'weightQuantity' && item.isWeightBased) {
+      const weightResult = parseWeightInput(value, item.weightUnit as any || 'grams');
+      const weightValue = typeof weightResult === 'number' ? weightResult : (weightResult?.value || 0);
+      updatedItems[index] = {
+        ...item,
+        weightQuantity: weightValue,
+        quantity: 1, // Weight-based products always have quantity 1
+        totalPrice: calculateWeightBasedPrice(weightValue, item.price)
+      };
+    } else {
+      // Update the field first
+      updatedItems[index] = { ...item, [field]: value };
+      const updatedItem = updatedItems[index];
+      
+      // Handle different field updates
+      if (field === 'quantity') {
+        // When quantity changes, only recalculate total price (keep per-unit values the same)
+        const quantity = updatedItem.quantity;
+        const unitPriceIncludingTax = Number(updatedItem.priceIncludingTax) || updatedItem.price;
+        const extraTax = Number(updatedItem.extraTax) || 0;
+        const furtherTax = Number(updatedItem.furtherTax) || 0;
+        const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
+        const discount = Number(updatedItem.discount) || 0;
+        
+        // Calculate total price = (unit price + per-unit taxes - per-unit discount) × quantity
+        updatedItems[index].totalPrice = (unitPriceIncludingTax + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+        
+      } else if (field === 'price' || field === 'priceIncludingTax' || field === 'priceExcludingTax' || field === 'taxPercentage' || field === 'taxAmount') {
+        // When tax/price fields change, recalculate related per-unit values and total
+        const quantity = updatedItem.quantity;
+        const basePrice = updatedItem.price;
+        const priceExcludingTax = Number(updatedItem.priceExcludingTax) || 0;
+        const priceIncludingTax = Number(updatedItem.priceIncludingTax) || 0;
+        const taxPercentage = Number(updatedItem.taxPercentage) || 0;
+        
+        // Auto-calculate missing per-unit values based on what was changed
+        if (field === 'taxPercentage' && priceExcludingTax > 0) {
+          // Calculate tax amount and price including tax from percentage
+          const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
+          const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+          updatedItems[index].taxAmount = calculatedTaxAmount;
+          updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
+        } else if (field === 'priceExcludingTax' && taxPercentage > 0) {
+          // Calculate tax amount and price including tax from excluding price
+          const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
+          const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+          updatedItems[index].taxAmount = calculatedTaxAmount;
+          updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
+        } else if (field === 'priceIncludingTax' && taxPercentage > 0) {
+          // Calculate price excluding tax and tax amount from including price
+          const calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
+          const calculatedTaxAmount = priceIncludingTax - calculatedPriceExcludingTax;
+          updatedItems[index].priceExcludingTax = calculatedPriceExcludingTax;
+          updatedItems[index].taxAmount = calculatedTaxAmount;
+        } else if (field === 'priceIncludingTax' && priceExcludingTax > 0) {
+          // If no tax percentage, calculate it from the price difference
+          const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
+          const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
+          updatedItems[index].taxAmount = calculatedTaxAmount;
+          updatedItems[index].taxPercentage = calculatedTaxPercentage;
+        } else if (field === 'priceExcludingTax' && priceIncludingTax > 0) {
+          // If no tax percentage, calculate it from the price difference
+          const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
+          const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
+          updatedItems[index].taxAmount = calculatedTaxAmount;
+          updatedItems[index].taxPercentage = calculatedTaxPercentage;
+        }
+        
+        // Recalculate total price with updated per-unit values
+        const finalUnitPriceIncludingTax = Number(updatedItems[index].priceIncludingTax) || basePrice;
+        const extraTax = Number(updatedItem.extraTax) || 0;
+        const furtherTax = Number(updatedItem.furtherTax) || 0;
+        const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
+        const discount = Number(updatedItem.discount) || 0;
+        
+        updatedItems[index].totalPrice = (finalUnitPriceIncludingTax + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+      }
+      
+      // Special handling for additional tax fields - recalculate total when they change
+      if (field === 'extraTax' || field === 'furtherTax' || field === 'fedPayableTax' || field === 'discount') {
+        const quantity = updatedItem.quantity;
+        const effectivePrice = Number(updatedItem.priceIncludingTax) || updatedItem.price;
+        const extraTax = Number(updatedItem.extraTax) || 0;
+        const furtherTax = Number(updatedItem.furtherTax) || 0;
+        const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
+        const discount = Number(updatedItem.discount) || 0;
+        
+        // Calculate total with all taxes and discounts
+        updatedItems[index].totalPrice = (effectivePrice + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+      }
+    }
+    
+    setOrderItems(updatedItems);
+  };
+
+  // Remove order item
+  const removeOrderItem = (index: number) => {
+    const updatedItems = orderItems.filter((_, i) => i !== index);
+    setOrderItems(updatedItems);
+  };
+
+  // Calculate totals
+  const calculateTotals = () => {
+    const subtotal = orderItems.reduce((sum, item) => {
+      let itemTotal = item.totalPrice;
+      
+      // Add addon costs
+      if (item.addons && item.addons.length > 0) {
+        const addonTotal = item.addons.reduce((addonSum, addon) => 
+          addonSum + (addon.price * addon.quantity), 0
+        );
+        itemTotal += addonTotal * item.quantity;
+      }
+      
+      return sum + itemTotal;
+    }, 0);
+
+    const discountAmount = orderData.discountType === 'percentage' 
+      ? (subtotal * orderData.discountAmount / 100)
+      : orderData.discountAmount;
+
+    const pointsDiscountAmount = orderData.pointsDiscountAmount || 0;
+    const taxAmount = (subtotal - discountAmount - pointsDiscountAmount) * (orderData.taxRate / 100);
+    const total = subtotal + taxAmount + orderData.shippingAmount - discountAmount - pointsDiscountAmount;
+
+    return {
+      subtotal,
+      taxAmount,
+      discountAmount,
+      pointsDiscountAmount,
+      total: Math.max(0, total)
+    };
+  };
+
   // Points redemption functions
   const handlePointsRedemption = (pointsToRedeem: number) => {
     if (pointsToRedeem < 0) pointsToRedeem = 0;
@@ -297,14 +1373,14 @@ export default function EditOrder() {
     const discountAmount = pointsToRedeem * loyaltySettings.redemptionValue;
     
     // Get current totals to check max redemption limit
-    const currentSubtotal = Number(order?.subtotal) || 0;
-    const currentDiscount = editData.discountAmount || 0;
-    const maxAllowedDiscount = (currentSubtotal - currentDiscount) * (loyaltySettings.maxRedemptionPercent / 100);
+    const { subtotal } = calculateTotals();
+    const currentDiscount = orderData.discountAmount || 0;
+    const maxAllowedDiscount = (subtotal - currentDiscount) * (loyaltySettings.maxRedemptionPercent / 100);
     
     const finalDiscountAmount = Math.min(discountAmount, maxAllowedDiscount);
     const finalPointsToRedeem = Math.floor(finalDiscountAmount / loyaltySettings.redemptionValue);
 
-    setEditData(prev => ({
+    setOrderData(prev => ({
       ...prev,
       pointsToRedeem: finalPointsToRedeem,
       pointsDiscountAmount: finalDiscountAmount,
@@ -313,9 +1389,9 @@ export default function EditOrder() {
   };
 
   const handleUseAllPoints = () => {
-    if (editData.useAllPoints) {
+    if (orderData.useAllPoints) {
       // Turn off - clear points
-      setEditData(prev => ({
+      setOrderData(prev => ({
         ...prev,
         pointsToRedeem: 0,
         pointsDiscountAmount: 0,
@@ -323,15 +1399,15 @@ export default function EditOrder() {
       }));
     } else {
       // Turn on - use maximum allowed points
-      const currentSubtotal = Number(order?.subtotal) || 0;
-      const currentDiscount = editData.discountAmount || 0;
-      const maxAllowedDiscount = (currentSubtotal - currentDiscount) * (loyaltySettings.maxRedemptionPercent / 100);
+      const { subtotal } = calculateTotals();
+      const currentDiscount = orderData.discountAmount || 0;
+      const maxAllowedDiscount = (subtotal - currentDiscount) * (loyaltySettings.maxRedemptionPercent / 100);
       const maxPointsDiscount = customerPoints.availablePoints * loyaltySettings.redemptionValue;
       
       const finalDiscountAmount = Math.min(maxAllowedDiscount, maxPointsDiscount);
       const finalPointsToRedeem = Math.floor(finalDiscountAmount / loyaltySettings.redemptionValue);
 
-      setEditData(prev => ({
+      setOrderData(prev => ({
         ...prev,
         pointsToRedeem: finalPointsToRedeem,
         pointsDiscountAmount: finalDiscountAmount,
@@ -340,93 +1416,65 @@ export default function EditOrder() {
     }
   };
 
-  const fetchOrder = async (id: string) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/orders/${id}`);
-      if (!response.ok) {
-        throw new Error('Order not found');
-      }
-      
-      const orderData = await response.json();
-      
-      // Process items to add weight-based information
-      if (orderData.items) {
-        orderData.items = orderData.items.map((item: any) => {
-          // Determine if item is weight-based by checking if weightQuantity exists and is > 0
-          const weightQuantity = item.weightQuantity ? parseFloat(item.weightQuantity) : 0;
-          const isWeightBased = weightQuantity > 0;
-
-          return {
-            ...item,
-            isWeightBased,
-            weightQuantity: weightQuantity > 0 ? weightQuantity : undefined,
-            weightUnit: item.weightUnit || undefined
-          };
-        });
-      }
-      
-      setOrder(orderData);
-      
-      // Initialize edit data with current order values
-      setEditData({
-        status: orderData.status,
-        paymentStatus: orderData.paymentStatus,
-        fulfillmentStatus: orderData.fulfillmentStatus,
-        shippingAmount: Number(orderData.shippingAmount) || 0,
-        discountAmount: Number(orderData.discountAmount) || 0,
-        notes: orderData.notes || '',
-        shippingMethod: orderData.shippingMethod || '',
-        trackingNumber: orderData.trackingNumber || '',
-        cancelReason: orderData.cancelReason || '',
-        assignedDriverId: orderData.assignedDriverId || '',
-        deliveryStatus: orderData.deliveryStatus || 'pending',
-        // Loyalty points fields
-        pointsToRedeem: Number(orderData.pointsToRedeem) || 0,
-        pointsDiscountAmount: Number(orderData.pointsDiscountAmount) || 0,
-        useAllPoints: false,
-        // Invoice and validation fields
-        invoiceType: orderData.invoiceType || '',
-        invoiceRefNo: orderData.invoiceRefNo || '',
-        scenarioId: orderData.scenarioId || '',
-        invoiceNumber: orderData.invoiceNumber || '',
-        validationResponse: orderData.validationResponse || ''
-      });
-
-      // Fetch customer points if loyalty is enabled and customer exists
-      if (orderData.userId && loyaltySettings.enabled) {
-        fetchCustomerPoints(orderData.userId);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStatusChange = (field: string, value: string) => {
-    setEditData(prev => ({ ...prev, [field]: value }));
-
-    // Clear cancel reason if not cancelled
-    if (field === 'status' && value !== 'cancelled') {
-      setEditData(prev => ({ ...prev, cancelReason: '' }));
-    }
-  };
-
+  // Submit order update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (orderItems.length === 0) {
+      setError('Please add at least one item to the order');
+      return;
+    }
+    
+    // Validate production token if production mode is enabled
+    if (isProductionSubmission && !skipFbrSubmission && !productionToken.trim()) {
+      setError('Please provide production environment token');
+      return;
+    }
+
+    // Generate FBR preview data if FBR submission is not skipped
+    if (!skipFbrSubmission) {
+      await generateFbrPreview();
+    }
+    
+    // Show appropriate confirmation dialog
+    if (isProductionSubmission && !skipFbrSubmission) {
+      setShowProductionConfirmation(true);
+    } else {
+      setShowOrderConfirmation(true);
+    }
+  };
+
+  // Actual order update function (called from confirmation dialogs)
+  const updateOrder = async () => {
     setSubmitting(true);
     setError('');
 
     try {
+      const { subtotal, taxAmount, total } = calculateTotals();
+
+      const orderPayload = {
+        ...orderData,
+        items: orderItems,
+        customerInfo,
+        subtotal,
+        taxAmount,
+        totalAmount: total,
+        currency: currentCurrency,
+        sellerInfo,
+        skipCustomerEmail,
+        skipSellerEmail,
+        skipFbrSubmission,
+        isProductionSubmission,
+        productionToken: isProductionSubmission ? productionToken : undefined,
+        isCustomScenario,
+        isCustomProvince,
+        isCustomSellerProvince
+      };
+
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...editData,
-          previousStatus: order?.status, // For stock management
-          previousPaymentStatus: order?.paymentStatus
-        })
+        body: JSON.stringify(orderPayload)
       });
 
       if (!response.ok) {
@@ -434,67 +1482,30 @@ export default function EditOrder() {
         throw new Error(data.error || 'Failed to update order');
       }
 
-      // Refresh order data
-      await fetchOrder(orderId);
-      //alert('Order updated successfully!');
+      const result = await response.json();
       
-      // Redirect to orders listing page
+      // Close confirmation dialogs
+      setShowOrderConfirmation(false);
+      setShowProductionConfirmation(false);
       
-        router.push('/orders');
-      
+      router.push(`/orders/${result.orderId || orderId}`);
     } catch (err: any) {
       setError(err.message);
+      if (errorRef.current) {
+        errorRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      // Close confirmation dialogs on error too
+      setShowOrderConfirmation(false);
+      setShowProductionConfirmation(false);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const getStatusBadge = (status: string, type: 'order' | 'payment' | 'fulfillment' = 'order') => {
-    const orderStatusColors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      processing: 'bg-indigo-100 text-indigo-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-    };
-
-    const paymentStatusColors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      refunded: 'bg-orange-100 text-orange-800',
-    };
-
-    const fulfillmentStatusColors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      fulfilled: 'bg-green-100 text-green-800',
-      partially_fulfilled: 'bg-orange-100 text-orange-800',
-    };
-
-    let colors;
-    switch (type) {
-      case 'payment':
-        colors = paymentStatusColors;
-        break;
-      case 'fulfillment':
-        colors = fulfillmentStatusColors;
-        break;
-      default:
-        colors = orderStatusColors;
-    }
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-      </span>
-    );
-  };
-
-    const formatCurrency = (amount: any) => {
-    // Convert to number and handle all edge cases
+  const formatCurrency = (amount: any) => {
     const numAmount = Number(amount);
     
-    // Handle NaN, undefined, null, or invalid values
     if (isNaN(numAmount) || amount === null || amount === undefined || typeof numAmount !== 'number') {
       return (
         <span className="flex items-center gap-1">
@@ -510,131 +1521,29 @@ export default function EditOrder() {
     );
   };
 
-  const parseAddons = (addonsData: any) => {
-    if (!addonsData) return [];
-    
-    try {
-      // If it's already an array, return it
-      if (Array.isArray(addonsData)) {
-        return addonsData;
-      }
-      
-      // If it's a string, try to parse it
-      if (typeof addonsData === 'string') {
-        const parsed = JSON.parse(addonsData);
-        return Array.isArray(parsed) ? parsed : [];
-      }
-      
-      // If it's an object but not an array, wrap it in an array
-      if (typeof addonsData === 'object') {
-        return [addonsData];
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('Error parsing addons:', error);
-      return [];
-    }
-  };
-
-  const getAddonTitle = (addon: any, index: number) => {
-    // First try to get the title from the stored addon data
-    if (addon.addonTitle) return addon.addonTitle;
-    if (addon.title) return addon.title;
-    if (addon.name) return addon.name;
-    
-    // If no title in stored data, try to find it in the addons table
-    if (addon.addonId && addons.length > 0) {
-      const addonFromTable = addons.find(a => a.id === addon.addonId);
-      if (addonFromTable) {
-        return addonFromTable.title;
-      }
-    }
-    
-    // Fallback to generic name
-    return `Addon ${index + 1}`;
-  };
-
-  const getAddonDescription = (addon: any) => {
-    // Try to get description from addons table
-    if (addon.addonId && addons.length > 0) {
-      const addonFromTable = addons.find(a => a.id === addon.addonId);
-      if (addonFromTable && addonFromTable.description) {
-        return addonFromTable.description;
-      }
-    }
-    return null;
-  };
-
-  const getAddonImage = (addon: any) => {
-    // Try to get image from addons table
-    if (addon.addonId && addons.length > 0) {
-      const addonFromTable = addons.find(a => a.id === addon.addonId);
-      if (addonFromTable && addonFromTable.image) {
-        return addonFromTable.image;
-      }
-    }
-    return null;
-  };
-
-  const calculateNewTotal = () => {
-    if (!order) return 0;
-    
-    // Calculate total using 'Price including tax' for each product item
-    const itemsTotal = order.items?.reduce((sum: number, item: any) => {
-      // Use priceIncludingTax if available, otherwise fall back to regular price
-      const itemPrice = item.priceIncludingTax || item.price;
-      let itemTotal = itemPrice * item.quantity;
-      
-      // Add addon prices if any
-      if (item.addons && Array.isArray(item.addons) && item.addons.length > 0) {
-        const addonsTotal = item.addons.reduce((addonSum: number, addon: any) => 
-          addonSum + (addon.price * addon.quantity), 0
-        );
-        itemTotal += addonsTotal * item.quantity;
-      }
-      
-      return sum + itemTotal;
-    }, 0) || 0;
-    
-    // Apply discounts
-    const discountAmount = Number(editData.discountAmount) || 0;
-    const pointsDiscountAmount = Number(editData.pointsDiscountAmount) || 0;
-    
-    // Final total after all discounts
-    const total = itemsTotal - discountAmount - pointsDiscountAmount;
-    
-    return Math.max(0, total); // Ensure total is never negative
-  };
-
-  const calculatePointsToEarn = () => {
-    if (!loyaltySettings.enabled || !order?.userId) {
-      return 0;
-    }
-    
-    // Use the new total calculation method
-    const newTotal = calculateNewTotal();
-    
-    // For points calculation, use the same total since we're now using price including tax
-    const baseAmount = loyaltySettings.earningBasis === 'total' ? newTotal : newTotal;
-    
-    if (baseAmount < loyaltySettings.minimumOrder) {
-      return 0;
-    }
-    
-    return Math.floor(baseAmount * loyaltySettings.earningRate);
-  };
-
   if (loading) return <div className="p-8 text-center">Loading order...</div>;
   if (error && !order) return <div className="p-8 text-center text-red-600">Error: {error}</div>;
   if (!order) return <div className="p-8 text-center">Order not found</div>;
 
+  const totals = calculateTotals();
+
   return (
-    <div className="p-4">
+    <div className="p-4 max-w-8xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">✏️ Edit Order #{order.orderNumber}</h1>
           <div className="text-sm text-gray-500">Order ID: {order.id}</div>
+          {order.fbrEnvironment && (
+            <div className="text-sm">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                order.fbrEnvironment === 'production' 
+                  ? 'bg-orange-100 text-orange-800' 
+                  : 'bg-blue-100 text-blue-800'
+              }`}>
+                {order.fbrEnvironment === 'production' ? '🚨 Production' : '🧪 Sandbox'} FBR
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button
@@ -642,6 +1551,20 @@ export default function EditOrder() {
             className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
             📄 View Invoice
+          </button>
+          <button
+            onClick={handleDuplicateOrder}
+            disabled={duplicating}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed"
+          >
+            {duplicating ? (
+              <>
+                <Loader className="inline mr-2 h-4 w-4 animate-spin" />
+                Duplicating...
+              </>
+            ) : (
+              '📋 Make a Duplicate'
+            )}
           </button>
           <button
             onClick={() => router.push('/orders')}
@@ -653,751 +1576,2095 @@ export default function EditOrder() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+        <div ref={errorRef} className="mb-4 p-3 bg-red-100 text-red-700 rounded">
           {error}
         </div>
       )}
 
-      {!stockManagementEnabled && (
-        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 bg-orange-500 rounded-full mr-3"></span>
-            <div>
-              <h3 className="font-medium text-orange-800">Stock Management Disabled</h3>
-              <p className="text-sm text-orange-600 mt-1">
-                Order status changes will not affect inventory levels. Stock management is currently disabled.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {stockManagementEnabled && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center">
-            <span className="inline-block w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-            <div>
-              <h3 className="font-medium text-blue-800">Stock Management Enabled</h3>
-              <p className="text-sm text-blue-600 mt-1">
-                Order status changes will automatically update inventory levels where applicable.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Edit Form */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Order Status */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">📊 Order Status</h3>
-            
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-gray-700 mb-2">Order Status</label>
-                  <select
-                    value={editData.status}
-                    onChange={(e) => handleStatusChange('status', e.target.value)}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    {orderStatuses.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {orderStatuses.find(s => s.value === editData.status)?.description}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2">Payment Status</label>
-                  <select
-                    value={editData.paymentStatus}
-                    onChange={(e) => handleStatusChange('paymentStatus', e.target.value)}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    {paymentStatuses.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {paymentStatuses.find(s => s.value === editData.paymentStatus)?.description}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2">Fulfillment Status</label>
-                  <select
-                    value={editData.fulfillmentStatus}
-                    onChange={(e) => handleStatusChange('fulfillmentStatus', e.target.value)}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    {fulfillmentStatuses.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {fulfillmentStatuses.find(s => s.value === editData.fulfillmentStatus)?.description}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2">Assigned Driver</label>
-                  <select
-                    value={editData.assignedDriverId}
-                    onChange={(e) => handleStatusChange('assignedDriverId', e.target.value)}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">-- No driver assigned --</option>
-                    {availableDrivers.map((driverData) => (
-                      <option key={driverData.driver.id} value={driverData.driver.id}>
-                        {driverData.user.name} - {driverData.driver.vehicleType} ({driverData.driver.vehiclePlateNumber}) - {driverData.driver.status}
-                      </option>
-                    ))}
-                  </select>
-                  {availableDrivers.length === 0 && (
-                    <div className="text-xs text-red-500 mt-1">No drivers available</div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 mb-2">Delivery Status</label>
-                  <select
-                    value={editData.deliveryStatus}
-                    onChange={(e) => handleStatusChange('deliveryStatus', e.target.value)}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    {deliveryStatuses.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {deliveryStatuses.find(s => s.value === editData.deliveryStatus)?.description}
-                  </div>
-                </div>
-              </div>
-
-              
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-gray-700 mb-2">Discount Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editData.discountAmount}
-                    onChange={(e) => setEditData({...editData, discountAmount: Number(e.target.value) || 0})}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-
-                {editData.status === 'cancelled' && (
-                  <div>
-                    <label className="block text-gray-700 mb-2">Cancel Reason</label>
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Customer Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Customer Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-2">
                     <input
-                      type="text"
-                      value={editData.cancelReason}
-                      onChange={(e) => setEditData({...editData, cancelReason: e.target.value})}
-                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                      placeholder="Reason for cancellation"
+                      type="radio"
+                      name="customerType"
+                      checked={customerInfo.isGuest}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setCustomerInfo({...customerInfo, isGuest: true});
+                          setOrderData({...orderData, customerId: ''});
+                        }
+                      }}
+                    />
+                    <span>Guest Customer</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="customerType"
+                      checked={!customerInfo.isGuest}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setCustomerInfo({...customerInfo, isGuest: false});
+                        }
+                      }}
+                    />
+                    <span>Existing Customer</span>
+                  </label>
+                </div>
+
+                {!customerInfo.isGuest && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Select Customer</Label>
+                      <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={customerSearchOpen}
+                            className="w-full justify-between"
+                          >
+                            {orderData.customerId 
+                              ? (() => {
+                                  const customer = customers.find(c => c.id === orderData.customerId);
+                                  return customer ? (customer.name || customer.email) : `Customer ID: ${orderData.customerId}`;
+                                })()
+                              : "Select customer..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search customers..."
+                              value={customerSearchTerm}
+                              onValueChange={setCustomerSearchTerm}
+                            />
+                            <CommandList>
+                              <CommandEmpty>
+                                {customers.length === 0 ? 'No customers found. Loading...' : 'No customers match your search.'}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {customers
+                                  .filter(customer => {
+                                    if (!customerSearchTerm) return true;
+                                    return customer.name?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                                           customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase());
+                                  })
+                                  .map((customer) => (
+                                    <CommandItem
+                                      key={customer.id}
+                                      onSelect={() => handleCustomerSelect(customer)}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          orderData.customerId === customer.id ? "opacity-100" : "opacity-0"
+                                        }`}
+                                      />
+                                      <div>
+                                        <div className="font-medium">{customer.name || customer.email}</div>
+                                        <div className="text-sm text-gray-500">{customer.email}</div>
+                                        {customer.phone && (
+                                          <div className="text-xs text-gray-400">{customer.phone}</div>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {customers.length > 0 ? `${customers.length} customers available` : 'Loading customers...'}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={orderData.email}
+                      onChange={(e) => setOrderData({...orderData, email: e.target.value})}
                       required
                     />
                   </div>
-                )}
-              </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={orderData.phone}
+                      onChange={(e) => setOrderData({...orderData, phone: e.target.value})}
+                    />
+                  </div>
+                </div>
 
-              <div className="mb-4">
-                <label className="block text-gray-700 mb-2">Order Notes</label>
-                <textarea
-                  value={editData.notes}
-                  onChange={(e) => setEditData({...editData, notes: e.target.value})}
-                  className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                  rows={3}
-                  placeholder="Internal notes about this order..."
-                />
-              </div>
-              
-              {/* Invoice & Validation Fields */}
-              <div className="mb-4">
-                <h4 className="text-lg font-semibold mb-4">🧾 Invoice & Validation</h4>
+                {/* Buyer Information for FBR */}
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Buyer Information (FBR)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="buyerFullName">Name</Label>
+                      <Input
+                        id="buyerFullName"
+                        value={orderData.buyerFullName}
+                        onChange={(e) => setOrderData({...orderData, buyerFullName: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="buyerNTNCNIC">NTN/CNIC</Label>
+                      <Input
+                        id="buyerNTNCNIC"
+                        value={orderData.buyerNTNCNIC}
+                        onChange={(e) => setOrderData({...orderData, buyerNTNCNIC: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="buyerBusinessName">Business Name</Label>
+                      <Input
+                        id="buyerBusinessName"
+                        value={orderData.buyerBusinessName}
+                        onChange={(e) => setOrderData({...orderData, buyerBusinessName: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="buyer-province">Province</Label>
+                      <div className="space-y-2">
+                        <Select 
+                          value={
+                            isCustomProvince ? "custom" :
+                            ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
+                              ? orderData.buyerProvince 
+                              : ""
+                          } 
+                          onValueChange={(value) => {
+                            if (value === "custom") {
+                              setIsCustomProvince(true);
+                              setOrderData({...orderData, buyerProvince: ""});
+                            } else {
+                              setIsCustomProvince(false);
+                              setOrderData({...orderData, buyerProvince: value});
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Province" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Punjab">Punjab</SelectItem>
+                            <SelectItem value="Sindh">Sindh</SelectItem>
+                            <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
+                            <SelectItem value="Balochistan">Balochistan</SelectItem>
+                            <SelectItem value="Islamabad">Islamabad</SelectItem>
+                            <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
+                            <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
+                            <SelectItem value="N/A">N/A</SelectItem>
+                            <SelectItem value="custom">Custom Province...</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {isCustomProvince && (
+                          <Input
+                            placeholder="Enter custom province"
+                            value={orderData.buyerProvince || ""}
+                            onChange={(e) => setOrderData({...orderData, buyerProvince: e.target.value})}
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="buyerAddress">Address</Label>
+                      <Input
+                        id="buyerAddress"
+                        value={orderData.buyerAddress}
+                        onChange={(e) => setOrderData({...orderData, buyerAddress: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Add Products */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PackagePlus className="h-5 w-5" />
+                  Order Items
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      Add Product <Plus className="ml-2 h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <div className="flex items-center border-b px-3">
+                        <CommandInput
+                          placeholder="Search products..."
+                          value={productSearchTerm}
+                          onValueChange={setProductSearchTerm}
+                          className="flex-1"
+                        />
+                        <Select value={selectedProductCategory} onValueChange={setSelectedProductCategory}>
+                          <SelectTrigger className="w-[180px] ml-2">
+                            <SelectValue placeholder="Category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {productCategories.map(category => (
+                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <CommandList>
+                        <CommandEmpty>
+                          {products.length === 0 ? 'Loading products...' : 'No products match your search.'}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredProducts.map((product) => (
+                            <div key={product.id}>
+                              <CommandItem onSelect={() => quickAddProductToOrder(product)}>
+                                <div className="flex-1">
+                                  <div className="font-medium">{product.name || 'Unnamed Product'}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {formatCurrency(product.price)} • {product.productType || 'No Category'}
+                                    {product.sku && ` • SKU: ${product.sku}`}
+                                  </div>
+                                </div>
+                              </CommandItem>
+                              {product.variants && product.variants.length > 0 && (
+                                <div className="ml-4 border-l border-gray-200">
+                                  {product.variants.filter(v => v.isActive).map((variant) => (
+                                    <CommandItem
+                                      key={variant.id}
+                                      onSelect={() => quickAddProductToOrder(product, variant)}
+                                    >
+                                      <div className="flex-1">
+                                        <div className="font-medium text-sm">↳ {variant.title}</div>
+                                        <div className="text-xs text-gray-500">
+                                          {formatCurrency(variant.price)}
+                                          {variant.sku && ` • SKU: ${variant.sku}`}
+                                          • Stock: {variant.inventoryQuantity}
+                                        </div>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Product & Tax Details Form */}
+                {productSelection.selectedProductId && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle className="text-lg">📋 Product & Tax Details (Editable)</CardTitle>
+                      <CardDescription>
+                        These values are pre-populated from the product but can be modified before adding to the order.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Basic Product Fields */}
+                      <div>
+                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Information</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="product-name-edit" className="text-sm">Product Name</Label>
+                            <Input
+                              id="product-name-edit"
+                              type="text"
+                              value={productSelection.productName}
+                              onChange={(e) => setProductSelection({...productSelection, productName: e.target.value})}
+                              placeholder="Product name"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="quantity-edit" className="text-sm">Quantity</Label>
+                            <Input
+                              id="quantity-edit"
+                              type="number"
+                              min="1"
+                              value={productSelection.quantity}
+                              onChange={(e) => setProductSelection({...productSelection, quantity: parseInt(e.target.value) || 1})}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="custom-price-edit" className="text-sm">Custom Price (Optional)</Label>
+                            <Input
+                              id="custom-price-edit"
+                              type="text"
+                              value={productSelection.customPrice}
+                              onChange={(e) => setProductSelection({...productSelection, customPrice: e.target.value})}
+                              placeholder="Override product price"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="uom-edit" className="text-sm">UOM</Label>
+                            <Input
+                              id="uom-edit"
+                              type="text"
+                              value={productSelection.uom}
+                              onChange={(e) => setProductSelection({...productSelection, uom: e.target.value})}
+                              placeholder="Unit of measure"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tax Calculation Fields */}
+                      <div>
+                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Tax & Pricing Details</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="price-excluding-tax-edit" className="text-sm">Price Excluding Tax</Label>
+                            <Input
+                              id="price-excluding-tax-edit"
+                              type="text"
+                              value={productSelection.priceExcludingTax === 0 ? '' : productSelection.priceExcludingTax.toString()}
+                              onChange={async (e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                                  setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
+                                  
+                                  if (!value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
+                                    const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
+                                    const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, taxPercentageNum);
+                                    const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+                                    setProductSelection(prev => ({
+                                      ...prev, 
+                                      taxAmount: calculatedTaxAmount,
+                                      priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
+                                    }));
+                                  } else if (!value.endsWith('.') && value !== '' && Number(productSelection.priceIncludingTax) > 0) {
+                                    // If no tax percentage but we have price including tax, calculate tax percentage
+                                    const priceIncludingTaxNum = Number(productSelection.priceIncludingTax);
+                                    const calculatedTaxAmount = priceIncludingTaxNum - priceExcludingTax;
+                                    const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
+                                    setProductSelection(prev => ({
+                                      ...prev, 
+                                      taxAmount: calculatedTaxAmount,
+                                      taxPercentage: Math.round(calculatedTaxPercentage * 100) / 100
+                                    }));
+                                  }
+                                }
+                              }}
+                              placeholder="Enter price"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="tax-percentage-edit" className="text-sm">
+                              Tax Percentage {isTaxCalculating && <span className="text-blue-500">(Calculating...)</span>}
+                            </Label>
+                            <Input
+                              id="tax-percentage-edit"
+                              type="text"
+                              value={productSelection.taxPercentage === 0 ? '' : productSelection.taxPercentage.toString()}
+                              onChange={async (e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  const taxPercentage = value === '' ? 0 : parseFloat(value) || 0;
+                                  setProductSelection(prev => ({...prev, taxPercentage: value === '' ? 0 : value}));
+                                  
+                                  if (taxPercentage > 0 && Number(productSelection.priceExcludingTax) > 0 && !value.endsWith('.')) {
+                                    const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
+                                    const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTaxNum, taxPercentage);
+                                    const calculatedPriceIncludingTax = priceExcludingTaxNum + calculatedTaxAmount;
+                                    setProductSelection(prev => ({
+                                      ...prev, 
+                                      taxAmount: calculatedTaxAmount,
+                                      priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
+                                    }));
+                                  }
+                                }
+                              }}
+                              placeholder="Enter percentage"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="price-including-tax-edit" className="text-sm">Price Including Tax</Label>
+                            <Input
+                              id="price-including-tax-edit"
+                              type="text"
+                              value={productSelection.priceIncludingTax === 0 ? '' : productSelection.priceIncludingTax.toString()}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                                  setProductSelection(prev => ({...prev, priceIncludingTax: priceIncludingTax}));
+                                  
+                                  if (!value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
+                                    // Calculate price excluding tax and tax amount from including price
+                                    const taxPercentageNum = Number(productSelection.taxPercentage);
+                                    const calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentageNum / 100);
+                                    const calculatedTaxAmount = priceIncludingTax - calculatedPriceExcludingTax;
+                                    setProductSelection(prev => ({
+                                      ...prev, 
+                                      priceExcludingTax: Math.round(calculatedPriceExcludingTax * 100) / 100,
+                                      taxAmount: Math.round(calculatedTaxAmount * 100) / 100
+                                    }));
+                                  } else if (!value.endsWith('.') && value !== '' && Number(productSelection.priceExcludingTax) > 0) {
+                                    // If no tax percentage but we have price excluding tax, calculate tax percentage
+                                    const priceExcludingTaxNum = Number(productSelection.priceExcludingTax);
+                                    const calculatedTaxAmount = priceIncludingTax - priceExcludingTaxNum;
+                                    const calculatedTaxPercentage = priceExcludingTaxNum > 0 ? (calculatedTaxAmount / priceExcludingTaxNum) * 100 : 0;
+                                    setProductSelection(prev => ({
+                                      ...prev, 
+                                      taxAmount: calculatedTaxAmount,
+                                      taxPercentage: Math.round(calculatedTaxPercentage * 100) / 100
+                                    }));
+                                  }
+                                }
+                              }}
+                              placeholder="Enter price"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="tax-amount-edit" className="text-sm">Tax Amount</Label>
+                            <Input
+                              id="tax-amount-edit"
+                              type="text"
+                              value={productSelection.taxAmount === 0 ? '' : productSelection.taxAmount.toString()}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, taxAmount: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Calculated automatically"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Tax Fields */}
+                      <div>
+                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Additional Tax Fields</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="extra-tax-edit" className="text-sm">Extra Tax</Label>
+                            <Input
+                              id="extra-tax-edit"
+                              type="text"
+                              value={productSelection.extraTax === 0 ? '' : productSelection.extraTax}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, extraTax: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1</Label>
+                            <Input
+                              id="further-tax-edit"
+                              type="text"
+                              value={productSelection.furtherTax === 0 ? '' : productSelection.furtherTax}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, furtherTax: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="fed-payable-tax-edit" className="text-sm">FED Payable Tax</Label>
+                            <Input
+                              id="fed-payable-tax-edit"
+                              type="text"
+                              value={productSelection.fedPayableTax === 0 ? '' : productSelection.fedPayableTax}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, fedPayableTax: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="fixed-notified-value-edit" className="text-sm">Fixed Notified Value/Retail Price</Label>
+                            <Input
+                              id="fixed-notified-value-edit"
+                              type="text"
+                              value={productSelection.fixedNotifiedValueOrRetailPrice === 0 ? '' : productSelection.fixedNotifiedValueOrRetailPrice}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, fixedNotifiedValueOrRetailPrice: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Enter value"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="sale-type-edit" className="text-sm">Sale Type</Label>
+                            <Input
+                              id="sale-type-edit"
+                              type="text"
+                              value={productSelection.saleType}
+                              onChange={(e) => setProductSelection({...productSelection, saleType: e.target.value})}
+                              placeholder="Goods at standard rate"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="discount-edit" className="text-sm">Discount Amount</Label>
+                            <Input
+                              id="discount-edit"
+                              type="text"
+                              value={productSelection.discountAmount === 0 ? '' : productSelection.discountAmount}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setProductSelection({...productSelection, discountAmount: value === '' ? 0 : value});
+                                }
+                              }}
+                              placeholder="Enter amount"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Product Identification Fields */}
+                      <div>
+                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Identification</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="serial-number-edit" className="text-sm">Serial Number</Label>
+                            <Input
+                              id="serial-number-edit"
+                              type="text"
+                              value={productSelection.serialNumber}
+                              onChange={(e) => setProductSelection({...productSelection, serialNumber: e.target.value})}
+                              placeholder="Product serial number"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="list-number-edit" className="text-sm">List Number</Label>
+                            <Input
+                              id="list-number-edit"
+                              type="text"
+                              value={productSelection.listNumber}
+                              onChange={(e) => setProductSelection({...productSelection, listNumber: e.target.value})}
+                              placeholder="List reference number"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="bc-number-edit" className="text-sm">BC Number</Label>
+                            <Input
+                              id="bc-number-edit"
+                              type="text"
+                              value={productSelection.bcNumber}
+                              onChange={(e) => setProductSelection({...productSelection, bcNumber: e.target.value})}
+                              placeholder="BC identification number"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="lot-number-edit" className="text-sm">Lot Number</Label>
+                            <Input
+                              id="lot-number-edit"
+                              type="text"
+                              value={productSelection.lotNumber}
+                              onChange={(e) => setProductSelection({...productSelection, lotNumber: e.target.value})}
+                              placeholder="Batch/lot number"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="expiry-date-edit" className="text-sm">Expiry Date</Label>
+                            <Input
+                              id="expiry-date-edit"
+                              type="date"
+                              value={productSelection.expiryDate}
+                              onChange={(e) => setProductSelection({...productSelection, expiryDate: e.target.value})}
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="item-serial-number-edit" className="text-sm">Item Serial Number</Label>
+                            <Input
+                              id="item-serial-number-edit"
+                              type="text"
+                              value={productSelection.itemSerialNumber}
+                              onChange={(e) => setProductSelection({...productSelection, itemSerialNumber: e.target.value})}
+                              placeholder="Item-specific serial"
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="sro-schedule-number-edit" className="text-sm">SRO/Schedule Number</Label>
+                            <Input
+                              id="sro-schedule-number-edit"
+                              type="text"
+                              value={productSelection.sroScheduleNumber}
+                              onChange={(e) => setProductSelection({...productSelection, sroScheduleNumber: e.target.value})}
+                              placeholder="SRO schedule reference"
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="hs-code-edit" className="text-sm">HS Code</Label>
+                            <Input
+                              id="hs-code-edit"
+                              type="text"
+                              value={productSelection.hsCode}
+                              onChange={(e) => setProductSelection({...productSelection, hsCode: e.target.value})}
+                              placeholder="Harmonized System Code"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Add Product Button */}
+                      <div className="flex justify-end pt-4 border-t">
+                        <Button
+                          onClick={handleAddProduct}
+                          disabled={isAddingProduct || !productSelection.selectedProductId}
+                          className="min-w-[120px]"
+                        >
+                          {isAddingProduct ? (
+                            <>
+                              <Loader className="mr-2 h-4 w-4 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Product
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Order Items List */}
+                {orderItems.length > 0 && (
+                  <div className="space-y-4">
+                    {orderItems.map((item, index) => (
+                      <div key={item.id || index} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.productName}</div>
+                            {item.variantTitle && (
+                              <div className="text-sm text-gray-600">{item.variantTitle}</div>
+                            )}
+                            {item.sku && (
+                              <div className="text-sm text-gray-500">SKU: {item.sku}</div>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeOrderItem(index)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+
+                        {/* Basic Product Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div>
+                            <Label className="text-sm">Product Name</Label>
+                            <Input
+                              value={item.productName || ''}
+                              onChange={(e) => updateOrderItem(index, 'productName', e.target.value)}
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          {item.isWeightBased ? (
+                            <div>
+                              <Label className="text-sm">Weight ({item.weightUnit})</Label>
+                              <Input
+                                type="number"
+                                step="0.001"
+                                value={item.weightQuantity ? formatWeightAuto(item.weightQuantity).formattedString : ''}
+                                onChange={(e) => updateOrderItem(index, 'weightQuantity', e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <div>
+                              <Label className="text-sm">Quantity</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => updateOrderItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                                className="text-sm"
+                              />
+                            </div>
+                          )}
+
+                          <div>
+                            <Label className="text-sm">Base Price</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => updateOrderItem(index, 'price', parseFloat(e.target.value) || 0)}
+                              className="text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <Label className="text-sm">UOM</Label>
+                            <Input
+                              value={item.uom || ''}
+                              onChange={(e) => updateOrderItem(index, 'uom', e.target.value)}
+                              placeholder="Unit of measure"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Tax & Pricing Details */}
+                        <div className="mb-6">
+                          <h6 className="text-sm font-medium mb-3 text-muted-foreground">💰 Tax & Pricing Details</h6>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Price Excluding Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.priceExcludingTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'priceExcludingTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Tax Percentage</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.taxPercentage || 0}
+                                onChange={(e) => updateOrderItem(index, 'taxPercentage', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Price Including Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.priceIncludingTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'priceIncludingTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Tax Amount</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.taxAmount || 0}
+                                onChange={(e) => updateOrderItem(index, 'taxAmount', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Additional Tax Fields */}
+                        <div className="mb-6">
+                          <h6 className="text-sm font-medium mb-3 text-muted-foreground">📊 Additional Tax Fields</h6>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Extra Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.extraTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'extraTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Further Tax 1</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.furtherTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'furtherTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">FED Payable Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.fedPayableTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'fedPayableTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Discount Amount</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.discount || 0}
+                                onChange={(e) => updateOrderItem(index, 'discount', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <div>
+                              <Label className="text-sm">Fixed Notified Value/Retail Price</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.fixedNotifiedValueOrRetailPrice || 0}
+                                onChange={(e) => updateOrderItem(index, 'fixedNotifiedValueOrRetailPrice', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Sale Type</Label>
+                              <Input
+                                value={item.saleType || 'Goods at standard rate'}
+                                onChange={(e) => updateOrderItem(index, 'saleType', e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Total Price</Label>
+                              <div className="flex items-center h-9 px-3 py-2 border rounded bg-gray-50 text-sm">
+                                {formatCurrency(item.totalPrice)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Product Identification */}
+                        <div className="mb-4">
+                          <h6 className="text-sm font-medium mb-3 text-muted-foreground">🔍 Product Identification</h6>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">HS Code</Label>
+                              <Input
+                                value={item.hsCode || ''}
+                                onChange={(e) => updateOrderItem(index, 'hsCode', e.target.value)}
+                                placeholder="Harmonized System Code"
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Serial Number</Label>
+                              <Input
+                                value={item.serialNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'serialNumber', e.target.value)}
+                                placeholder="Product serial number"
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">List Number</Label>
+                              <Input
+                                value={item.listNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'listNumber', e.target.value)}
+                                placeholder="List reference number"
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">BC Number</Label>
+                              <Input
+                                value={item.bcNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'bcNumber', e.target.value)}
+                                placeholder="BC identification number"
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <div>
+                              <Label className="text-sm">Lot Number</Label>
+                              <Input
+                                value={item.lotNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'lotNumber', e.target.value)}
+                                placeholder="Batch/lot number"
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Expiry Date</Label>
+                              <Input
+                                type="date"
+                                value={item.expiryDate || ''}
+                                onChange={(e) => updateOrderItem(index, 'expiryDate', e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Item Serial Number</Label>
+                              <Input
+                                value={item.itemSerialNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'itemSerialNumber', e.target.value)}
+                                placeholder="Item-specific serial"
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">SRO/Schedule Number</Label>
+                              <Input
+                                value={item.sroScheduleNumber || ''}
+                                onChange={(e) => updateOrderItem(index, 'sroScheduleNumber', e.target.value)}
+                                placeholder="SRO schedule reference"
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Tax Summary Display */}
+                        {(Number(item.taxAmount) || Number(item.extraTax) || Number(item.furtherTax) || Number(item.fedPayableTax) || Number(item.discount)) > 0 && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="text-sm font-medium text-green-800 mb-2">💰 Tax & Discount Summary:</div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {Number(item.priceExcludingTax) > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Price Excl. Tax:</span>
+                                  <span>{formatCurrency(Number(item.priceExcludingTax) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.taxAmount) > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Tax Amount:</span>
+                                  <span>{formatCurrency(Number(item.taxAmount) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.extraTax) > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Extra Tax:</span>
+                                  <span>{formatCurrency(Number(item.extraTax) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.furtherTax) > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Further Tax:</span>
+                                  <span>{formatCurrency(Number(item.furtherTax) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.fedPayableTax) > 0 && (
+                                <div className="flex justify-between">
+                                  <span>FED Tax:</span>
+                                  <span>{formatCurrency(Number(item.fedPayableTax) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.discount) > 0 && (
+                                <div className="flex justify-between text-red-600">
+                                  <span>Discount:</span>
+                                  <span>-{formatCurrency(Number(item.discount) * item.quantity)}</span>
+                                </div>
+                              )}
+                              {Number(item.priceIncludingTax) > 0 && (
+                                <div className="flex justify-between font-medium">
+                                  <span>Price Incl. Tax:</span>
+                                  <span>{formatCurrency(Number(item.priceIncludingTax) * item.quantity)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Loyalty Points */}
+            {loyaltySettings.enabled && orderData.customerId && customerPoints.availablePoints > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>🎁 Loyalty Points</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-purple-800">Available Points:</span>
+                      <span className="text-lg font-bold text-purple-600">{customerPoints.availablePoints}</span>
+                    </div>
+                    <div className="text-xs text-purple-600">
+                      Worth up to {formatCurrency(customerPoints.availablePoints * loyaltySettings.redemptionValue)} discount
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Use All Available Points</label>
+                        <p className="text-xs text-gray-500">
+                          Apply maximum discount (up to {loyaltySettings.maxRedemptionPercent}% of order)
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUseAllPoints}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                          orderData.useAllPoints ? 'bg-purple-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            orderData.useAllPoints ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {!orderData.useAllPoints && (
+                      <div>
+                        <Label>Points to Redeem</Label>
+                        <div className="flex space-x-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max={customerPoints.availablePoints}
+                            value={orderData.pointsToRedeem}
+                            onChange={(e) => handlePointsRedemption(parseInt(e.target.value) || 0)}
+                            placeholder={`Min: ${loyaltySettings.redemptionMinimum}`}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => handlePointsRedemption(customerPoints.availablePoints)}
+                            variant="secondary"
+                          >
+                            Max
+                          </Button>
+                        </div>
+                        {orderData.pointsToRedeem > 0 && (
+                          <div className="mt-2 text-sm text-green-600">
+                            Discount: {formatCurrency(orderData.pointsDiscountAmount)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Shipping Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>🚛 Shipping Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 mb-2">Invoice Type</label>
-                    <input
+                    <Label htmlFor="shippingFirstName">First Name</Label>
+                    <Input
+                      id="shippingFirstName"
+                      value={customerInfo.shippingFirstName}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingFirstName: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingLastName">Last Name</Label>
+                    <Input
+                      id="shippingLastName"
+                      value={customerInfo.shippingLastName}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingLastName: e.target.value})}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="shippingAddress1">Address Line 1</Label>
+                    <Input
+                      id="shippingAddress1"
+                      value={customerInfo.shippingAddress1}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingAddress1: e.target.value})}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="shippingAddress2">Address Line 2</Label>
+                    <Input
+                      id="shippingAddress2"
+                      value={customerInfo.shippingAddress2}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingAddress2: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingCity">City</Label>
+                    <Input
+                      id="shippingCity"
+                      value={customerInfo.shippingCity}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingCity: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingState">State</Label>
+                    <Input
+                      id="shippingState"
+                      value={customerInfo.shippingState}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingState: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingPostalCode">Postal Code</Label>
+                    <Input
+                      id="shippingPostalCode"
+                      value={customerInfo.shippingPostalCode}
+                      onChange={(e) => setCustomerInfo({...customerInfo, shippingPostalCode: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingCountry">Country</Label>
+                    <Select value={customerInfo.shippingCountry} onValueChange={(value) => setCustomerInfo({...customerInfo, shippingCountry: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="US">United States</SelectItem>
+                        <SelectItem value="PK">Pakistan</SelectItem>
+                        <SelectItem value="GB">United Kingdom</SelectItem>
+                        <SelectItem value="CA">Canada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>⚙️ Order Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="status">Order Status</Label>
+                    <Select value={orderData.status} onValueChange={(value) => setOrderData({...orderData, status: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="processing">Processing</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="paymentStatus">Payment Status</Label>
+                    <Select value={orderData.paymentStatus} onValueChange={(value) => setOrderData({...orderData, paymentStatus: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="failed">Failed</SelectItem>
+                        <SelectItem value="refunded">Refunded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="shippingAmount">Shipping Amount</Label>
+                    <Input
+                      id="shippingAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={orderData.shippingAmount}
+                      onChange={(e) => setOrderData({...orderData, shippingAmount: parseFloat(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="discountAmount">Discount Amount</Label>
+                    <Input
+                      id="discountAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={orderData.discountAmount}
+                      onChange={(e) => setOrderData({...orderData, discountAmount: parseFloat(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="notes">Order Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={orderData.notes}
+                    onChange={(e) => setOrderData({...orderData, notes: e.target.value})}
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Seller Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🏪 Seller Information
+                </CardTitle>
+                <CardDescription>
+                  Your business information for FBR Digital Invoicing. These fields are auto-filled from environment variables but can be modified if needed.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="seller-ntn">Seller NTN/CNIC</Label>
+                    <Input
+                      id="seller-ntn"
                       type="text"
-                      value={editData.invoiceType}
-                      onChange={(e) => setEditData({...editData, invoiceType: e.target.value})}
-                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                      value={sellerInfo.sellerNTNCNIC}
+                      onChange={(e) => setSellerInfo({...sellerInfo, sellerNTNCNIC: e.target.value})}
+                      placeholder="Enter your NTN or CNIC"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-business">Business Name</Label>
+                    <Input
+                      id="seller-business"
+                      type="text"
+                      value={sellerInfo.sellerBusinessName}
+                      onChange={(e) => setSellerInfo({...sellerInfo, sellerBusinessName: e.target.value})}
+                      placeholder="Enter your business name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-province">Province</Label>
+                    <div className="space-y-2">
+                      <Select 
+                        value={
+                          isCustomSellerProvince ? "custom" :
+                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
+                            ? sellerInfo.sellerProvince 
+                            : ""
+                        } 
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            setIsCustomSellerProvince(true);
+                            setSellerInfo({...sellerInfo, sellerProvince: ""});
+                          } else {
+                            setIsCustomSellerProvince(false);
+                            setSellerInfo({...sellerInfo, sellerProvince: value});
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Punjab">Punjab</SelectItem>
+                          <SelectItem value="Sindh">Sindh</SelectItem>
+                          <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
+                          <SelectItem value="Balochistan">Balochistan</SelectItem>
+                          <SelectItem value="Islamabad">Islamabad</SelectItem>
+                          <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
+                          <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
+                          <SelectItem value="custom">Custom Province...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {isCustomSellerProvince && (
+                        <Input
+                          placeholder="Enter custom province"
+                          value={sellerInfo.sellerProvince || ""}
+                          onChange={(e) => setSellerInfo({...sellerInfo, sellerProvince: e.target.value})}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-address">Address</Label>
+                    <Input
+                      id="seller-address"
+                      type="text"
+                      value={sellerInfo.sellerAddress}
+                      onChange={(e) => setSellerInfo({...sellerInfo, sellerAddress: e.target.value})}
+                      placeholder="Enter your business address"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fbr-sandbox-token">FBR Sandbox Token</Label>
+                    <Input
+                      id="fbr-sandbox-token"
+                      type="text"
+                      value={sellerInfo.fbrSandboxToken}
+                      onChange={(e) => setSellerInfo({...sellerInfo, fbrSandboxToken: e.target.value})}
+                      placeholder="FBR sandbox token"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fbr-base-url">FBR Base URL</Label>
+                    <Input
+                      id="fbr-base-url"
+                      type="text"
+                      value={sellerInfo.fbrBaseUrl}
+                      onChange={(e) => setSellerInfo({...sellerInfo, fbrBaseUrl: e.target.value})}
+                      placeholder="FBR base URL"
+                    />
+                  </div>
+                </div>
+
+                {(!sellerInfo.sellerNTNCNIC || !sellerInfo.sellerBusinessName || !sellerInfo.fbrSandboxToken || !sellerInfo.fbrBaseUrl) && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-yellow-800">
+                      <span>⚠️</span>
+                      <span className="font-medium">Missing Seller Information</span>
+                    </div>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Please ensure your seller information is complete for FBR Digital Invoicing. 
+                      You can set default values in your environment variables (FBR_SELLER_*).
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Invoice & Validation Fields */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🧾 Invoice & Validation
+                </CardTitle>
+                <CardDescription>
+                  Enter invoice details and validation information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="invoice-type">Invoice Type</Label>
+                    <Input
+                      id="invoice-type"
+                      type="text"
+                      value={orderData.invoiceType}
+                      onChange={(e) => setOrderData({...orderData, invoiceType: e.target.value})}
                       placeholder="e.g., Sales Invoice, Pro Forma"
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-2">Invoice Ref No</label>
-                    <input
+                    <Label htmlFor="invoice-ref">Invoice Ref No</Label>
+                    <Input
+                      id="invoice-ref"
                       type="text"
-                      value={editData.invoiceRefNo}
-                      onChange={(e) => setEditData({...editData, invoiceRefNo: e.target.value})}
-                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                      value={orderData.invoiceRefNo}
+                      onChange={(e) => setOrderData({...orderData, invoiceRefNo: e.target.value})}
                       placeholder="Reference number"
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-2">Scenario ID</label>
-                    <input
-                      type="text"
-                      value={editData.scenarioId}
-                      onChange={(e) => setEditData({...editData, scenarioId: e.target.value})}
-                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
-                      placeholder="Scenario identifier"
-                    />
+                    <Label htmlFor="scenario-id">Scenario ID</Label>
+                    <div className="space-y-2">
+                      <Select 
+                        value={isCustomScenario ? "custom" : orderData.scenarioId} 
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            setIsCustomScenario(true);
+                            setOrderData({...orderData, scenarioId: ""});
+                          } else {
+                            setIsCustomScenario(false);
+                            setOrderData({...orderData, scenarioId: value});
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select FBR Scenario" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 overflow-y-auto">
+                          <SelectItem value="SN001">SN001 - Goods at standard rate (default)</SelectItem>
+                          <SelectItem value="SN002">SN002 - Goods at standard rate (with WHT)</SelectItem>
+                          <SelectItem value="SN003">SN003 - Goods at standard rate (default)</SelectItem>
+                          <SelectItem value="SN004">SN004 - Goods at 5% rate</SelectItem>
+                          <SelectItem value="SN005">SN005 - Goods at 1% rate</SelectItem>
+                          <SelectItem value="SN006">SN006 - Tax-exempt goods (0% tax)</SelectItem>
+                          <SelectItem value="SN007">SN007 - Zero-rate goods (0% tax)</SelectItem>
+                          <SelectItem value="SN008">SN008 - 3rd Schedule Goods (requires retail price)</SelectItem>
+                          <SelectItem value="SN009">SN009 - Goods at 10% rate</SelectItem>
+                          <SelectItem value="SN010">SN010 - Goods at 12% rate</SelectItem>
+                          <SelectItem value="SN011">SN011 - Goods at 15% rate</SelectItem>
+                          <SelectItem value="SN012">SN012 - Goods at 18% rate</SelectItem>
+                          <SelectItem value="SN013">SN013 - Goods at 20% rate</SelectItem>
+                          <SelectItem value="SN014">SN014 - Services at standard rate</SelectItem>
+                          <SelectItem value="SN015">SN015 - Services at reduced rate</SelectItem>
+                          <SelectItem value="SN016">SN016 - Services zero-rated</SelectItem>
+                          <SelectItem value="SN017">SN017 - Services with FED</SelectItem>
+                          <SelectItem value="SN018">SN018 - Services with FED in ST mode</SelectItem>
+                          <SelectItem value="SN019">SN019 - International services</SelectItem>
+                          <SelectItem value="SN020">SN020 - Professional services</SelectItem>
+                          <SelectItem value="SN021">SN021 - Construction services</SelectItem>
+                          <SelectItem value="SN022">SN022 - Transport services</SelectItem>
+                          <SelectItem value="SN023">SN023 - Telecommunication services</SelectItem>
+                          <SelectItem value="SN024">SN024 - Financial services</SelectItem>
+                          <SelectItem value="SN025">SN025 - Insurance services</SelectItem>
+                          <SelectItem value="SN026">SN026 - Mixed supplies (goods + services)</SelectItem>
+                          <SelectItem value="SN027">SN027 - Retail Supplies (Invoice Level)</SelectItem>
+                          <SelectItem value="SN028">SN028 - Retail Supplies (Item Level)</SelectItem>
+                          <SelectItem value="custom">Custom Scenario...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {isCustomScenario && (
+                        <Input
+                          id="custom-scenario-id"
+                          type="text"
+                          value={orderData.scenarioId}
+                          onChange={(e) => setOrderData({...orderData, scenarioId: e.target.value})}
+                          placeholder="Enter custom scenario ID (e.g., SN029)"
+                        />
+                      )}
+                    </div>
+                    
+                    {orderData.scenarioId && (
+                      <div className="text-sm text-muted-foreground">
+                        {orderData.scenarioId === "SN001" && "⚠️ Not valid for unregistered buyers"}
+                        {orderData.scenarioId === "SN002" && "Requires withholding tax at item level"}
+                        {orderData.scenarioId === "SN005" && "Uses 1% tax rate"}
+                        {orderData.scenarioId === "SN006" && "Tax-exempt goods (0% tax)"}
+                        {orderData.scenarioId === "SN007" && "Zero-rate goods (0% tax)"}
+                        {orderData.scenarioId === "SN008" && "Requires fixed retail price"}
+                        {orderData.scenarioId === "SN017" && "Requires FED payable amount"}
+                        {orderData.scenarioId === "SN018" && "Services with FED in ST mode"}
+                        {orderData.scenarioId === "SN026" && "✅ Tested and working for unregistered buyers"}
+                        {orderData.scenarioId === "SN027" && "Retail supplies at invoice level"}
+                        {orderData.scenarioId === "SN028" && "Retail supplies at item level"}
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-2">Invoice Number</label>
-                    <input
+                    <Label htmlFor="invoice-number">Invoice Number</Label>
+                    <Input
+                      id="invoice-number"
                       type="text"
-                      value={editData.invoiceNumber}
-                      onChange={(e) => setEditData({...editData, invoiceNumber: e.target.value})}
-                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                      value={orderData.invoiceNumber}
+                      onChange={(e) => setOrderData({...orderData, invoiceNumber: e.target.value})}
                       placeholder="Invoice number"
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="invoice-date">Invoice Date</Label>
+                    <Input
+                      id="invoice-date"
+                      type="date"
+                      value={orderData.invoiceDate ? format(orderData.invoiceDate, 'yyyy-MM-dd') : ''}
+                      onChange={(e) => setOrderData({...orderData, invoiceDate: e.target.value ? new Date(e.target.value) : new Date()})}
+                    />
+                  </div>
                 </div>
-                <div className="mt-4">
-                  <label className="block text-gray-700 mb-2">Validation Response</label>
-                  <textarea
-                    value={editData.validationResponse}
-                    onChange={(e) => setEditData({...editData, validationResponse: e.target.value})}
-                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                <div>
+                  <Label htmlFor="validation-response">Validation Response</Label>
+                  <Textarea
+                    id="validation-response"
+                    value={orderData.validationResponse}
+                    onChange={(e) => setOrderData({...orderData, validationResponse: e.target.value})}
                     rows={4}
                     placeholder="Validation response data..."
                   />
                 </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-                >
-                  {submitting ? 'Updating...' : 'Update Order'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fetchOrder(orderId)}
-                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                >
-                  Reset Changes
-                </button>
-              </div>
-            </form>
+                
+                {/* FBR Submission Control Checkboxes */}
+                <div className="space-y-3 pt-4 border-t">
+                  <h4 className="text-sm font-medium text-gray-700">FBR Submission Options</h4>
+                  
+                  {/* Skip FBR Submission */}
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="skip-fbr-submission"
+                      checked={skipFbrSubmission}
+                      onChange={(e) => setSkipFbrSubmission(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="skip-fbr-submission" className="text-sm">
+                      Do not submit invoice to FBR (create order only)
+                    </Label>
+                  </div>
+                  
+                  {/* Production Environment Submission */}
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="production-submission"
+                      checked={isProductionSubmission}
+                      onChange={(e) => {
+                        setIsProductionSubmission(e.target.checked);
+                        if (!e.target.checked) {
+                          setProductionToken('');
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                      disabled={skipFbrSubmission}
+                    />
+                    <Label htmlFor="production-submission" className="text-sm font-medium text-orange-600">
+                      Production Environment Invoice Submission
+                    </Label>
+                  </div>
+                  
+                  {/* Production Token Field */}
+                  {isProductionSubmission && !skipFbrSubmission && (
+                    <div className="ml-6 space-y-2">
+                      <Label htmlFor="production-token" className="text-sm font-medium">
+                        Production Environment Token
+                      </Label>
+                      <Input
+                        id="production-token"
+                        type="password"
+                        value={productionToken}
+                        onChange={(e) => setProductionToken(e.target.value)}
+                        placeholder="Enter production environment token"
+                        className="font-mono text-sm"
+                      />
+                      <div className="text-xs text-gray-500">
+                        ⚠️ This token will be used for live FBR submission
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Loyalty Points Redemption */}
-          {loyaltySettings.enabled && order?.userId && customerPoints.availablePoints > 0 && (
-            <div className="bg-white border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">🎁 Loyalty Points</h3>
-              
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-purple-800">Available Points:</span>
-                  <span className="text-lg font-bold text-purple-600">{customerPoints.availablePoints}</span>
-                </div>
-                <div className="text-xs text-purple-600">
-                  Worth up to {formatCurrency(customerPoints.availablePoints * loyaltySettings.redemptionValue)} discount
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {/* Use All Points Toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Use All Available Points</label>
-                    <p className="text-xs text-gray-500">
-                      Apply maximum discount (up to {loyaltySettings.maxRedemptionPercent}% of order)
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleUseAllPoints}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                      editData.useAllPoints ? 'bg-purple-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        editData.useAllPoints ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Manual Points Input */}
-                {!editData.useAllPoints && (
-                  <div>
-                    <label className="block text-gray-700 mb-2">Points to Redeem</label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max={customerPoints.availablePoints}
-                        value={editData.pointsToRedeem}
-                        onChange={(e) => handlePointsRedemption(parseInt(e.target.value) || 0)}
-                        className="flex-1 p-2 border rounded focus:border-purple-500 focus:outline-none"
-                        placeholder={`Min: ${loyaltySettings.redemptionMinimum}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handlePointsRedemption(customerPoints.availablePoints)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-                      >
-                        Max
-                      </button>
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <div ref={sidebarContainerRef} className="sticky top-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>📊 Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(totals.subtotal)}</span>
                     </div>
-                    {editData.pointsToRedeem > 0 && (
-                      <div className="mt-2 text-sm text-green-600">
-                        Discount: {formatCurrency(editData.pointsDiscountAmount)}
+                    
+                    {totals.discountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount:</span>
+                        <span>-{formatCurrency(totals.discountAmount)}</span>
                       </div>
                     )}
-                    {editData.pointsToRedeem > 0 && editData.pointsToRedeem < loyaltySettings.redemptionMinimum && (
-                      <div className="mt-2 text-sm text-red-600">
-                        Minimum {loyaltySettings.redemptionMinimum} points required for redemption
+                    
+                    {totals.pointsDiscountAmount > 0 && (
+                      <div className="flex justify-between text-purple-600">
+                        <span>Points Discount:</span>
+                        <span>-{formatCurrency(totals.pointsDiscountAmount)}</span>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Points Summary */}
-                {editData.pointsToRedeem > 0 && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="text-sm text-green-800">
-                      <div className="flex justify-between">
-                        <span>Points to redeem:</span>
-                        <span className="font-medium">{editData.pointsToRedeem}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Discount amount:</span>
-                        <span className="font-medium">{formatCurrency(editData.pointsDiscountAmount)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-green-600 mt-1">
-                        <span>Remaining points:</span>
-                        <span>{customerPoints.availablePoints - editData.pointsToRedeem}</span>
-                      </div>
+                    
+                    <div className="flex justify-between">
+                      <span>Tax:</span>
+                      <span>{formatCurrency(totals.taxAmount)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span>Shipping:</span>
+                      <span>{formatCurrency(orderData.shippingAmount)}</span>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-between text-lg font-semibold">
+                      <span>Total:</span>
+                      <span>{formatCurrency(totals.total)}</span>
                     </div>
                   </div>
-                )}
+
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="text-sm text-gray-600">
+                      Items: <strong>{orderItems.length}</strong>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Currency: <strong>{orderData.currency}</strong>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePreviewJson}
+                      disabled={orderItems.length === 0}
+                      className="w-full"
+                    >
+                      🔍 Preview JSON Data
+                    </Button>
+                    
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={submitting || orderItems.length === 0}
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
+                          Updating Order...
+                        </>
+                      ) : (
+                        'Update Order'
+                      )}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push('/orders')}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      {/* JSON Preview Dialog */}
+      <Dialog open={showJsonPreview} onOpenChange={setShowJsonPreview}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>🔍 FBR JSON Preview</DialogTitle>
+            <DialogDescription>
+              Preview of the data that will be sent to FBR for validation and submission.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <pre className="bg-gray-100 p-4 rounded text-xs overflow-auto max-h-96">
+              {JSON.stringify(fbrPreviewData, null, 2)}
+            </pre>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowJsonPreview(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Confirmation Dialog with FBR Preview */}
+      <Dialog open={showOrderConfirmation} onOpenChange={setShowOrderConfirmation}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📋 Update Order Confirmation {isProductionSubmission && <span className="text-orange-600">- Production Mode</span>}
+            </DialogTitle>
+            <DialogDescription>
+              Please review the order details and FBR invoice data before updating.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Order Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-semibold mb-2">Order Summary</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Customer:</span> {orderData.email}
+                </div>
+                <div>
+                  <span className="font-medium">Total Amount:</span> {currentCurrency === 'USD' ? '$' : currentCurrency === 'AED' ? 'AED ' : 'Rs. '}{calculateTotals().total.toFixed(2)}
+                </div>
+                <div>
+                  <span className="font-medium">Items:</span> {orderItems.length}
+                </div>
+                <div>
+                  <span className="font-medium">Status:</span> {orderData.status}
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Order Items */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">📦 Order Items</h3>
-            
-            {order.items && order.items.length > 0 ? (
-              <div className="space-y-3">
-                {order.items.map((item, index) => (
-                  <div key={item.id} className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        {item.productImage && (
-                          <img 
-                            src={item.productImage} 
-                            alt={item.productName}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                        )}
-                        <div>
-                          <div className="font-medium">{item.productName}</div>
-                          {item.variantTitle && (
-                            <div className="text-sm text-gray-600">{item.variantTitle}</div>
-                          )}
-                          {item.sku && (
-                            <div className="text-sm text-gray-500">SKU: {item.sku}</div>
-                          )}
-                          {item.hsCode && (
-                            <div className="text-sm text-gray-500">HS Code: {item.hsCode}</div>
-                          )}
-                          {item.isWeightBased && item.weightQuantity && (
-                            <div className="text-sm text-blue-600">
-                              ⚖️ Weight: {formatWeightAuto(item.weightQuantity).formattedString}
-                            </div>
-                          )}
-                          {(() => {
-                            const parsedAddons = parseAddons(item.addons);
-                            return parsedAddons.length > 0 && (
-                              <div className="text-xs text-blue-600 mt-1">
-                                🧩 {parsedAddons.length} addon(s) included
-                              </div>
-                            );
-                          })()}
-                        </div>
+            {/* FBR Invoice Preview */}
+            {!skipFbrSubmission && (
+              <div className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  🧾 FBR Invoice Data Preview
+                  {generatingPreview && <span className="text-sm text-gray-500">(Generating...)</span>}
+                </h3>
+                
+                {generatingPreview ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-2">Generating FBR preview...</span>
+                  </div>
+                ) : fbrPreviewData ? (
+                  <div className="space-y-4">
+                    {/* Key Invoice Information */}
+                    <div className="grid grid-cols-2 gap-4 text-sm bg-blue-50 p-3 rounded">
+                      <div>
+                        <span className="font-medium">Invoice Type:</span> {fbrPreviewData.invoiceType}
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {(() => {
-                            const parsedAddons = parseAddons(item.addons);
-                            if (parsedAddons.length > 0) {
-                              return (
-                                <div>
-                                  <div className="text-sm">Price Inc. Tax: {formatCurrency(item.priceIncludingTax || item.price)} x {item.quantity}</div>
-                                  <div className="text-xs text-gray-500">
-                                    +Addons: {formatCurrency(parsedAddons.reduce((sum, addon) => sum + ((Number(addon.price) || 0) * (Number(addon.quantity) || 1)), 0))} x {item.quantity}
-                                  </div>
-                                </div>
-                              );
-                            } else if (item.isWeightBased && item.weightQuantity) {
-                              return (
-                                <div className="text-sm">
-                                  Price Inc. Tax: {formatCurrency(item.priceIncludingTax || item.price)} (for {formatWeightAuto(item.weightQuantity).formattedString})
-                                </div>
-                              );
-                            } else {
-                              return <div>Price Inc. Tax: {formatCurrency(item.priceIncludingTax || item.price)} x {item.quantity}</div>;
-                            }
-                          })()}
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {formatCurrency(item.totalPrice)}
-                        </div>
+                      <div>
+                        <span className="font-medium">Invoice Date:</span> {fbrPreviewData.invoiceDate}
+                      </div>
+                      <div>
+                        <span className="font-medium">Scenario ID:</span> {fbrPreviewData.scenarioId}
+                      </div>
+                      <div>
+                        <span className="font-medium">Invoice Ref No:</span> {fbrPreviewData.invoiceRefNo || 'N/A'}
                       </div>
                     </div>
-                    
-                    {/* Display addons for group products */}
-                    {(() => {
-                      const parsedAddons = parseAddons(item.addons);
-                      return parsedAddons.length > 0 && (
-                        <div className="mt-3 pl-4 border-l-2 border-blue-200">
-                          <div className="text-sm font-medium text-gray-700 mb-2">🧩 Addons ({parsedAddons.length}):</div>
-                          <div className="space-y-2">
-                            {parsedAddons.map((addon, addonIndex) => {
-                            // Ensure addon has required properties
-                            const safeAddon = {
-                              addonId: addon.addonId || '',
-                              addonTitle: addon.addonTitle || addon.title || addon.name || `Addon ${addonIndex + 1}`,
-                              price: Number(addon.price) || 0,
-                              quantity: Number(addon.quantity) || 1
-                            };
-                            
-                            const addonDescription = getAddonDescription(addon);
-                            const addonImage = getAddonImage(addon);
-                            return (
-                              <div key={addonIndex} className="flex items-start justify-between text-sm">
-                                <div className="flex items-start gap-2 flex-1">
-                                  {addonImage && (
-                                    <img 
-                                      src={addonImage} 
-                                      alt={safeAddon.addonTitle}
-                                      className="w-6 h-6 object-cover rounded"
-                                    />
-                                  )}
-                                  <div className="flex-1">
-                                    <div className="font-medium text-gray-700">
-                                      • {safeAddon.addonTitle} (x{safeAddon.quantity})
-                                    </div>
-                                    {addonDescription && (
-                                      <div className="text-xs text-gray-500 mt-1">
-                                        {addonDescription}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-right ml-4">
-                                  <div className="font-medium text-gray-700">
-                                    {formatCurrency(safeAddon.price)} each
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Total: {formatCurrency(safeAddon.price * safeAddon.quantity)}
-                                  </div>
-                                </div>
+
+                    {/* Seller Information */}
+                    <div className="bg-purple-50 p-3 rounded">
+                      <h4 className="font-medium text-purple-800 mb-2">📤 Seller Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.sellerNTNCNIC || 'Not provided'}</div>
+                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.sellerBusinessName || 'Not provided'}</div>
+                        <div><span className="font-medium">Province:</span> {fbrPreviewData.sellerProvince || 'Not provided'}</div>
+                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.sellerAddress || 'Not provided'}</div>
+                      </div>
+                    </div>
+
+                    {/* Buyer Information */}
+                    <div className="bg-green-50 p-3 rounded">
+                      <h4 className="font-medium text-green-800 mb-2">📥 Buyer Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">Buyer Name:</span> {fbrPreviewData.buyerFullName || orderData.buyerFullName || `${customerInfo.billingFirstName} ${customerInfo.billingLastName}`.trim() || 'Not provided'}</div>
+                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.buyerNTNCNIC || 'Not provided'}</div>
+                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
+                        <div><span className="font-medium">Registration Type:</span> {fbrPreviewData.buyerRegistrationType || 'Not provided'}</div>
+                        <div><span className="font-medium">Province:</span> {fbrPreviewData.buyerProvince || 'Not provided'}</div>
+                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.buyerAddress || 'Not provided'}</div>
+                      </div>
+                    </div>
+
+                    {/* Items Details */}
+                    {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                      <div className="bg-gray-50 p-3 rounded">
+                        <h4 className="font-medium mb-3">📦 Invoice Items ({fbrPreviewData.items.length})</h4>
+                        <div className="space-y-3">
+                          {fbrPreviewData.items.map((item: any, index: number) => (
+                            <div key={index} className="bg-white p-3 rounded border border-gray-200">
+                              <div className="font-medium text-sm mb-2">
+                                {item.productDescription || item.itemName || `Item ${index + 1}`}
                               </div>
-                            );
-                          })}
-                            <div className="flex justify-between text-sm font-medium text-gray-700 border-t pt-2 mt-2">
-                              <span>Addons subtotal per product:</span>
-                              <span>{formatCurrency(parsedAddons.reduce((sum, addon) => sum + ((Number(addon.price) || 0) * (Number(addon.quantity) || 1)), 0))}</span>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                <div><span className="font-medium">HS Code:</span> {item.hsCode}</div>
+                                <div><span className="font-medium">Quantity:</span> {item.quantity}</div>
+                                <div><span className="font-medium">UoM:</span> {item.uoM || item.uom || 'N/A'}</div>
+                                <div><span className="font-medium">Rate:</span> {item.rate}</div>
+                                {item.priceIncludingTax !== undefined && item.priceIncludingTax !== null && (
+                                  <div><span className="font-medium">Price Incl. Tax:</span> {item.priceIncludingTax?.toLocaleString()}</div>
+                                )}
+                                {item.priceExcludingTax !== undefined && item.priceExcludingTax !== null && (
+                                  <div><span className="font-medium">Price Excl. Tax:</span> {item.priceExcludingTax?.toLocaleString()}</div>
+                                )}
+                                {item.taxPercentage !== undefined && item.taxPercentage !== null && (
+                                  <div><span className="font-medium">Tax %:</span> {item.taxPercentage}%</div>
+                                )}
+                                <div><span className="font-medium">Value Excl. ST:</span> {item.valueSalesExcludingST?.toLocaleString()}</div>
+                                <div><span className="font-medium">Sales Tax:</span> {item.salesTaxApplicable?.toLocaleString()}</div>
+                                <div><span className="font-medium">FED Payable:</span> {item.fedPayable?.toLocaleString() || 0}</div>
+                                <div><span className="font-medium">Total Value:</span> {item.totalValues?.toLocaleString()}</div>
+                                {item.saleType && (
+                                  <div className="md:col-span-2"><span className="font-medium">Sale Type:</span> {item.saleType}</div>
+                                )}
+                                {item.discount > 0 && (
+                                  <div><span className="font-medium">Discount:</span> {item.discount}</div>
+                                )}
+                                {item.extraTax && (
+                                  <div><span className="font-medium">Extra Tax:</span> {item.extraTax}</div>
+                                )}
+                                {item.furtherTax > 0 && (
+                                  <div><span className="font-medium">Further Tax:</span> {item.furtherTax}</div>
+                                )}
+                                {item.sroScheduleNo && (
+                                  <div><span className="font-medium">SRO Schedule:</span> {item.sroScheduleNo}</div>
+                                )}
+                                {item.sroItemSerialNo && (
+                                  <div><span className="font-medium">SRO Item Serial:</span> {item.sroItemSerialNo}</div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    
-                    {/* Display tax and discount information */}
-                    {(Number(item.taxAmount) || Number(item.taxPercentage) || Number(item.discount) || Number(item.extraTax) || Number(item.furtherTax) || Number(item.fedPayableTax) || Number(item.priceIncludingTax) || Number(item.priceExcludingTax)) > 0 && (
-                      <div className="mt-3 pl-4 border-l-2 border-green-200">
-                        <div className="text-sm font-medium text-gray-700 mb-2">💰 Tax & Discount Details:</div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {(Number(item.taxAmount) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Tax Amount:</span>
-                              <span>{formatCurrency(Number(item.taxAmount || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.taxPercentage) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Tax %:</span>
-                              <span>{Number(item.taxPercentage || 0).toFixed(2)}%</span>
-                            </div>
-                          )}
-                          {(Number(item.priceIncludingTax) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Price Inc. Tax:</span>
-                              <span>{formatCurrency(Number(item.priceIncludingTax || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.priceExcludingTax) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Price Ex. Tax:</span>
-                              <span>{formatCurrency(Number(item.priceExcludingTax || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.extraTax) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Extra Tax:</span>
-                              <span>{formatCurrency(Number(item.extraTax || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.furtherTax) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Further Tax:</span>
-                              <span>{formatCurrency(Number(item.furtherTax || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.fedPayableTax) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>FED Tax:</span>
-                              <span>{formatCurrency(Number(item.fedPayableTax || 0))}</span>
-                            </div>
-                          )}
-                          {(Number(item.discount) || 0) > 0 && (
-                            <div className="flex justify-between">
-                              <span>Discount:</span>
-                              <span>{formatCurrency(Number(item.discount || 0))}</span>
-                            </div>
-                          )}
+                          ))}
                         </div>
                       </div>
                     )}
+
+                    {/* Summary Totals */}
+                    {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
+                      <div className="bg-indigo-50 p-3 rounded">
+                        <h4 className="font-medium text-indigo-800 mb-2">💰 Invoice Summary</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                          <div>
+                            <span className="font-medium">Total Items:</span> {fbrPreviewData.items.length}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Quantity:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Excl. ST:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.valueSalesExcludingST || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Sales Tax:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.salesTaxApplicable || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Total FED:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.fedPayable || 0), 0).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Grand Total:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.totalValues || 0), 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* FBR JSON Preview - Same as Console Log */}
+                    <details className="border rounded p-2 bg-slate-50">
+                      <summary className="cursor-pointer font-medium text-sm text-blue-800">
+                        🔍 FBR JSON Preview (Same as Console Log)
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-gray-600 italic">
+                          This is the exact JSON that will be sent to FBR and logged in the console:
+                        </div>
+                        <div className="bg-black text-green-400 p-3 rounded font-mono text-xs max-h-80 overflow-y-auto">
+                          <div className="text-yellow-400">🔍 === FINAL FBR JSON PAYLOAD ===</div>
+                          <div className="text-cyan-400">📋 Generated FBR Invoice JSON:</div>
+                          <pre className="mt-2 whitespace-pre-wrap">
+                            {fbrJsonPreview ? JSON.stringify(fbrJsonPreview, null, 2) : 'No JSON data available'}
+                          </pre>
+                          <div className="text-yellow-400 mt-2">===============================</div>
+                        </div>
+                      </div>
+                    </details>
                   </div>
-                ))}
+                ) : (
+                  <div className="text-gray-500 text-sm">
+                    FBR preview could not be generated. The order will be updated without preview.
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center text-gray-500 py-8">
-                No items in this order
+            )}
+
+            {skipFbrSubmission && (
+              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                <p className="text-yellow-800 text-sm">
+                  ⚠️ FBR submission is disabled for this order update.
+                </p>
               </div>
             )}
           </div>
 
-          {/* Customer Information */}
-          <div className="bg-white border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">👤 Customer Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-medium text-gray-700 mb-3">Contact</h4>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="text-gray-500">Email:</span>
-                    <span className="ml-2">{order.email}</span>
-                  </div>
-                  {order.phone && (
-                    <div>
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="ml-2">{order.phone}</span>
-                    </div>
-                  )}
-                  {order.user && (
-                    <div>
-                      <span className="text-gray-500">Customer:</span>
-                      <span className="ml-2">{order.user.name}</span>
-                    </div>
-                  )}
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowOrderConfirmation(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={updateOrder}
+              disabled={submitting}
+              className={isProductionSubmission ? "bg-orange-600 hover:bg-orange-700" : ""}
+            >
+              {submitting ? 'Updating Order...' : 'Confirm & Update Order'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Production Environment Confirmation Dialog */}
+      <Dialog open={showProductionConfirmation} onOpenChange={setShowProductionConfirmation}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              ⚠️ Production Environment Confirmation
+            </DialogTitle>
+            <DialogDescription>
+              You are about to update this order and submit the invoice to the production FBR environment.
+            </DialogDescription>
+            <div className="text-sm bg-orange-50 p-3 rounded border border-orange-200 mt-2">
+              <strong>Warning:</strong> This will create a real invoice in the FBR system and cannot be undone. 
+              Make sure all information is correct before proceeding.
+            </div>
+          </DialogHeader>
+
+          {fbrPreviewData && (
+            <div className="space-y-4 mt-4">
+              {/* Production Warning Banner */}
+              <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                <div className="flex items-center gap-2 text-red-800 font-medium mb-2">
+                  🚨 PRODUCTION ENVIRONMENT SUBMISSION
+                </div>
+                <div className="text-sm text-red-700">
+                  This invoice will be submitted to the live FBR system. Please ensure all details are accurate.
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-medium text-gray-700 mb-3">Shipping Address</h4>
-                <div className="text-sm text-gray-600">
-                  {order.shippingFirstName || order.shippingLastName ? (
-                    <div>
-                      <div>{order.shippingFirstName} {order.shippingLastName}</div>
-                      <div>{order.shippingAddress1}</div>
-                      {order.shippingAddress2 && <div>{order.shippingAddress2}</div>}
+              {/* Same order summary as regular confirmation */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="bg-white p-2 rounded">
+                    <div className="font-medium text-blue-700 mb-1">📤 Seller</div>
+                    <div>{fbrPreviewData.sellerBusinessName || 'Not provided'}</div>
+                    <div className="text-xs text-gray-600">{fbrPreviewData.sellerNTNCNIC || 'No NTN'}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="font-medium text-green-700 mb-1">📥 Buyer</div>
+                    <div>{fbrPreviewData.buyerFullName || fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
+                    <div className="text-xs text-gray-600">{fbrPreviewData.buyerNTNCNIC || 'No NTN/CNIC'}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="font-medium text-purple-700 mb-1">📄 Invoice</div>
+                    <div>{fbrPreviewData.invoiceType || 'Sale Invoice'}</div>
+                    <div className="text-xs text-gray-600">{fbrPreviewData.scenarioId || 'No scenario'}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <div className="font-medium text-orange-700 mb-1">💰 Total</div>
+                    <div className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(fbrPreviewData.totalAmount)}</div>
+                    <div className="text-xs text-gray-600">{orderItems.length} items</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Summary */}
+              <div className="bg-gray-50 p-3 rounded">
+                <h4 className="font-medium text-gray-800 mb-2">📦 Order Items ({orderItems.length})</h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {orderItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm bg-white p-2 rounded">
                       <div>
-                        {order.shippingCity}, {order.shippingState} {order.shippingPostalCode}
+                        <span className="font-medium">{item.productName}</span>
+                        {item.variantTitle && <span className="text-gray-500"> - {item.variantTitle}</span>}
+                        <div className="text-xs text-gray-500">Qty: {item.quantity}</div>
                       </div>
-                      <div>{order.shippingCountry}</div>
+                      <div className="text-right">
+                        <div className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(item.totalPrice)}</div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-gray-400">No shipping address provided</div>
-                  )}
+                  ))}
+                </div>
+              </div>
+
+              {/* Production Environment Details */}
+              <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                <div className="text-sm text-orange-800">
+                  <strong>🏭 Production Submission:</strong> This order will be submitted to FBR production environment.
+                  <div className="mt-1 text-xs">
+                    Token: {productionToken ? '***' + productionToken.slice(-4) : 'Not provided'}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Order Summary Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-white border rounded-lg p-6 sticky top-4">
-            <h3 className="text-lg font-semibold mb-4">📊 Order Summary</h3>
-            
-            {/* Current Status */}
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Order Status:</span>
-                {getStatusBadge(order.status, 'order')}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Payment:</span>
-                {getStatusBadge(order.paymentStatus, 'payment')}
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Fulfillment:</span>
-                {getStatusBadge(order.fulfillmentStatus, 'fulfillment')}
-              </div>
-            </div>
-
-            {/* Financial Summary */}
-            <div className="space-y-3 mb-6">
-              {editData.discountAmount > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(editData.discountAmount)}</span>
-                </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowProductionConfirmation(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={updateOrder}
+              disabled={submitting}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {submitting ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Confirm Production Update'
               )}
-              
-              {editData.pointsDiscountAmount > 0 && (
-                <div className="flex justify-between text-purple-600">
-                  <span>Points Discount ({editData.pointsToRedeem} pts):</span>
-                  <span>-{formatCurrency(editData.pointsDiscountAmount)}</span>
-                </div>
-              )}
-              
-              <div className="border-t pt-3">
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total:</span>
-                  <span>{formatCurrency(calculateNewTotal())}</span>
-                </div>
-              </div>
-
-              {/* Points Preview */}
-              {loyaltySettings.enabled && order.userId && (
-                <div className="border-t pt-3">
-                  <div className="bg-purple-50 p-3 rounded-lg">
-                    <div className="text-sm font-medium text-purple-800 mb-1">🎁 Loyalty Points</div>
-                    <div className="text-sm text-purple-700">
-                      Points for this order: <strong>{calculatePointsToEarn()} points</strong>
-                      {calculatePointsToEarn() === 0 && loyaltySettings.minimumOrder > 0 && (
-                        <div className="text-xs text-purple-600 mt-1">
-                          (Minimum order: {formatCurrency(loyaltySettings.minimumOrder)})
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-xs text-purple-600 mt-2">
-                      {order.status === 'completed' && editData.status === 'completed' ? (
-                        <span className="text-green-600">✅ Points are available</span>
-                      ) : editData.status === 'completed' && order.status !== 'completed' ? (
-                        <span className="text-green-600">✅ Points will be activated when saved</span>
-                      ) : order.status !== 'completed' && editData.status !== 'completed' ? (
-                        <span className="text-yellow-600">⏳ Points are pending completion</span>
-                      ) : (
-                        <span className="text-yellow-600">⏳ Points will remain pending</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Order Timeline */}
-            <div className="space-y-3">
-              <h4 className="font-medium text-gray-700">Order Timeline</h4>
-              <div className="text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Created:</span>
-                  <span>{formatDateTime(order.createdAt)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Last Updated:</span>
-                  <span>{formatDateTime(order.updatedAt)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="mt-6 space-y-2">
-              <div className="text-sm text-gray-600">
-                Items: <strong>{order.items?.length || 0}</strong>
-              </div>
-              
-              {editData.status === 'cancelled' && order.status !== 'cancelled' && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded">
-                  <div className="text-red-800 text-sm font-medium">
-                    ⚠️ Status Change Warning
-                  </div>
-                  <div className="text-red-600 text-sm">
-                    Cancelling this order will automatically restore inventory for all items.
-                  </div>
-                </div>
-              )}
-
-              {editData.status === 'confirmed' && order.status === 'pending' && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                  <div className="text-blue-800 text-sm font-medium">
-                    ℹ️ Status Change Info
-                  </div>
-                  <div className="text-blue-600 text-sm">
-                    {stockManagementEnabled 
-                      ? 'Confirming this order will validate and reserve inventory for all items. This action may fail if insufficient stock is available.'
-                      : 'Confirming this order will not affect inventory levels since stock management is disabled.'
-                    }
-                  </div>
-                </div>
-              )}
-
-              {editData.paymentStatus === 'paid' && order.paymentStatus === 'pending' && order.status === 'pending' && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                  <div className="text-green-800 text-sm font-medium">
-                    💳 Payment Status Change Info
-                  </div>
-                  <div className="text-green-600 text-sm">
-                    {stockManagementEnabled 
-                      ? 'Marking payment as paid will validate and reserve inventory for all items. This action may fail if insufficient stock is available.'
-                      : 'Marking payment as paid will not affect inventory levels since stock management is disabled.'
-                    }
-                  </div>
-                </div>
-              )}
-
-              {editData.status === 'completed' && order.status !== 'completed' && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                  <div className="text-green-800 text-sm font-medium">
-                    ✅ Status Change Info
-                  </div>
-                  <div className="text-green-600 text-sm">
-                    {stockManagementEnabled 
-                      ? 'Marking as completed will finalize the order and permanently reduce inventory quantities.'
-                      : 'Marking as completed will not affect inventory levels since stock management is disabled.'
-                    }
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-} 
+}

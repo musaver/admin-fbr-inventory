@@ -272,6 +272,9 @@ export default function AddOrder() {
     invoiceDate: new Date() as Date | undefined,
     validationResponse: '',
     // Buyer fields (from selected user)
+    buyerFirstName: '',
+    buyerLastName: '',
+    buyerFullName: '',
     buyerNTNCNIC: '',
     buyerBusinessName: '',
     buyerProvince: '',
@@ -744,18 +747,22 @@ export default function AddOrder() {
     
     if (customerId) {
       const customer = customers.find(c => c.id === customerId);
-              if (customer) {
-          setOrderData(prev => ({ 
-            ...prev, 
-            email: customer.email, 
-            phone: customer.phone || '',
-            // Populate buyer fields from selected customer's buyer information
-            buyerNTNCNIC: customer.buyerNTNCNIC || '',
-            buyerBusinessName: customer.buyerBusinessName || '',
-            buyerProvince: customer.buyerProvince || '',
-            buyerAddress: customer.buyerAddress || '',
-            buyerRegistrationType: customer.buyerRegistrationType || ''
-          }));
+      if (customer) {
+        setOrderData(prev => ({ 
+          ...prev, 
+          email: customer.email, 
+          phone: customer.phone || '',
+          // Buyer name from user table name; fallback to first/last
+          buyerFirstName: (customer.name && customer.name.trim()) ? customer.name : (customer.firstName || ''),
+          buyerLastName: customer.lastName || '',
+          buyerFullName: (customer.name && customer.name.trim()) ? customer.name : `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+          // Populate buyer fields from selected customer's buyer information
+          buyerNTNCNIC: customer.buyerNTNCNIC || '',
+          buyerBusinessName: customer.buyerBusinessName || '',
+          buyerProvince: customer.buyerProvince || '',
+          buyerAddress: customer.buyerAddress || '',
+          buyerRegistrationType: customer.buyerRegistrationType || ''
+        }));
           
           // Set custom province flag if the loaded province is not in predefined list
           const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
@@ -1480,6 +1487,9 @@ export default function AddOrder() {
       buyerProvince: orderData.buyerProvince || null,
       buyerAddress: orderData.buyerAddress || null,
       buyerRegistrationType: orderData.buyerRegistrationType || null,
+      buyerFirstName: customerInfo.billingFirstName || customerInfo.shippingFirstName || null,
+      buyerLastName: customerInfo.billingLastName || customerInfo.shippingLastName || null,
+      buyerFullName: `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim(),
       
       // Seller fields (for FBR Digital Invoicing)
       sellerNTNCNIC: sellerInfo.sellerNTNCNIC || null,
@@ -1785,6 +1795,9 @@ export default function AddOrder() {
         taxAmount: parseFloat((totals.taxAmount || 0).toString()),
         currency: orderData.currency,
         items: orderItems,
+        buyerFirstName: orderData.buyerFirstName || customerInfo.billingFirstName || customerInfo.shippingFirstName || '',
+        buyerLastName: orderData.buyerLastName || customerInfo.billingLastName || customerInfo.shippingLastName || '',
+        buyerFullName: orderData.buyerFullName || `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim(),
         buyerNTNCNIC: orderData.buyerNTNCNIC || '',
         buyerBusinessName: orderData.buyerBusinessName || '',
         buyerProvince: orderData.buyerProvince || '',
@@ -1810,8 +1823,48 @@ export default function AddOrder() {
 
       if (response.ok) {
         const result = await response.json();
-        setFbrPreviewData(result.fbrInvoice || result);
-        setFbrJsonPreview(result.fbrInvoice || result); // Store the raw JSON for display
+        const raw = result.fbrInvoice || result;
+        // Enhance preview with quantity-adjusted totals for display
+        const enhanced = { ...raw } as any;
+        // Ensure buyer name exists in preview
+        const computedBuyerName = (orderData.buyerFullName || `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim()) || '';
+        if (!enhanced.buyerFullName) enhanced.buyerFullName = computedBuyerName;
+        if (!enhanced.buyerFirstName) enhanced.buyerFirstName = orderData.buyerFirstName || customerInfo.billingFirstName || customerInfo.shippingFirstName || '';
+        if (!enhanced.buyerLastName) enhanced.buyerLastName = orderData.buyerLastName || customerInfo.billingLastName || customerInfo.shippingLastName || '';
+        if (Array.isArray(enhanced.items)) {
+          enhanced.items = enhanced.items.map((it: any, idx: number) => {
+            const src = orderItems[idx] || {} as any;
+            const qty = Number(src.quantity ?? it.quantity ?? 1) || 1;
+            const pct = Number(src.taxPercentage ?? it.taxPercentage ?? 0) || 0;
+            const unitEx = (() => {
+              const ex = Number(src.priceExcludingTax ?? it.priceExcludingTax ?? 0) || 0;
+              if (ex > 0) return ex;
+              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
+              if (inc > 0 && pct > 0) return inc / (1 + pct / 100);
+              return Number(src.price ?? it.rate ?? 0) || 0;
+            })();
+            const unitTax = (() => {
+              const t = Number(src.taxAmount ?? it.taxAmount ?? 0) || 0;
+              if (t > 0) return t;
+              if (pct > 0 && unitEx > 0) return (unitEx * pct) / 100;
+              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
+              if (inc > 0 && unitEx > 0) return inc - unitEx;
+              return 0;
+            })();
+            const unitInc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || (unitEx + unitTax);
+            return {
+              ...it,
+              quantity: qty,
+              priceExcludingTaxTotal: unitEx * qty,
+              priceIncludingTaxTotal: unitInc * qty,
+              salesTaxApplicable: unitTax * qty, // for display
+              valueSalesExcludingST: unitEx * qty,
+              totalValues: unitInc * qty,
+            };
+          });
+        }
+        setFbrPreviewData(enhanced);
+        setFbrJsonPreview(enhanced); // Store adjusted JSON for display
       } else {
         console.error('Failed to generate FBR preview');
         setFbrPreviewData(null);
@@ -2336,7 +2389,18 @@ export default function AddOrder() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="buyer-first-name">Buyer Name</Label>
+                    <Input
+                      id="buyer-first-name"
+                      type="text"
+                      value={orderData.buyerFirstName}
+                      onChange={(e) => setOrderData({...orderData, buyerFirstName: e.target.value, buyerFullName: `${e.target.value} ${orderData.buyerLastName}`.trim()})}
+                      placeholder="Enter buyer first name"
+                    />
+                  </div>
+                  
                   <div className="space-y-2">
                     <Label htmlFor="buyer-ntn">Buyer NTN/CNIC</Label>
                     <Input
@@ -3116,7 +3180,12 @@ export default function AddOrder() {
                     type="number"
                     min="1"
                     value={productSelection.quantity}
-                    onChange={(e) => setProductSelection({...productSelection, quantity: parseInt(e.target.value) || 1})}
+                    onChange={(e) => {
+                      const qty = parseInt(e.target.value) || 1;
+                      setProductSelection(prev => ({ ...prev, quantity: qty }));
+                      // If unit prices are set, keep unit values and recompute totals dynamically in UI sections
+                      // Item-level recomputation happens when item is added; here we just ensure live summaries use qty
+                    }}
                   />
                 </div>
               )}
@@ -3265,7 +3334,7 @@ export default function AddOrder() {
                     </div>
                     
                       <div className="space-y-2">
-                        <Label htmlFor="serial-number-edit" className="text-sm">Item Serial No.</Label>
+                        <Label htmlFor="serial-number-edit" className="text-sm">SRO Item Serial No. (FBR)</Label>
                         <Input
                           id="serial-number-edit"
                         type="text"
@@ -3792,30 +3861,54 @@ export default function AddOrder() {
                         <div className="mt-3 pl-4 border-l-2 border-green-200">
                           <div className="text-sm font-medium text-gray-700 mb-2">💰 Tax & Discount Details:</div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
-                            {(Number(item.taxAmount) || 0) > 0 && (
-                              <div className="flex justify-between">
-                                <span>Tax Amount:</span>
-                                <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(item.taxAmount || 0)}</span>
-                              </div>
-                            )}
-                            {(Number(item.taxPercentage) || 0) > 0 && (
-                              <div className="flex justify-between">
-                                <span>Tax %:</span>
-                                <span>{safeFormatPrice(item.taxPercentage || 0)}%</span>
-                              </div>
-                            )}
-                            {(Number(item.priceIncludingTax) || 0) > 0 && (
-                              <div className="flex justify-between">
-                                <span>Price Inc. Tax:</span>
-                                <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(item.priceIncludingTax || 0)}</span>
-                              </div>
-                            )}
-                            {(Number(item.priceExcludingTax) || 0) > 0 && (
-                              <div className="flex justify-between">
-                                <span>Price Ex. Tax:</span>
-                                <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(item.priceExcludingTax || 0)}</span>
-                              </div>
-                            )}
+                            {(() => {
+                              const qty = Number(item.quantity) || 1;
+                              const pct = Number(item.taxPercentage) || 0;
+                              const unitEx = (() => {
+                                const ex = Number(item.priceExcludingTax) || 0;
+                                if (ex > 0) return ex;
+                                const inc = Number(item.priceIncludingTax) || 0;
+                                if (inc > 0 && pct > 0) return inc / (1 + pct / 100);
+                                return Number(item.price) || 0;
+                              })();
+                              const unitTax = (() => {
+                                const t = Number(item.taxAmount) || 0;
+                                if (t > 0) return t;
+                                if (pct > 0 && unitEx > 0) return (unitEx * pct) / 100;
+                                const inc = Number(item.priceIncludingTax) || 0;
+                                if (inc > 0 && unitEx > 0) return inc - unitEx;
+                                return 0;
+                              })();
+                              const unitInc = Number(item.priceIncludingTax) || (unitEx + unitTax);
+                              return (
+                                <>
+                                  {(unitTax > 0) && (
+                                    <div className="flex justify-between">
+                                      <span>Tax Amount:</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitTax * qty)}</span>
+                                    </div>
+                                  )}
+                                  {(pct > 0) && (
+                                    <div className="flex justify-between">
+                                      <span>Tax %:</span>
+                                      <span>{safeFormatPrice(pct)}%</span>
+                                    </div>
+                                  )}
+                                  {(unitInc > 0) && (
+                                    <div className="flex justify-between">
+                                      <span>Price Inc. Tax:</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitInc * qty)}</span>
+                                    </div>
+                                  )}
+                                  {(unitEx > 0) && (
+                                    <div className="flex justify-between">
+                                      <span>Price Ex. Tax:</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitEx * qty)}</span>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                             {(Number(item.extraTax) || 0) > 0 && (
                               <div className="flex justify-between">
                                 <span>Extra Tax:</span>
@@ -4308,7 +4401,7 @@ export default function AddOrder() {
                     <div><span className="font-medium">Ref No:</span> {fbrPreviewData.invoiceRefNo || 'N/A'}</div>
                   </div>
 
-                  {/* Seller/Buyer Information */}
+                    {/* Seller/Buyer Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div className="bg-white p-2 rounded">
                       <div className="font-medium text-purple-700 mb-1">📤 Seller</div>
@@ -4317,7 +4410,7 @@ export default function AddOrder() {
                     </div>
                     <div className="bg-white p-2 rounded">
                       <div className="font-medium text-green-700 mb-1">📥 Buyer</div>
-                      <div>{fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
+                        <div>{fbrPreviewData.buyerFullName || orderData.buyerFullName || `${customerInfo.billingFirstName} ${customerInfo.billingLastName}`.trim() || fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
                       <div className="text-xs text-gray-600">{fbrPreviewData.buyerNTNCNIC || 'No NTN/CNIC'}</div>
                     </div>
                   </div>
@@ -4477,6 +4570,7 @@ export default function AddOrder() {
                     <div className="bg-green-50 p-3 rounded">
                       <h4 className="font-medium text-green-800 mb-2">📥 Buyer Information</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div><span className="font-medium">Buyer Name:</span> {fbrPreviewData.buyerFullName || orderData.buyerFullName || `${customerInfo.billingFirstName} ${customerInfo.billingLastName}`.trim() || 'Not provided'}</div>
                         <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.buyerNTNCNIC || 'Not provided'}</div>
                         <div><span className="font-medium">Business Name:</span> {fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
                         <div><span className="font-medium">Registration Type:</span> {fbrPreviewData.buyerRegistrationType || 'Not provided'}</div>
