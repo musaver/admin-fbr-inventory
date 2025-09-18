@@ -246,7 +246,7 @@ export default function AddOrder() {
     customerId: '',
     email: '',
     phone: '',
-    status: 'pending',
+    status: 'completed',
     paymentStatus: 'pending',
     notes: '',
     shippingAmount: 0,
