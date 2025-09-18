@@ -924,7 +924,7 @@ export default function SettingsPage() {
                     <option value="Sindh">Sindh</option>
                     <option value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</option>
                     <option value="Balochistan">Balochistan</option>
-                    <option value="Islamabad">Islamabad</option>
+                    <option value="Capital Territory">Capital Territory</option>
                     <option value="Gilgit-Baltistan">Gilgit-Baltistan</option>
                     <option value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</option>
                   </select>

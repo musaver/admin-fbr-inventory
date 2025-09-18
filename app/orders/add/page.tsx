@@ -590,7 +590,7 @@ export default function AddOrder() {
         setSellerInfo(sellerInfoData);
         
         // Set custom seller province flag if the loaded province is not in predefined list
-        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
+        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
         if (sellerInfoData.sellerProvince && !predefinedSellerProvinces.includes(sellerInfoData.sellerProvince)) {
           setIsCustomSellerProvince(true);
         }
@@ -765,7 +765,7 @@ export default function AddOrder() {
         }));
           
           // Set custom province flag if the loaded province is not in predefined list
-          const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+          const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
           if (customer.buyerProvince && !predefinedProvinces.includes(customer.buyerProvince)) {
             setIsCustomProvince(true);
           }
@@ -2201,10 +2201,10 @@ export default function AddOrder() {
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="confirmed">Confirmed</SelectItem>
                       <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
@@ -2268,7 +2268,7 @@ export default function AddOrder() {
                     <Select 
                       value={
                         isCustomSellerProvince ? "custom" :
-                        ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
+                        ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
                           ? sellerInfo.sellerProvince 
                           : ""
                       } 
@@ -2290,7 +2290,7 @@ export default function AddOrder() {
                         <SelectItem value="Sindh">Sindh</SelectItem>
                         <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
                         <SelectItem value="Balochistan">Balochistan</SelectItem>
-                        <SelectItem value="Islamabad">Islamabad</SelectItem>
+                            <SelectItem value="Capital Territory">Capital Territory</SelectItem>
                         <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
                         <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
                         <SelectItem value="N/A">N/A</SelectItem>
@@ -2430,7 +2430,7 @@ export default function AddOrder() {
                       <Select 
                         value={
                           isCustomProvince ? "custom" :
-                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
+                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
                             ? orderData.buyerProvince 
                             : ""
                         } 
@@ -2452,7 +2452,7 @@ export default function AddOrder() {
                           <SelectItem value="Sindh">Sindh</SelectItem>
                           <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
                           <SelectItem value="Balochistan">Balochistan</SelectItem>
-                          <SelectItem value="Islamabad">Islamabad</SelectItem>
+                            <SelectItem value="Capital Territory">Capital Territory</SelectItem>
                           <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
                           <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
                           <SelectItem value="N/A">N/A</SelectItem>

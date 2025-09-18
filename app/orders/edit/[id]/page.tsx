@@ -701,7 +701,7 @@ export default function EditOrder() {
       }
       
       // Initialize province dropdown states
-      const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+      const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
       if (orderData.buyerProvince && !predefinedProvinces.includes(orderData.buyerProvince)) {
         setIsCustomProvince(true);
       }
@@ -935,7 +935,7 @@ export default function EditOrder() {
         });
         
         // Set custom seller province flag if the loaded province is not in predefined list
-        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
+        const predefinedSellerProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"];
         if (data.sellerProvince && !predefinedSellerProvinces.includes(data.sellerProvince)) {
           setIsCustomSellerProvince(true);
         }
@@ -981,7 +981,7 @@ export default function EditOrder() {
     }));
     
     // Set custom province flag if the selected customer's province is not in predefined list
-    const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
+    const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
     if (customer.buyerProvince && !predefinedProvinces.includes(customer.buyerProvince)) {
       setIsCustomProvince(true);
     } else {
@@ -1750,7 +1750,7 @@ export default function EditOrder() {
                         <Select 
                           value={
                             isCustomProvince ? "custom" :
-                            ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Islamabad", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
+                            ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"].includes(orderData.buyerProvince || "")
                               ? orderData.buyerProvince 
                               : ""
                           } 
@@ -1772,7 +1772,7 @@ export default function EditOrder() {
                             <SelectItem value="Sindh">Sindh</SelectItem>
                             <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
                             <SelectItem value="Balochistan">Balochistan</SelectItem>
-                            <SelectItem value="Islamabad">Islamabad</SelectItem>
+                            <SelectItem value="Capital Territory">Capital Territory</SelectItem>
                             <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
                             <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
                             <SelectItem value="N/A">N/A</SelectItem>
@@ -2925,7 +2925,7 @@ export default function EditOrder() {
                       <Select 
                         value={
                           isCustomSellerProvince ? "custom" :
-                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
+                          ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
                             ? sellerInfo.sellerProvince 
                             : ""
                         } 
@@ -2947,7 +2947,7 @@ export default function EditOrder() {
                           <SelectItem value="Sindh">Sindh</SelectItem>
                           <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
                           <SelectItem value="Balochistan">Balochistan</SelectItem>
-                          <SelectItem value="Islamabad">Islamabad</SelectItem>
+                          <SelectItem value="Capital Territory">Islamabad</SelectItem>
                           <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
                           <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
                           <SelectItem value="N/A">N/A</SelectItem>
