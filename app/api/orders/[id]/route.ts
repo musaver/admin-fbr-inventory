@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { eq, and, isNull } from 'drizzle-orm';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
 import { isWeightBasedProduct } from '@/utils/weightUtils';
+import { withTenant, ErrorResponses } from '@/lib/api-helpers';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -53,9 +54,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withTenant(async (req: NextRequest, context: any) => {
   try {
-    const { id: orderId } = await params;
+    // Extract orderId from URL path
+    const url = new URL(req.url);
+    const pathSegments = url.pathname.split('/');
+    const orderId = pathSegments[pathSegments.length - 1];
     const body = await req.json();
     
     const {
@@ -80,8 +84,56 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       invoiceRefNo,
       scenarioId,
       invoiceNumber,
+      invoiceDate,
       validationResponse,
-      isProductionSubmission
+      isProductionSubmission,
+      productionToken,
+      
+      // FBR submission fields for edit order
+      email,
+      items,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      currency,
+      
+      // Buyer fields
+      buyerNTNCNIC,
+      buyerBusinessName,
+      buyerProvince,
+      buyerAddress,
+      buyerRegistrationType,
+      
+      // Seller fields
+      sellerNTNCNIC,
+      sellerBusinessName,
+      sellerProvince,
+      sellerAddress,
+      fbrSandboxToken,
+      fbrBaseUrl,
+      
+      // Billing/Shipping addresses
+      billingFirstName,
+      billingLastName,
+      billingAddress1,
+      billingAddress2,
+      billingCity,
+      billingState,
+      billingPostalCode,
+      billingCountry,
+      shippingFirstName,
+      shippingLastName,
+      shippingAddress1,
+      shippingAddress2,
+      shippingCity,
+      shippingState,
+      shippingPostalCode,
+      shippingCountry,
+      
+      // Email and FBR submission control flags
+      skipCustomerEmail,
+      skipSellerEmail,
+      skipFbrSubmission
     } = body;
 
     // Get current order and items for stock management
@@ -102,6 +154,222 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const order = currentOrder[0];
 
+    // FBR Digital Invoicing Validation (BEFORE order update)
+    let fbrResponse = null;
+    let fbrInvoiceNumber = null;
+    
+    if (scenarioId && items && !skipFbrSubmission) {
+      console.log(`\n=== FBR DIGITAL INVOICING VALIDATION (EDIT ORDER) ===`);
+      console.log(`Scenario: ${scenarioId}, Invoice Type: ${invoiceType || 'Sale Invoice'}`);
+      
+      // Helper function to format date for FBR without timezone conversion
+      function formatDateForFbr(dateInput: string | Date): string {
+        let date: Date;
+        
+        if (typeof dateInput === 'string') {
+          // If it's already in YYYY-MM-DD format, return as is
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+            return dateInput;
+          }
+          // If it contains time info, parse it carefully
+          if (dateInput.includes('T')) {
+            date = new Date(dateInput);
+          } else {
+            // Parse as local date without timezone conversion
+            const [year, month, day] = dateInput.split('-').map(Number);
+            date = new Date(year, month - 1, day);
+          }
+        } else {
+          date = dateInput;
+        }
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // Validate that invoice date is provided for FBR submission
+      if (!invoiceDate) {
+        return NextResponse.json({ 
+          error: 'Invoice date is required for FBR integration. Please set the invoice date in the Invoice & Validation section.',
+          step: 'validation'
+        }, { status: 400 });
+      }
+      
+      try {
+        // Prepare order data for FBR submission
+        const orderForFbr = {
+          email: email || order.email,
+          scenarioId,
+          invoiceType: invoiceType || 'Sale Invoice',
+          invoiceDate: invoiceDate ? formatDateForFbr(invoiceDate) : undefined,
+          invoiceRefNo,
+          subtotal: parseFloat((subtotal || order.subtotal).toString()),
+          totalAmount: parseFloat((totalAmount || order.totalAmount).toString()),
+          taxAmount: parseFloat((taxAmount || order.taxAmount || 0).toString()),
+          currency: currency || order.currency,
+          
+          // Buyer information
+          buyerNTNCNIC: buyerNTNCNIC || order.buyerNTNCNIC,
+          buyerBusinessName: buyerBusinessName || order.buyerBusinessName,
+          buyerProvince: buyerProvince || order.buyerProvince,
+          buyerAddress: buyerAddress || order.buyerAddress,
+          buyerRegistrationType: buyerRegistrationType || order.buyerRegistrationType || 'Unregistered',
+          
+          // Seller information (for FBR Digital Invoicing)
+          sellerNTNCNIC,
+          sellerBusinessName,
+          sellerProvince,
+          sellerAddress,
+          fbrSandboxToken,
+          fbrBaseUrl,
+          
+          // Billing/Shipping addresses for fallback buyer info
+          billingFirstName: billingFirstName || order.billingFirstName,
+          billingLastName: billingLastName || order.billingLastName,
+          billingAddress1: billingAddress1 || order.billingAddress1,
+          billingAddress2: billingAddress2 || order.billingAddress2,
+          billingCity: billingCity || order.billingCity,
+          billingState: billingState || order.billingState,
+          billingPostalCode: billingPostalCode || order.billingPostalCode,
+          billingCountry: billingCountry || order.billingCountry,
+          shippingFirstName: shippingFirstName || order.shippingFirstName,
+          shippingLastName: shippingLastName || order.shippingLastName,
+          shippingAddress1: shippingAddress1 || order.shippingAddress1,
+          shippingAddress2: shippingAddress2 || order.shippingAddress2,
+          shippingCity: shippingCity || order.shippingCity,
+          shippingState: shippingState || order.shippingState,
+          shippingPostalCode: shippingPostalCode || order.shippingPostalCode,
+          shippingCountry: shippingCountry || order.shippingCountry,
+          
+          // Order items with all FBR-required fields
+          items: items.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName,
+            productDescription: item.productDescription || item.productName,
+            variantTitle: item.variantTitle,
+            sku: item.sku,
+            hsCode: item.hsCode,
+            uom: item.uom || 'PCS',
+            quantity: item.quantity,
+            price: parseFloat(item.price.toString()),
+            totalPrice: parseFloat(item.totalPrice.toString()),
+            
+            // Weight-based fields
+            isWeightBased: item.isWeightBased || false,
+            weightQuantity: item.weightQuantity,
+            weightUnit: item.weightUnit,
+            
+            // Tax and additional fields
+            taxAmount: item.taxAmount,
+            taxPercentage: item.taxPercentage,
+            priceIncludingTax: item.priceIncludingTax,
+            priceExcludingTax: item.priceExcludingTax,
+            extraTax: item.extraTax,
+            furtherTax: item.furtherTax,
+            fedPayableTax: item.fedPayableTax,
+            discount: item.discount,
+            
+            // FBR-specific fields
+            itemSerialNumber: item.itemSerialNumber,
+            sroScheduleNumber: item.sroScheduleNumber,
+            fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice,
+          }))
+        };
+
+        // Submit to FBR via our internal API (unless skipped)
+        // 🔍 DEBUG: Log the exact JSON being sent to FBR
+        console.log('\n🔍 === FBR SUBMISSION DEBUG (EDIT) ===');
+        console.log('📤 Order data being sent to FBR mapper:');
+        console.log(JSON.stringify(orderForFbr, null, 2));
+        if (isProductionSubmission) {
+          console.log('🚨 PRODUCTION MODE ENABLED - Will use production FBR endpoints');
+        }
+        console.log('=================================\n');
+
+        // Add production mode parameters to the FBR submission
+        const fbrPayload = {
+          ...orderForFbr,
+          // Override token and production flag if production mode is enabled
+          ...(isProductionSubmission && productionToken && {
+            fbrSandboxToken: productionToken,
+            isProductionSubmission: true
+          })
+        };
+
+        const fbrSubmissionResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/fbr/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(fbrPayload),
+        });
+
+        const fbrResult = await fbrSubmissionResponse.json();
+        fbrResponse = fbrResult;
+
+        if (fbrResponse.ok && fbrResponse.response?.invoiceNumber) {
+          console.log('✅ FBR submission successful:', {
+            step: fbrResponse.step,
+            invoiceNumber: fbrResponse.response?.invoiceNumber,
+            message: fbrResponse.response?.message,
+          });
+          
+          fbrInvoiceNumber = fbrResponse.response.invoiceNumber;
+        } else {
+          console.error('❌ FBR submission failed:', {
+            step: fbrResponse.step,
+            error: fbrResponse.error,
+            validationError: fbrResponse.response?.validationResponse?.error,
+          });
+        
+          // Return error immediately - don't update the order
+          let errorMessage = 'FBR Digital Invoice submission failed';
+          
+          if (fbrResponse.response?.validationResponse?.error) {
+            errorMessage += `: ${fbrResponse.response.validationResponse.error}`;
+          } else if (fbrResponse.error) {
+            errorMessage += `: ${fbrResponse.error}`;
+          }
+          
+          // Include detailed validation errors if available
+          if (fbrResponse.response?.validationResponse?.invoiceStatuses) {
+            const itemErrors = fbrResponse.response.validationResponse.invoiceStatuses
+              .filter((status: any) => status.error)
+              .map((status: any) => `Item ${status.itemSNo}: ${status.error}`)
+              .join('; ');
+            
+            if (itemErrors) {
+              errorMessage += `. Details: ${itemErrors}`;
+            }
+          }
+          
+          return NextResponse.json({ 
+            error: errorMessage,
+            fbrError: {
+              ...fbrResponse,
+              fbrInvoice: fbrResponse.fbrInvoice // Pass through the generated FBR payload
+            },
+            step: 'fbr_validation'
+          }, { status: 400 });
+        }
+      } catch (fbrError) {
+        console.error('❌ Error during FBR submission:', fbrError);
+        
+        return NextResponse.json({ 
+          error: `FBR submission failed: ${fbrError instanceof Error ? fbrError.message : String(fbrError)}`,
+          step: 'fbr_connection'
+        }, { status: 500 });
+      }
+      console.log(`=== END FBR DIGITAL INVOICING VALIDATION ===\n`);
+    } else if (scenarioId && !items) {
+      console.log('⚠️ FBR submission skipped - no items provided for edit order');
+    } else if (scenarioId && skipFbrSubmission) {
+      console.log('⏭️ Skipping FBR submission as requested');
+      fbrResponse = { skipped: true, message: 'FBR submission skipped by user request' };
+    }
+
     // Check if stock management is enabled
     const stockManagementEnabled = await getStockManagementSettingDirect();
 
@@ -111,7 +379,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         orderItemsData,
         previousStatus,
         status,
-        order.orderNumber
+        order.orderNumber,
+        context
       );
     }
 
@@ -150,8 +419,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (invoiceType !== undefined) updateData.invoiceType = invoiceType;
     if (invoiceRefNo !== undefined) updateData.invoiceRefNo = invoiceRefNo;
     if (scenarioId !== undefined) updateData.scenarioId = scenarioId;
-    if (invoiceNumber !== undefined) updateData.invoiceNumber = invoiceNumber;
-    if (validationResponse !== undefined) updateData.validationResponse = validationResponse;
+    if (invoiceNumber !== undefined || fbrInvoiceNumber) updateData.invoiceNumber = fbrInvoiceNumber || invoiceNumber;
+    if (invoiceDate !== undefined) updateData.invoiceDate = invoiceDate ? (typeof invoiceDate === 'string' && invoiceDate.includes('T') ? new Date(invoiceDate) : new Date(invoiceDate + 'T00:00:00.000Z')) : null;
+    if (validationResponse !== undefined || fbrResponse) updateData.validationResponse = fbrResponse ? JSON.stringify(fbrResponse) : validationResponse;
     if (isProductionSubmission !== undefined) updateData.fbrEnvironment = isProductionSubmission ? 'production' : 'sandbox';
     if (newTotalAmount !== Number(order.totalAmount)) updateData.totalAmount = newTotalAmount;
 
@@ -231,7 +501,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const updatedOrder = {
       ...updatedOrderData[0].order,
       user: updatedOrderData[0].user,
-      items: updatedItems
+      items: updatedItems,
+      fbrResponse: fbrResponse, // Include FBR submission result
+      fbrInvoiceNumber: fbrInvoiceNumber, // Include FBR invoice number
+      success: true,
+      message: fbrInvoiceNumber ? `Order updated successfully with FBR Invoice ${fbrInvoiceNumber}` : 'Order updated successfully'
     };
 
     return NextResponse.json(updatedOrder);
@@ -239,7 +513,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     console.error('Error updating order:', error);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
   }
-}
+});
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -267,7 +541,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     // Restore inventory if order was not cancelled (only if stock management is enabled)
     // Since inventory is now reserved when orders are created, we need to restore it unless it was already cancelled
     if (stockManagementEnabledForDeletion && order[0].status !== 'cancelled') {
-      await restoreInventoryFromOrder(orderItemsData, order[0].orderNumber);
+      await restoreInventoryFromOrder(orderItemsData, order[0].orderNumber, { tenantId: 'default' }); // TODO: Get actual tenantId
     }
 
     // Delete order items first (foreign key constraint)
@@ -288,7 +562,8 @@ async function handleStockManagement(
   orderItems: any[],
   previousStatus: string,
   newStatus: string,
-  orderNumber: string
+  orderNumber: string,
+  context: any
 ) {
   for (const item of orderItems) {
     // Get product to determine stock management type
@@ -358,6 +633,7 @@ async function handleStockManagement(
         // Create stock movement record
         await db.insert(stockMovements).values({
           id: uuidv4(),
+          tenantId: context.tenantId,
           inventoryId: inventory.id,
           productId: item.productId,
           variantId: item.variantId || null,
@@ -407,6 +683,7 @@ async function handleStockManagement(
         // Create stock movement record
         await db.insert(stockMovements).values({
           id: uuidv4(),
+          tenantId: context.tenantId,
           inventoryId: inventory.id,
           productId: item.productId,
           variantId: item.variantId || null,
@@ -431,7 +708,7 @@ async function handleStockManagement(
 
 
 // Helper function to restore inventory when order is deleted
-async function restoreInventoryFromOrder(orderItems: any[], orderNumber: string) {
+async function restoreInventoryFromOrder(orderItems: any[], orderNumber: string, context: any) {
   for (const item of orderItems) {
     // Get product to determine stock management type
     const product = await db.query.products.findFirst({
@@ -486,6 +763,7 @@ async function restoreInventoryFromOrder(orderItems: any[], orderNumber: string)
       // Create stock movement record
       await db.insert(stockMovements).values({
         id: uuidv4(),
+        tenantId: context.tenantId,
         inventoryId: inventory.id,
         productId: item.productId,
         variantId: item.variantId || null,
@@ -521,6 +799,7 @@ async function restoreInventoryFromOrder(orderItems: any[], orderNumber: string)
       // Create stock movement record
       await db.insert(stockMovements).values({
         id: uuidv4(),
+        tenantId: context.tenantId,
         inventoryId: inventory.id,
         productId: item.productId,
         variantId: item.variantId || null,

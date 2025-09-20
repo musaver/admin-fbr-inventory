@@ -6,7 +6,8 @@ import {
   Upload, 
   Download, 
   Users, 
-  Package, 
+  Package,
+  ShoppingCart,
   FileText, 
   CheckCircle, 
   XCircle, 
@@ -58,6 +59,11 @@ interface ImportJob {
       name: string;
       sku: string;
     }>;
+    successfulOrders?: Array<{
+      id: string;
+      orderNumber: string;
+      customerEmail: string;
+    }>;
   } | null;
 }
 
@@ -65,8 +71,9 @@ export default function BulkUserUpload() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const defaultTab = searchParams.get('tab') === 'products' ? 'products' : 'users';
-  const [activeTab, setActiveTab] = useState<'users' | 'products'>(defaultTab);
+  const defaultTab = searchParams.get('tab') === 'products' ? 'products' : 
+                    searchParams.get('tab') === 'orders' ? 'orders' : 'users';
+  const [activeTab, setActiveTab] = useState<'users' | 'products' | 'orders'>(defaultTab);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [currentJob, setCurrentJob] = useState<ImportJob | null>(null);
@@ -94,12 +101,18 @@ export default function BulkUserUpload() {
 "Jane Smith","jane.smith@example.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
 "Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
       fileName = 'bulk_user_import_template.csv';
-    } else {
+    } else if (activeTab === 'products') {
       csvContent = `SKU,Unit Price,Price Including Tax,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM
 "PROD-001","29.99","32.49","Premium quality product","2.50","8.5","1234567890","100","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","Pcs"
 "PROD-002","19.99","21.59","Standard quality item","1.60","8.0","9876543210","50","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","Kg"
 "PROD-003","45.00","48.60","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
+    } else {
+      csvContent = `Customer Email,Customer Name,Customer Phone,Product SKU,Product Name,Product Description,Quantity,Unit Price,Total Amount,Billing Address,Shipping Address,Order Status,Payment Status,Service Date,Service Time,Notes,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date
+"john.doe@example.com","John Doe","+92300-1234567","PROD-001","Premium Widget","High quality widget for professional use","2","29.99","59.98","123 Main St, Lahore, Punjab","123 Main St, Lahore, Punjab","confirmed","paid","2024-12-25","14:30","Rush delivery requested","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31"
+"jane.smith@example.com","Jane Smith","+92321-9876543","PROD-002","Standard Item","Standard quality item for regular use","1","19.99","19.99","456 Commerce Ave, Karachi, Sindh","456 Commerce Ave, Karachi, Sindh","processing","pending","2024-12-26","10:00","Standard delivery","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30"
+"ahmed.khan@example.com","Ahmed Khan","+92333-1122334","PROD-003","Premium Product","Premium quality product for special customers","3","45.00","135.00","789 Market Rd, Peshawar, KPK","789 Market Rd, Peshawar, KPK","pending","pending","2024-12-27","16:00","Handle with care","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31"`;
+      fileName = 'bulk_order_import_template.csv';
     }
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -217,16 +230,16 @@ export default function BulkUserUpload() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Bulk Import</h1>
           <p className="text-muted-foreground">
-            Import multiple users or products from CSV files
+            Import multiple users, products, or orders from CSV files
           </p>
         </div>
         <Button
           variant="outline"
-          onClick={() => router.push(activeTab === 'users' ? '/users' : '/products')}
+          onClick={() => router.push(activeTab === 'users' ? '/users' : activeTab === 'products' ? '/products' : '/orders')}
           className="gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to {activeTab === 'users' ? 'Users' : 'Products'}
+          Back to {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
         </Button>
       </div>
 
@@ -239,7 +252,7 @@ export default function BulkUserUpload() {
         }}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl">
           <TabsTrigger value="users" className="gap-2">
             <Users className="h-4 w-4" />
             Import Users
@@ -247,6 +260,10 @@ export default function BulkUserUpload() {
           <TabsTrigger value="products" className="gap-2">
             <Package className="h-4 w-4" />
             Import Products
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Import Orders
           </TabsTrigger>
         </TabsList>
 
@@ -347,6 +364,56 @@ export default function BulkUserUpload() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="orders" className="space-y-6">
+          {/* Instructions Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Instructions
+              </CardTitle>
+              <CardDescription>
+                Follow these guidelines for successful order import
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="space-y-2">
+                  <div>Download the CSV template below to see the required format</div>
+                  <ul className="list-disc list-inside space-y-1 mt-2">
+                    <li><strong>Required fields:</strong> Customer Email, Product SKU, Quantity, Unit Price</li>
+                    <li><strong>Optional fields:</strong> Customer Name, Customer Phone, Product Name, Product Description, Total Amount, Billing Address, Shipping Address, Order Status, Payment Status, Service Date, Service Time, Notes, HS Code, UOM, Serial Number, List Number, BC Number, Lot Number, Expiry Date</li>
+                    <li>Supports up to 100MB files (~50,000 orders)</li>
+                    <li>If customer email exists, assigns order to existing user; otherwise creates new user</li>
+                    <li>If product SKU exists, uses existing product; otherwise creates new product</li>
+                    <li>Processing happens in background with real-time progress</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+
+          {/* Template Download */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Download Template
+              </CardTitle>
+              <CardDescription>
+                Get the CSV template with correct format and sample data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Download Order CSV Template
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Upload Section */}
@@ -354,7 +421,7 @@ export default function BulkUserUpload() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Upload {activeTab === 'users' ? 'Users' : 'Products'}
+            Upload {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
           </CardTitle>
           <CardDescription>
             Select your CSV file to begin the import process
@@ -564,6 +631,36 @@ export default function BulkUserUpload() {
               </Card>
             )}
 
+            {currentJob.type === 'orders' && currentJob.results?.successfulOrders && Array.isArray(currentJob.results.successfulOrders) && currentJob.results.successfulOrders.length > 0 && (
+              <Card className="border-green-200">
+                <CardHeader>
+                  <CardTitle className="text-green-800 flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5" />
+                    Successfully Created Orders
+                  </CardTitle>
+                  <CardDescription>Showing first 20 orders</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {currentJob.results.successfulOrders.slice(0, 20).map((order, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
+                        <ShoppingCart className="h-4 w-4 text-green-600" />
+                        <div className="text-sm">
+                          <span className="font-medium">{order.orderNumber}</span>
+                          <span className="text-muted-foreground"> ({order.customerEmail})</span>
+                        </div>
+                      </div>
+                    ))}
+                    {currentJob.results.successfulOrders.length > 20 && (
+                      <div className="text-sm text-muted-foreground italic text-center py-2">
+                        ... and {currentJob.results.successfulOrders.length - 20} more orders
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Error Details */}
             {currentJob.errors && Array.isArray(currentJob.errors) && currentJob.errors.length > 0 && (
               <Card className="border-red-200">
@@ -587,7 +684,9 @@ export default function BulkUserUpload() {
                         <div className="text-sm text-red-600 dark:text-red-400">
                           {currentJob.type === 'users' 
                             ? `Email: ${error.email || 'N/A'}`
-                            : `SKU: ${error.identifier || 'N/A'}`
+                            : currentJob.type === 'products'
+                              ? `SKU: ${error.identifier || 'N/A'}`
+                              : `Identifier: ${error.identifier || 'N/A'}`
                           }
                         </div>
                       </div>
@@ -614,10 +713,10 @@ export default function BulkUserUpload() {
                       </span>
                     </div>
                     <Button
-                      onClick={() => router.push(currentJob.type === 'users' ? '/users' : '/products')}
+                      onClick={() => router.push(currentJob.type === 'users' ? '/users' : currentJob.type === 'products' ? '/products' : '/orders')}
                       className="gap-2"
                     >
-                      View All {currentJob.type === 'users' ? 'Users' : 'Products'}
+                      View All {currentJob.type === 'users' ? 'Users' : currentJob.type === 'products' ? 'Products' : 'Orders'}
                     </Button>
                   </div>
                 </CardContent>

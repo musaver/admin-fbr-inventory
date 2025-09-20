@@ -26,8 +26,8 @@ export const POST = withTenant(async (request: NextRequest, context) => {
     }
 
     // Validate import type
-    if (!['users', 'products'].includes(importType)) {
-      return ErrorResponses.invalidInput('Invalid import type. Must be "users" or "products"');
+    if (!['users', 'products', 'orders'].includes(importType)) {
+      return ErrorResponses.invalidInput('Invalid import type. Must be "users", "products", or "orders"');
     }
 
     // Validate file type (CSV only for now)
@@ -37,9 +37,9 @@ export const POST = withTenant(async (request: NextRequest, context) => {
 
     // Validate file size (100MB limit for bulk imports)
     const maxSize = 100 * 1024 * 1024; // 100MB
-    const itemType = importType === 'users' ? 'users' : 'products';
-    const estimatePerItem = importType === 'users' ? 500 : 300; // Rough estimates
-    const maxItems = importType === 'users' ? '~200,000 users' : '~300,000 products';
+    const itemType = importType === 'users' ? 'users' : importType === 'products' ? 'products' : 'orders';
+    const estimatePerItem = importType === 'users' ? 500 : importType === 'products' ? 300 : 2000; // Rough estimates
+    const maxItems = importType === 'users' ? '~200,000 users' : importType === 'products' ? '~300,000 products' : '~50,000 orders';
     
     if (file.size > maxSize) {
       return ErrorResponses.invalidInput(`File too large. Maximum size is 100MB (${maxItems}).`);
@@ -98,10 +98,12 @@ export const POST = withTenant(async (request: NextRequest, context) => {
 
     const responseMessage = importType === 'users' 
       ? 'User import job started. You will receive progress updates.'
-      : 'Product import job started. You will receive progress updates.';
+      : importType === 'products'
+        ? 'Product import job started. You will receive progress updates.'
+        : 'Order import job started. You will receive progress updates.';
     
     const estimatedItems = Math.floor(file.size / estimatePerItem);
-    const itemField = importType === 'users' ? 'estimatedUsers' : 'estimatedProducts';
+    const itemField = importType === 'users' ? 'estimatedUsers' : importType === 'products' ? 'estimatedProducts' : 'estimatedOrders';
 
     return NextResponse.json({ 
       jobId,

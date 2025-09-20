@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest';
 import { db } from '@/lib/db';
-import { importJobs, user, userLoyaltyPoints, products, stockMovements } from '@/lib/schema';
+import { importJobs, user, userLoyaltyPoints, products, stockMovements, orders, orderItems } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,6 +32,32 @@ interface ProductImportRow {
   uom?: string;
 }
 
+interface OrderImportRow {
+  customerEmail: string;
+  customerName?: string;
+  customerPhone?: string;
+  productSku: string;
+  productName?: string;
+  productDescription?: string;
+  quantity: string;
+  unitPrice: string;
+  totalAmount?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  orderStatus?: string;
+  paymentStatus?: string;
+  serviceDate?: string;
+  serviceTime?: string;
+  notes?: string;
+  hsCode?: string;
+  uom?: string;
+  serialNumber?: string;
+  listNumber?: string;
+  bcNumber?: string;
+  lotNumber?: string;
+  expiryDate?: string;
+}
+
 interface ProcessingResult {
   successful: number;
   failed: number;
@@ -50,6 +76,11 @@ interface ProcessingResult {
     id: string;
     name: string;
     sku: string;
+  }>;
+  successfulOrders?: Array<{
+    id: string;
+    orderNumber: string;
+    customerEmail: string;
   }>;
 }
 
@@ -295,6 +326,128 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
   return products;
 }
 
+// Utility function to parse CSV for orders
+function parseOrderCSV(csvText: string): OrderImportRow[] {
+  const lines = csvText.split('\n').filter(line => line.trim());
+  
+  if (lines.length < 2) {
+    throw new Error('CSV file must contain header and at least one data row');
+  }
+
+  // Parse header
+  const header = lines[0].split(',').map(h => h.replace(/['"]/g, '').trim());
+  console.log('📋 Order CSV Headers found:', header);
+  
+  // Expected columns (case-insensitive)
+  const columnMap = {
+    'customerEmail': ['customer email', 'email', 'customer_email'],
+    'customerName': ['customer name', 'name', 'customer_name'],
+    'customerPhone': ['customer phone', 'phone', 'customer_phone'],
+    'productSku': ['product sku', 'sku', 'product_sku'],
+    'productName': ['product name', 'product_name'],
+    'productDescription': ['product description', 'description', 'product_description'],
+    'quantity': ['quantity', 'qty'],
+    'unitPrice': ['unit price', 'price', 'unit_price'],
+    'totalAmount': ['total amount', 'total', 'total_amount'],
+    'billingAddress': ['billing address', 'billing_address'],
+    'shippingAddress': ['shipping address', 'shipping_address'],
+    'orderStatus': ['order status', 'status', 'order_status'],
+    'paymentStatus': ['payment status', 'payment_status'],
+    'serviceDate': ['service date', 'service_date'],
+    'serviceTime': ['service time', 'service_time'],
+    'notes': ['notes', 'note'],
+    'hsCode': ['hs code', 'hs_code', 'hscode'],
+    'uom': ['uom', 'unit of measure', 'unit'],
+    'serialNumber': ['serial number', 'serial_number', 'serial no'],
+    'listNumber': ['list number', 'list_number', 'list no'],
+    'bcNumber': ['bc number', 'bc_number', 'bc no'],
+    'lotNumber': ['lot number', 'lot_number', 'lot no'],
+    'expiryDate': ['expiry date', 'expiry_date', 'expiration date']
+  };
+
+  // Map header indices
+  const headerMap: Record<string, number> = {};
+  Object.entries(columnMap).forEach(([key, variants]) => {
+    const index = header.findIndex(h => 
+      variants.some(variant => h.toLowerCase() === variant.toLowerCase())
+    );
+    if (index !== -1) {
+      headerMap[key] = index;
+      console.log(`✅ Order: Mapped column "${key}" to header "${header[index]}" at index ${index}`);
+    } else {
+      console.log(`❌ Order: Could not map column "${key}". Available headers:`, header.map(h => `"${h.toLowerCase()}"`));
+    }
+  });
+  console.log('📊 Order CSV Final headerMap:', headerMap);
+
+  // Validate required columns
+  if (headerMap.customerEmail === undefined || headerMap.productSku === undefined || 
+      headerMap.quantity === undefined || headerMap.unitPrice === undefined) {
+    throw new Error('Required columns missing: Customer Email, Product SKU, Quantity, and Unit Price are required');
+  }
+
+  // Parse data rows
+  const orderRows: OrderImportRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i];
+    if (!row.trim()) continue;
+
+    // Simple CSV parser (handles basic quoted values)
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let j = 0; j < row.length; j++) {
+      const char = row[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^["']|["']$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim().replace(/^["']|["']$/g, ''));
+
+    // Extract order data
+    const orderData: OrderImportRow = {
+      customerEmail: values[headerMap.customerEmail] || '',
+      customerName: values[headerMap.customerName] || '',
+      customerPhone: values[headerMap.customerPhone] || '',
+      productSku: values[headerMap.productSku] || '',
+      productName: values[headerMap.productName] || '',
+      productDescription: values[headerMap.productDescription] || '',
+      quantity: values[headerMap.quantity] || '',
+      unitPrice: values[headerMap.unitPrice] || '',
+      totalAmount: values[headerMap.totalAmount] || '',
+      billingAddress: values[headerMap.billingAddress] || '',
+      shippingAddress: values[headerMap.shippingAddress] || '',
+      orderStatus: values[headerMap.orderStatus] || '',
+      paymentStatus: values[headerMap.paymentStatus] || '',
+      serviceDate: values[headerMap.serviceDate] || '',
+      serviceTime: values[headerMap.serviceTime] || '',
+      notes: values[headerMap.notes] || '',
+      hsCode: values[headerMap.hsCode] || '',
+      uom: values[headerMap.uom] || '',
+      serialNumber: values[headerMap.serialNumber] || '',
+      listNumber: values[headerMap.listNumber] || '',
+      bcNumber: values[headerMap.bcNumber] || '',
+      lotNumber: values[headerMap.lotNumber] || '',
+      expiryDate: values[headerMap.expiryDate] || '',
+    };
+
+    // Debug log for first few rows
+    if (i <= 3) {
+      console.log(`🔍 Order Row ${i} extracted data:`, orderData);
+    }
+
+    orderRows.push(orderData);
+  }
+
+  return orderRows;
+}
+
 
 // Validate user data
 function validateUser(userData: UserImportRow): string | null {
@@ -327,6 +480,43 @@ function validateProduct(productData: ProductImportRow): string | null {
 
   // Validate price is a valid number
   const price = parseFloat(productData.unitPrice);
+  if (isNaN(price) || price < 0) {
+    return 'Unit Price must be a valid positive number';
+  }
+
+  return null;
+}
+
+// Validate order data
+function validateOrder(orderData: OrderImportRow): string | null {
+  if (!orderData.customerEmail?.trim()) {
+    return 'Customer Email is required';
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(orderData.customerEmail)) {
+    return 'Invalid email format';
+  }
+
+  if (!orderData.productSku?.trim()) {
+    return 'Product SKU is required';
+  }
+
+  if (!orderData.quantity?.trim()) {
+    return 'Quantity is required';
+  }
+
+  const quantity = parseInt(orderData.quantity);
+  if (isNaN(quantity) || quantity <= 0) {
+    return 'Quantity must be a valid positive number';
+  }
+
+  if (!orderData.unitPrice?.trim()) {
+    return 'Unit Price is required';
+  }
+
+  const price = parseFloat(orderData.unitPrice);
   if (isNaN(price) || price < 0) {
     return 'Unit Price must be a valid positive number';
   }
@@ -870,6 +1060,277 @@ async function processProductChunk(
   return result;
 }
 
+// Process orders in chunks - creates orders with user/product matching logic
+async function processOrderChunk(
+  orderRows: OrderImportRow[], 
+  tenantId: string, 
+  startIndex: number
+): Promise<ProcessingResult> {
+  console.log(`📦 Processing ${orderRows.length} orders for tenant: ${tenantId}`);
+  
+  const result: ProcessingResult = {
+    successful: 0,
+    failed: 0,
+    errors: [],
+    successfulOrders: []
+  };
+
+  // Group orders by customer email to create one order per customer
+  const ordersByCustomer = new Map<string, OrderImportRow[]>();
+  orderRows.forEach((orderRow, index) => {
+    const email = orderRow.customerEmail.toLowerCase().trim();
+    if (!ordersByCustomer.has(email)) {
+      ordersByCustomer.set(email, []);
+    }
+    ordersByCustomer.get(email)!.push({ ...orderRow, globalRowIndex: startIndex + index + 1 } as any);
+  });
+
+  for (const [customerEmail, customerOrders] of ordersByCustomer) {
+    try {
+      // Find or create user
+      let customerId: string;
+      let existingUser = await db.select({ id: user.id })
+        .from(user)
+        .where(and(
+          eq(user.email, customerEmail),
+          eq(user.tenantId, tenantId)
+        ))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        customerId = existingUser[0].id;
+        console.log(`✅ Found existing user: ${customerEmail}`);
+      } else {
+        // Create new user from first order's customer data
+        const firstOrder = customerOrders[0];
+        customerId = uuidv4();
+        
+        const newUser = {
+          id: customerId,
+          tenantId,
+          name: firstOrder.customerName?.trim() || customerEmail.split('@')[0],
+          email: customerEmail,
+          phone: firstOrder.customerPhone?.trim() || null,
+          userType: 'customer',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(user).values(newUser);
+        
+        // Initialize loyalty points
+        await db.insert(userLoyaltyPoints).values({
+          id: uuidv4(),
+          userId: customerId,
+          totalPointsEarned: 0,
+          totalPointsRedeemed: 0,
+          availablePoints: 0,
+          pendingPoints: 0,
+          pointsExpiringSoon: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        console.log(`✅ Created new user: ${customerEmail}`);
+      }
+
+      // Create order
+      const orderId = uuidv4();
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      
+      let subtotal = 0;
+      const orderItemsToCreate: any[] = [];
+
+      // Process each order item
+      for (let i = 0; i < customerOrders.length; i++) {
+        const orderData = customerOrders[i];
+        const globalRowIndex = (orderData as any).globalRowIndex;
+
+        try {
+          // Validate order data
+          const validationError = validateOrder(orderData);
+          if (validationError) {
+            result.errors.push({
+              row: globalRowIndex,
+              identifier: `${customerEmail} - ${orderData.productSku}`,
+              message: validationError
+            });
+            result.failed++;
+            continue;
+          }
+
+          // Find or create product
+          let productId: string;
+          let existingProduct = await db.select({ id: products.id, price: products.price })
+            .from(products)
+            .where(and(
+              eq(products.sku, orderData.productSku.trim()),
+              eq(products.tenantId, tenantId)
+            ))
+            .limit(1);
+
+          if (existingProduct.length > 0) {
+            productId = existingProduct[0].id;
+            console.log(`✅ Found existing product: ${orderData.productSku}`);
+          } else {
+            // Create new product
+            productId = uuidv4();
+            const unitPrice = parseFloat(orderData.unitPrice);
+            
+            const newProduct = {
+              id: productId,
+              tenantId,
+              name: orderData.productName?.trim() || orderData.productSku.trim(),
+              slug: `${orderData.productSku.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${productId.substring(0, 8)}`,
+              description: orderData.productDescription?.trim() || null,
+              sku: orderData.productSku.trim(),
+              price: unitPrice.toFixed(2),
+              hsCode: orderData.hsCode?.trim() || null,
+              uom: orderData.uom?.trim() || null,
+              serialNumber: orderData.serialNumber?.trim() || null,
+              listNumber: orderData.listNumber?.trim() || null,
+              bcNumber: orderData.bcNumber?.trim() || null,
+              lotNumber: orderData.lotNumber?.trim() || null,
+              expiryDate: orderData.expiryDate?.trim() || null,
+              isActive: true,
+              productType: 'simple',
+              stockManagementType: 'quantity',
+              taxAmount: '0.00',
+              taxPercentage: '0.00',
+              priceIncludingTax: unitPrice.toFixed(2),
+              priceExcludingTax: unitPrice.toFixed(2),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            await db.insert(products).values(newProduct);
+            console.log(`✅ Created new product: ${orderData.productSku}`);
+          }
+
+          // Create order item
+          const quantity = parseInt(orderData.quantity);
+          const unitPrice = parseFloat(orderData.unitPrice);
+          const totalPrice = quantity * unitPrice;
+          subtotal += totalPrice;
+
+          const orderItem = {
+            id: uuidv4(),
+            orderId: orderId,
+            productId: productId,
+            productName: orderData.productName?.trim() || orderData.productSku.trim(),
+            productDescription: orderData.productDescription?.trim() || null,
+            sku: orderData.productSku.trim(),
+            hsCode: orderData.hsCode?.trim() || null,
+            uom: orderData.uom?.trim() || null,
+            serialNumber: orderData.serialNumber?.trim() || null,
+            listNumber: orderData.listNumber?.trim() || null,
+            bcNumber: orderData.bcNumber?.trim() || null,
+            lotNumber: orderData.lotNumber?.trim() || null,
+            expiryDate: orderData.expiryDate?.trim() || null,
+            quantity: quantity,
+            price: unitPrice.toFixed(2),
+            totalPrice: totalPrice.toFixed(2),
+          };
+
+          orderItemsToCreate.push(orderItem);
+
+        } catch (error: any) {
+          result.errors.push({
+            row: globalRowIndex,
+            identifier: `${customerEmail} - ${orderData.productSku}`,
+            message: error.message || 'Unknown error occurred'
+          });
+          result.failed++;
+        }
+      }
+
+      // Create the order if we have valid items
+      if (orderItemsToCreate.length > 0) {
+        const firstOrder = customerOrders[0];
+        
+        // Parse addresses (simple parsing)
+        const parseBillingAddress = (address: string) => {
+          if (!address) return {};
+          const parts = address.split(',').map(p => p.trim());
+          return {
+            billingAddress1: parts[0] || null,
+            billingCity: parts[1] || null,
+            billingState: parts[2] || null
+          };
+        };
+
+        const parseShippingAddress = (address: string) => {
+          if (!address) return {};
+          const parts = address.split(',').map(p => p.trim());
+          return {
+            shippingAddress1: parts[0] || null,
+            shippingCity: parts[1] || null,
+            shippingState: parts[2] || null
+          };
+        };
+
+        const billingAddr = parseBillingAddress(firstOrder.billingAddress || '');
+        const shippingAddr = parseShippingAddress(firstOrder.shippingAddress || firstOrder.billingAddress || '');
+
+        const order = {
+          id: orderId,
+          tenantId,
+          orderNumber,
+          userId: customerId,
+          email: customerEmail,
+          phone: firstOrder.customerPhone?.trim() || null,
+          status: firstOrder.orderStatus?.toLowerCase() || 'pending',
+          paymentStatus: firstOrder.paymentStatus?.toLowerCase() || 'pending',
+          fulfillmentStatus: 'pending',
+          subtotal: subtotal.toFixed(2),
+          taxAmount: '0.00',
+          shippingAmount: '0.00',
+          discountAmount: '0.00',
+          totalAmount: subtotal.toFixed(2),
+          currency: 'PKR',
+          serviceDate: firstOrder.serviceDate?.trim() || null,
+          serviceTime: firstOrder.serviceTime?.trim() || null,
+          notes: firstOrder.notes?.trim() || null,
+          ...billingAddr,
+          ...shippingAddr,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(orders).values(order);
+        
+        // Insert order items
+        for (const orderItem of orderItemsToCreate) {
+          await db.insert(orderItems).values(orderItem);
+        }
+
+        result.successful++;
+        result.successfulOrders!.push({
+          id: orderId,
+          orderNumber,
+          customerEmail
+        });
+
+        console.log(`✅ Created order ${orderNumber} with ${orderItemsToCreate.length} items for ${customerEmail}`);
+      }
+
+    } catch (error: any) {
+      // If order creation fails, mark all items for this customer as failed
+      customerOrders.forEach((orderData) => {
+        const globalRowIndex = (orderData as any).globalRowIndex;
+        result.errors.push({
+          row: globalRowIndex,
+          identifier: `${customerEmail} - Order Creation`,
+          message: error.message || 'Unknown error occurred'
+        });
+        result.failed++;
+      });
+    }
+  }
+
+  return result;
+}
+
 // Main Inngest function
 export const bulkUserImport = inngest.createFunction(
   { 
@@ -923,6 +1384,11 @@ export const bulkUserImport = inngest.createFunction(
           const data = parseProductCSV(csvText);
           console.log(`✅ Parsed ${data.length} products from CSV`);
           return { type: 'products', data };
+        } else if (importType === 'orders') {
+          console.log('🔍 Parsing as order CSV...');
+          const data = parseOrderCSV(csvText);
+          console.log(`✅ Parsed ${data.length} order rows from CSV`);
+          return { type: 'orders', data };
         } else {
           console.log('🔍 Parsing as user CSV...');
           
@@ -949,7 +1415,7 @@ export const bulkUserImport = inngest.createFunction(
 
       // Step 4: Process data in chunks of 50
       const CHUNK_SIZE = 50;
-      const chunks: (UserImportRow[] | ProductImportRow[])[] = [];
+      const chunks: (UserImportRow[] | ProductImportRow[] | OrderImportRow[])[] = [];
       for (let i = 0; i < parsedData.data.length; i += CHUNK_SIZE) {
         chunks.push(parsedData.data.slice(i, i + CHUNK_SIZE));
       }
@@ -959,7 +1425,8 @@ export const bulkUserImport = inngest.createFunction(
         failed: 0,
         errors: [],
         successfulUsers: importType === 'users' ? [] : undefined,
-        successfulProducts: importType === 'products' ? [] : undefined
+        successfulProducts: importType === 'products' ? [] : undefined,
+        successfulOrders: importType === 'orders' ? [] : undefined
       };
 
       // Process each chunk
@@ -973,6 +1440,8 @@ export const bulkUserImport = inngest.createFunction(
           
           if (importType === 'products') {
             return processProductChunk(chunk as ProductImportRow[], tenantId, startIndex);
+          } else if (importType === 'orders') {
+            return processOrderChunk(chunk as OrderImportRow[], tenantId, startIndex);
           } else {
             const result = processUserChunk(chunk as UserImportRow[], tenantId, startIndex);
             console.log(`🏁 Chunk ${chunkIndex + 1} processing completed`);
@@ -996,6 +1465,9 @@ export const bulkUserImport = inngest.createFunction(
           console.log(`👥 Added ${chunkResult.successfulUsers.length} successful users to total`);
         } else if (importType === 'products' && chunkResult.successfulProducts) {
           totalResults.successfulProducts!.push(...chunkResult.successfulProducts);
+        } else if (importType === 'orders' && chunkResult.successfulOrders) {
+          totalResults.successfulOrders!.push(...chunkResult.successfulOrders);
+          console.log(`📦 Added ${chunkResult.successfulOrders.length} successful orders to total`);
         }
         
         console.log(`📊 Running totals: ${totalResults.successful} successful, ${totalResults.failed} failed`);
@@ -1023,7 +1495,8 @@ export const bulkUserImport = inngest.createFunction(
               successful: totalResults.successful,
               failed: totalResults.failed,
               successfulUsers: totalResults.successfulUsers?.slice(0, 100), // Limit stored results
-              successfulProducts: totalResults.successfulProducts?.slice(0, 100) // Limit stored results
+              successfulProducts: totalResults.successfulProducts?.slice(0, 100), // Limit stored results
+              successfulOrders: totalResults.successfulOrders?.slice(0, 100) // Limit stored results
             }
           })
           .where(eq(importJobs.id, jobId));

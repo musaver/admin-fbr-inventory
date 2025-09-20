@@ -1455,15 +1455,55 @@ export default function EditOrder() {
       const orderPayload = {
         ...orderData,
         items: orderItems,
-        customerInfo,
         subtotal,
         taxAmount,
         totalAmount: total,
         currency: currentCurrency,
-        sellerInfo,
+        
+        // Billing address
+        billingFirstName: customerInfo.billingFirstName,
+        billingLastName: customerInfo.billingLastName,
+        billingAddress1: customerInfo.billingAddress1,
+        billingAddress2: customerInfo.billingAddress2,
+        billingCity: customerInfo.billingCity,
+        billingState: customerInfo.billingState,
+        billingPostalCode: customerInfo.billingPostalCode,
+        billingCountry: customerInfo.billingCountry,
+        
+        // Shipping address
+        shippingFirstName: customerInfo.sameAsBilling ? customerInfo.billingFirstName : customerInfo.shippingFirstName,
+        shippingLastName: customerInfo.sameAsBilling ? customerInfo.billingLastName : customerInfo.shippingLastName,
+        shippingAddress1: customerInfo.sameAsBilling ? customerInfo.billingAddress1 : customerInfo.shippingAddress1,
+        shippingAddress2: customerInfo.sameAsBilling ? customerInfo.billingAddress2 : customerInfo.shippingAddress2,
+        shippingCity: customerInfo.sameAsBilling ? customerInfo.billingCity : customerInfo.shippingCity,
+        shippingState: customerInfo.sameAsBilling ? customerInfo.billingState : customerInfo.shippingState,
+        shippingPostalCode: customerInfo.sameAsBilling ? customerInfo.billingPostalCode : customerInfo.shippingPostalCode,
+        shippingCountry: customerInfo.sameAsBilling ? customerInfo.billingCountry : customerInfo.shippingCountry,
+        
+        // Buyer fields (from selected customer)
+        buyerNTNCNIC: orderData.buyerNTNCNIC || null,
+        buyerBusinessName: orderData.buyerBusinessName || null,
+        buyerProvince: orderData.buyerProvince || null,
+        buyerAddress: orderData.buyerAddress || null,
+        buyerRegistrationType: orderData.buyerRegistrationType || null,
+        buyerFirstName: customerInfo.billingFirstName || customerInfo.shippingFirstName || null,
+        buyerLastName: customerInfo.billingLastName || customerInfo.shippingLastName || null,
+        buyerFullName: `${(customerInfo.billingFirstName || customerInfo.shippingFirstName || '').trim()} ${(customerInfo.billingLastName || customerInfo.shippingLastName || '').trim()}`.trim(),
+        
+        // Seller fields (for FBR Digital Invoicing)
+        sellerNTNCNIC: sellerInfo.sellerNTNCNIC || null,
+        sellerBusinessName: sellerInfo.sellerBusinessName || null,
+        sellerProvince: sellerInfo.sellerProvince || null,
+        sellerAddress: sellerInfo.sellerAddress || null,
+        fbrSandboxToken: sellerInfo.fbrSandboxToken || null,
+        fbrBaseUrl: sellerInfo.fbrBaseUrl || null,
+        
+        // Email and FBR submission control flags
         skipCustomerEmail,
         skipSellerEmail,
         skipFbrSubmission,
+        
+        // Production environment fields
         isProductionSubmission,
         productionToken: isProductionSubmission ? productionToken : undefined,
         isCustomScenario,
@@ -1479,6 +1519,26 @@ export default function EditOrder() {
 
       if (!response.ok) {
         const data = await response.json();
+        
+        // Handle FBR-specific errors with more detail (same as add order page)
+        if (data.step === 'fbr_validation' || data.step === 'fbr_connection') {
+          let errorMessage = data.error || 'FBR Digital Invoice submission failed';
+          
+          // Show detailed FBR validation errors
+          if (data.fbrError?.response?.validationResponse?.invoiceStatuses) {
+            const itemErrors = data.fbrError.response.validationResponse.invoiceStatuses
+              .filter((status: any) => status.error)
+              .map((status: any) => `• Item ${status.itemSNo}: ${status.error}`)
+              .join('\n');
+            
+            if (itemErrors) {
+              //errorMessage += '\n\nValidation Details:\n' + itemErrors;
+            }
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
         throw new Error(data.error || 'Failed to update order');
       }
 
@@ -1488,7 +1548,25 @@ export default function EditOrder() {
       setShowOrderConfirmation(false);
       setShowProductionConfirmation(false);
       
-      router.push(`/orders/${result.orderId || orderId}`);
+      // Show success message and redirect to invoice page if FBR invoice was generated
+      if (result.fbrInvoiceNumber) {
+        console.log('✅ Order updated with FBR Digital Invoice:', {
+          orderNumber: result.orderNumber,
+          fbrInvoiceNumber: result.fbrInvoiceNumber,
+          orderId: result.orderId || orderId
+        });
+        
+        // Redirect to invoice page like add order does
+        router.push(`/orders/${result.orderId || orderId}/invoice`);
+      } else {
+        console.log('✅ Order updated successfully (no FBR submission):', {
+          orderNumber: result.orderNumber,
+          orderId: result.orderId || orderId
+        });
+        
+        // Redirect to order detail page 
+        router.push(`/orders/${result.orderId || orderId}`);
+      }
     } catch (err: any) {
       setError(err.message);
       if (errorRef.current) {
