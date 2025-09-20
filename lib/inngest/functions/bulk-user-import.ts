@@ -1102,8 +1102,46 @@ async function processOrderChunk(
 
   console.log(`📦 Grouped ${orderRows.length} rows into ${ordersByKey.size} orders`);
 
+  // Validate for duplicate order numbers across different customers
+  const orderNumberToCustomer = new Map<string, string>();
+  const duplicateOrderNumbers = new Set<string>();
+  
+  for (const [orderKey, customerOrders] of ordersByKey) {
+    const customerEmail = orderKey.split('|')[0];
+    const orderNumber = customerOrders[0].orderNumber;
+    
+    if (orderNumber) {
+      if (orderNumberToCustomer.has(orderNumber)) {
+        const existingCustomer = orderNumberToCustomer.get(orderNumber);
+        if (existingCustomer !== customerEmail) {
+          duplicateOrderNumbers.add(orderNumber);
+          console.warn(`⚠️ Duplicate order number ${orderNumber} found for different customers: ${existingCustomer} and ${customerEmail}`);
+        }
+      } else {
+        orderNumberToCustomer.set(orderNumber, customerEmail);
+      }
+    }
+  }
+
   for (const [orderKey, customerOrders] of ordersByKey) {
     const customerEmail = orderKey.split('|')[0]; // Extract email from key
+    
+    // Check if this order has a duplicate order number issue
+    const orderNumber = customerOrders[0].orderNumber;
+    if (orderNumber && duplicateOrderNumbers.has(orderNumber)) {
+      // Skip processing this order and mark all items as failed
+      customerOrders.forEach((orderData) => {
+        const globalRowIndex = (orderData as any).globalRowIndex;
+        result.errors.push({
+          row: globalRowIndex,
+          identifier: `${customerEmail} (Order: ${orderNumber}) - ${orderData.productSku}`,
+          message: `Duplicate order number ${orderNumber} used by different customers. Each order number must be unique.`
+        });
+        result.failed++;
+      });
+      continue;
+    }
+    
     try {
       // Find or create user
       let customerId: string;
@@ -1176,10 +1214,11 @@ async function processOrderChunk(
           // Validate order data
           const validationError = validateOrder(orderData);
           if (validationError) {
+            const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
             result.errors.push({
               row: globalRowIndex,
-              identifier: `${customerEmail} - ${orderData.productSku}`,
-              message: validationError
+              identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
+              message: `${validationError}${orderRef}`
             });
             result.failed++;
             continue;
@@ -1256,15 +1295,17 @@ async function processOrderChunk(
             quantity: quantity,
             price: unitPrice.toFixed(2),
             totalPrice: totalPrice.toFixed(2),
+            itemSequence: i + 1, // Item order within the order (1, 2, 3, etc.)
           };
 
           orderItemsToCreate.push(orderItem);
 
         } catch (error: any) {
+          const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
           result.errors.push({
             row: globalRowIndex,
-            identifier: `${customerEmail} - ${orderData.productSku}`,
-            message: error.message || 'Unknown error occurred'
+            identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
+            message: `${error.message || 'Unknown error occurred'}${orderRef}`
           });
           result.failed++;
         }
@@ -1336,21 +1377,37 @@ async function processOrderChunk(
         });
 
         console.log(`✅ Created order ${finalOrderNumber} with ${orderItemsToCreate.length} items for ${customerEmail}`);
+      } else {
+        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for ${customerEmail}`);
       }
 
     } catch (error: any) {
       // If order creation fails, mark all items for this customer as failed
       customerOrders.forEach((orderData) => {
         const globalRowIndex = (orderData as any).globalRowIndex;
+        const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
         result.errors.push({
           row: globalRowIndex,
-          identifier: `${customerEmail} - Order Creation`,
-          message: error.message || 'Unknown error occurred'
+          identifier: `${customerEmail}${orderRef} - Order Creation`,
+          message: `Order creation failed: ${error.message || 'Unknown error occurred'}${orderRef}`
         });
         result.failed++;
       });
     }
   }
+
+  // Log final summary
+  const totalOrders = result.successfulOrders?.length || 0;
+  const totalItems = orderRows.length;
+  const failedItems = result.failed;
+  const successfulItems = result.successful;
+
+  console.log(`📊 Order Import Summary:
+    - Total items processed: ${totalItems}
+    - Orders created: ${totalOrders} 
+    - Successful items: ${successfulItems}
+    - Failed items: ${failedItems}
+    - Average items per order: ${totalOrders > 0 ? (successfulItems / totalOrders).toFixed(1) : 0}`);
 
   return result;
 }
