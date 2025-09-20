@@ -36,6 +36,7 @@ interface OrderImportRow {
   customerEmail: string;
   customerName?: string;
   customerPhone?: string;
+  orderNumber?: string; // Custom order ID for grouping items
   productSku: string;
   productName?: string;
   productDescription?: string;
@@ -343,6 +344,7 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
     'customerEmail': ['customer email', 'email', 'customer_email'],
     'customerName': ['customer name', 'name', 'customer_name'],
     'customerPhone': ['customer phone', 'phone', 'customer_phone'],
+    'orderNumber': ['order number', 'order_number', 'order id', 'order_id'],
     'productSku': ['product sku', 'sku', 'product_sku'],
     'productName': ['product name', 'product_name'],
     'productDescription': ['product description', 'description', 'product_description'],
@@ -415,6 +417,7 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
       customerEmail: values[headerMap.customerEmail] || '',
       customerName: values[headerMap.customerName] || '',
       customerPhone: values[headerMap.customerPhone] || '',
+      orderNumber: values[headerMap.orderNumber] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
       productDescription: values[headerMap.productDescription] || '',
@@ -1075,17 +1078,32 @@ async function processOrderChunk(
     successfulOrders: []
   };
 
-  // Group orders by customer email to create one order per customer
-  const ordersByCustomer = new Map<string, OrderImportRow[]>();
+  // Group orders by customer email + order number to create proper orders
+  // If order number is provided, group by email+orderNumber, otherwise by email only
+  const ordersByKey = new Map<string, OrderImportRow[]>();
   orderRows.forEach((orderRow, index) => {
     const email = orderRow.customerEmail.toLowerCase().trim();
-    if (!ordersByCustomer.has(email)) {
-      ordersByCustomer.set(email, []);
+    const orderNumber = orderRow.orderNumber?.trim();
+    
+    // Create unique key: if orderNumber exists, use email+orderNumber, otherwise use email+auto-increment
+    let orderKey: string;
+    if (orderNumber) {
+      orderKey = `${email}|${orderNumber}`;
+    } else {
+      // If no order number provided, each row becomes a separate order (for backward compatibility)
+      orderKey = `${email}|auto-${startIndex + index + 1}`;
     }
-    ordersByCustomer.get(email)!.push({ ...orderRow, globalRowIndex: startIndex + index + 1 } as any);
+    
+    if (!ordersByKey.has(orderKey)) {
+      ordersByKey.set(orderKey, []);
+    }
+    ordersByKey.get(orderKey)!.push({ ...orderRow, globalRowIndex: startIndex + index + 1 } as any);
   });
 
-  for (const [customerEmail, customerOrders] of ordersByCustomer) {
+  console.log(`📦 Grouped ${orderRows.length} rows into ${ordersByKey.size} orders`);
+
+  for (const [orderKey, customerOrders] of ordersByKey) {
+    const customerEmail = orderKey.split('|')[0]; // Extract email from key
     try {
       // Find or create user
       let customerId: string;
@@ -1136,7 +1154,15 @@ async function processOrderChunk(
 
       // Create order
       const orderId = uuidv4();
-      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      const firstOrder = customerOrders[0];
+      
+      // Use provided order number or generate a unique one
+      let finalOrderNumber: string;
+      if (firstOrder.orderNumber?.trim()) {
+        finalOrderNumber = firstOrder.orderNumber.trim();
+      } else {
+        finalOrderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      }
       
       let subtotal = 0;
       const orderItemsToCreate: any[] = [];
@@ -1246,8 +1272,6 @@ async function processOrderChunk(
 
       // Create the order if we have valid items
       if (orderItemsToCreate.length > 0) {
-        const firstOrder = customerOrders[0];
-        
         // Parse addresses (simple parsing)
         const parseBillingAddress = (address: string) => {
           if (!address) return {};
@@ -1275,7 +1299,7 @@ async function processOrderChunk(
         const order = {
           id: orderId,
           tenantId,
-          orderNumber,
+          orderNumber: finalOrderNumber,
           userId: customerId,
           email: customerEmail,
           phone: firstOrder.customerPhone?.trim() || null,
@@ -1307,11 +1331,11 @@ async function processOrderChunk(
         result.successful++;
         result.successfulOrders!.push({
           id: orderId,
-          orderNumber,
+          orderNumber: finalOrderNumber,
           customerEmail
         });
 
-        console.log(`✅ Created order ${orderNumber} with ${orderItemsToCreate.length} items for ${customerEmail}`);
+        console.log(`✅ Created order ${finalOrderNumber} with ${orderItemsToCreate.length} items for ${customerEmail}`);
       }
 
     } catch (error: any) {
