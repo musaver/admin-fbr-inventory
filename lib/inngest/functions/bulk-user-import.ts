@@ -86,6 +86,22 @@ interface ProcessingResult {
     itemCount: number;
     rowNumbers: number[]; // Array of CSV row numbers for this order
   }>;
+  // Detailed row-by-row processing report
+  detailedReport?: Array<{
+    row: number;
+    status: 'success' | 'failed';
+    action: string; // 'created_order' | 'added_to_order' | 'created_user' | 'created_product' | 'validation_error' | 'processing_error'
+    data: {
+      customerEmail?: string;
+      customOrderNumber?: string;
+      productSku?: string;
+      productName?: string;
+      quantity?: number;
+      orderNumber?: string; // Final order number assigned
+      orderId?: string;
+      errorMessage?: string;
+    };
+  }>;
 }
 
 // Test function to verify CSV parsing
@@ -1078,7 +1094,8 @@ async function processOrderChunk(
     successful: 0,
     failed: 0,
     errors: [],
-    successfulOrders: []
+    successfulOrders: [],
+    detailedReport: []
   };
 
   // Group orders by customer email + order number to create proper orders
@@ -1187,6 +1204,22 @@ async function processOrderChunk(
               identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
               message: `${validationError}${orderRef}`
             });
+            
+            // Add to detailed report
+            result.detailedReport!.push({
+              row: globalRowIndex,
+              status: 'failed',
+              action: 'validation_error',
+              data: {
+                customerEmail: customerEmail,
+                customOrderNumber: orderData.orderNumber,
+                productSku: orderData.productSku,
+                productName: orderData.productName,
+                quantity: parseInt(orderData.quantity) || 0,
+                errorMessage: validationError
+              }
+            });
+            
             result.failed++;
             continue;
           }
@@ -1267,6 +1300,22 @@ async function processOrderChunk(
 
           orderItemsToCreate.push(orderItem);
 
+          // Add to detailed report (success for this item)
+          result.detailedReport!.push({
+            row: globalRowIndex,
+            status: 'success',
+            action: i === 0 ? 'created_order' : 'added_to_order',
+            data: {
+              customerEmail: customerEmail,
+              customOrderNumber: orderData.orderNumber,
+              productSku: orderData.productSku,
+              productName: orderData.productName,
+              quantity: quantity,
+              orderNumber: finalOrderNumber,
+              orderId: orderId
+            }
+          });
+
         } catch (error: any) {
           const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
           result.errors.push({
@@ -1274,6 +1323,22 @@ async function processOrderChunk(
             identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
             message: `${error.message || 'Unknown error occurred'}${orderRef}`
           });
+          
+          // Add to detailed report
+          result.detailedReport!.push({
+            row: globalRowIndex,
+            status: 'failed',
+            action: 'processing_error',
+            data: {
+              customerEmail: customerEmail,
+              customOrderNumber: orderData.orderNumber,
+              productSku: orderData.productSku,
+              productName: orderData.productName,
+              quantity: parseInt(orderData.quantity) || 0,
+              errorMessage: error.message || 'Unknown error occurred'
+            }
+          });
+          
           result.failed++;
         }
       }
@@ -1479,7 +1544,8 @@ export const bulkUserImport = inngest.createFunction(
         errors: [],
         successfulUsers: importType === 'users' ? [] : undefined,
         successfulProducts: importType === 'products' ? [] : undefined,
-        successfulOrders: importType === 'orders' ? [] : undefined
+        successfulOrders: importType === 'orders' ? [] : undefined,
+        detailedReport: importType === 'orders' ? [] : undefined
       };
 
       // Process each chunk
@@ -1521,6 +1587,11 @@ export const bulkUserImport = inngest.createFunction(
         } else if (importType === 'orders' && chunkResult.successfulOrders) {
           totalResults.successfulOrders!.push(...chunkResult.successfulOrders);
           console.log(`📦 Added ${chunkResult.successfulOrders.length} successful orders to total`);
+          
+          // Merge detailed reports
+          if (chunkResult.detailedReport) {
+            totalResults.detailedReport!.push(...chunkResult.detailedReport);
+          }
         }
         
         console.log(`📊 Running totals: ${totalResults.successful} successful, ${totalResults.failed} failed`);
@@ -1549,7 +1620,8 @@ export const bulkUserImport = inngest.createFunction(
               failed: totalResults.failed,
               successfulUsers: totalResults.successfulUsers?.slice(0, 100), // Limit stored results
               successfulProducts: totalResults.successfulProducts?.slice(0, 100), // Limit stored results
-              successfulOrders: totalResults.successfulOrders?.slice(0, 100) // Limit stored results
+              successfulOrders: totalResults.successfulOrders?.slice(0, 100), // Limit stored results
+              detailedReport: totalResults.detailedReport // Include full detailed report
             }
           })
           .where(eq(importJobs.id, jobId));

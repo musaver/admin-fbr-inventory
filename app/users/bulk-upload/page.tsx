@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Upload, 
@@ -15,7 +15,10 @@ import {
   AlertCircle,
   ArrowLeft,
   Loader2,
-  BarChart3
+  BarChart3,
+  FileDown,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,9 +65,293 @@ interface ImportJob {
     successfulOrders?: Array<{
       id: string;
       orderNumber: string;
+      customOrderNumberImport: string | null;
       customerEmail: string;
+      itemCount: number;
+      rowNumbers: number[];
+    }>;
+    detailedReport?: Array<{
+      row: number;
+      status: 'success' | 'failed';
+      action: string;
+      data: {
+        customerEmail?: string;
+        customOrderNumber?: string;
+        productSku?: string;
+        productName?: string;
+        quantity?: number;
+        orderNumber?: string;
+        orderId?: string;
+        errorMessage?: string;
+      };
     }>;
   } | null;
+}
+
+// Detailed Import Report Component
+interface DetailedImportReportProps {
+  report: Array<{
+    row: number;
+    status: 'success' | 'failed';
+    action: string;
+    data: {
+      customerEmail?: string;
+      customOrderNumber?: string;
+      productSku?: string;
+      productName?: string;
+      quantity?: number;
+      orderNumber?: string;
+      orderId?: string;
+      errorMessage?: string;
+    };
+  }>;
+  importType: string;
+  fileName: string;
+}
+
+function DetailedImportReport({ report, fileName }: DetailedImportReportProps) {
+  const [showAllRows, setShowAllRows] = useState(false);
+  const [sortBy, setSortBy] = useState<'row' | 'status'>('row');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'success' | 'failed'>('all');
+
+  const filteredReport = report.filter(item => {
+    if (filterStatus === 'all') return true;
+    return item.status === filterStatus;
+  });
+
+  const sortedReport = [...filteredReport].sort((a, b) => {
+    if (sortBy === 'row') return a.row - b.row;
+    if (sortBy === 'status') return a.status.localeCompare(b.status);
+    return 0;
+  });
+
+  const displayedReport = showAllRows ? sortedReport : sortedReport.slice(0, 20);
+  const successCount = report.filter(item => item.status === 'success').length;
+  const failedCount = report.filter(item => item.status === 'failed').length;
+
+  const downloadReport = () => {
+    const csvHeaders = ['Row', 'Status', 'Action', 'Customer Email', 'Order Number', 'Custom Order Number', 'Product SKU', 'Product Name', 'Quantity', 'Error Message'];
+    const csvRows = [
+      csvHeaders.join(','),
+      ...report.map(item => [
+        item.row,
+        item.status,
+        item.action,
+        item.data.customerEmail || '',
+        item.data.orderNumber || '',
+        item.data.customOrderNumber || '',
+        item.data.productSku || '',
+        item.data.productName || '',
+        item.data.quantity || '',
+        item.data.errorMessage || ''
+      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+    ];
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `${fileName.replace('.csv', '')}_import_report.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  return (
+    <Card className="border-blue-200">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-blue-600" />
+            <CardTitle className="text-blue-800 dark:text-blue-200">
+              Detailed Import Report
+            </CardTitle>
+          </div>
+          <Button
+            onClick={downloadReport}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+        <CardDescription>
+          Row-by-row breakdown of the import process ({report.length} total rows)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Summary Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-green-50 dark:bg-green-950 p-3 rounded border border-green-200 dark:border-green-800">
+            <div className="text-2xl font-bold text-green-800 dark:text-green-200">{successCount}</div>
+            <div className="text-sm text-green-600 dark:text-green-400">Successful Rows</div>
+          </div>
+          <div className="bg-red-50 dark:bg-red-950 p-3 rounded border border-red-200 dark:border-red-800">
+            <div className="text-2xl font-bold text-red-800 dark:text-red-200">{failedCount}</div>
+            <div className="text-sm text-red-600 dark:text-red-400">Failed Rows</div>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded border border-blue-200 dark:border-blue-800">
+            <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">{report.length}</div>
+            <div className="text-sm text-blue-600 dark:text-blue-400">Total Rows</div>
+          </div>
+        </div>
+
+        {/* Filters and Controls */}
+        <div className="flex items-center gap-4 py-2 border-t border-b">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Filter:</Label>
+            <div className="flex gap-1">
+              {['all', 'success', 'failed'].map((status) => (
+                <Button
+                  key={status}
+                  variant={filterStatus === status ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilterStatus(status as any)}
+                  className="h-7 text-xs"
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                  {status !== 'all' && (
+                    <Badge variant="secondary" className="ml-1 h-4 text-xs px-1">
+                      {status === 'success' ? successCount : failedCount}
+                    </Badge>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Sort by:</Label>
+            <div className="flex gap-1">
+              {[
+                { key: 'row', label: 'Row #' },
+                { key: 'status', label: 'Status' }
+              ].map((sort) => (
+                <Button
+                  key={sort.key}
+                  variant={sortBy === sort.key ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSortBy(sort.key as any)}
+                  className="h-7 text-xs"
+                >
+                  {sort.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Report Table */}
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {displayedReport.map((item, index) => (
+            <div
+              key={index}
+              className={`p-4 rounded-lg border ${
+                item.status === 'success'
+                  ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant={item.status === 'success' ? 'default' : 'destructive'} className="text-xs">
+                    Row {item.row}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {item.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </Badge>
+                  {item.status === 'success' ? (
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                {item.data.customerEmail && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Customer:</span>
+                    <div className="font-mono text-xs">{item.data.customerEmail}</div>
+                  </div>
+                )}
+                
+                {item.data.customOrderNumber && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Original Order #:</span>
+                    <div className="font-mono text-xs">{item.data.customOrderNumber}</div>
+                  </div>
+                )}
+                
+                {item.data.orderNumber && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Generated Order #:</span>
+                    <div className="font-mono text-xs">{item.data.orderNumber}</div>
+                  </div>
+                )}
+                
+                {item.data.productSku && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Product SKU:</span>
+                    <div className="font-mono text-xs">{item.data.productSku}</div>
+                  </div>
+                )}
+                
+                {item.data.productName && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Product:</span>
+                    <div className="text-xs">{item.data.productName}</div>
+                  </div>
+                )}
+                
+                {item.data.quantity && (
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Quantity:</span>
+                    <div className="text-xs">{item.data.quantity}</div>
+                  </div>
+                )}
+              </div>
+
+              {item.data.errorMessage && (
+                <div className="mt-2 p-2 bg-red-100 dark:bg-red-900 rounded border border-red-200 dark:border-red-700">
+                  <div className="text-xs font-medium text-red-800 dark:text-red-200 mb-1">Error:</div>
+                  <div className="text-xs text-red-700 dark:text-red-300">{item.data.errorMessage}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Show More/Less Button */}
+        {filteredReport.length > 20 && (
+          <div className="flex justify-center pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowAllRows(!showAllRows)}
+              className="gap-2"
+            >
+              {showAllRows ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Show Less (showing all {filteredReport.length} rows)
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Show All Rows ({filteredReport.length - 20} more)
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function BulkUserUpload() {
@@ -767,6 +1054,15 @@ export default function BulkUserUpload() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Detailed Import Report */}
+            {currentJob.status === 'completed' && currentJob.results?.detailedReport && Array.isArray(currentJob.results.detailedReport) && currentJob.results.detailedReport.length > 0 && (
+              <DetailedImportReport
+                report={currentJob.results.detailedReport}
+                importType={currentJob.type}
+                fileName={currentJob.fileName}
+              />
             )}
           </CardContent>
         </Card>
