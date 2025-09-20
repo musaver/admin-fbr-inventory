@@ -1823,6 +1823,18 @@ export default function EditOrder() {
                       />
                     </div>
                     <div>
+                      <Label htmlFor="buyer-registration-type">Registration Type</Label>
+                      <Select value={orderData.buyerRegistrationType} onValueChange={(value) => setOrderData({...orderData, buyerRegistrationType: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Registration Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Registered">Registered</SelectItem>
+                          <SelectItem value="Unregistered">Unregistered</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label htmlFor="buyer-province">Province</Label>
                       <div className="space-y-2">
                         <Select 
