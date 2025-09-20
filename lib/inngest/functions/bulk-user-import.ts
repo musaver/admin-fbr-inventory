@@ -42,6 +42,10 @@ interface OrderImportRow {
   productDescription?: string;
   quantity: string;
   unitPrice: string;
+  taxAmount?: string;
+  taxPercentage?: string;
+  priceIncludingTax?: string;
+  priceExcludingTax?: string;
   totalAmount?: string;
   billingAddress?: string;
   shippingAddress?: string;
@@ -97,6 +101,11 @@ interface ProcessingResult {
       productSku?: string;
       productName?: string;
       quantity?: number;
+      unitPrice?: number;
+      taxAmount?: number;
+      taxPercentage?: number;
+      priceIncludingTax?: number;
+      priceExcludingTax?: number;
       orderNumber?: string; // Final order number assigned
       orderId?: string;
       errorMessage?: string;
@@ -266,7 +275,7 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
     console.log('❌ Missing columns that could not be mapped:', missingColumns);
     console.log('💡 Make sure your CSV headers exactly match one of these variants for each field:');
     missingColumns.forEach(col => {
-      console.log(`   ${col}: ${columnMap[col].join(', ')}`);
+      console.log(`   ${col}: ${(columnMap as any)[col].join(', ')}`);
     });
   } else {
     console.log('✅ All expected columns were successfully mapped!');
@@ -369,6 +378,10 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
     'productDescription': ['product description', 'description', 'product_description'],
     'quantity': ['quantity', 'qty'],
     'unitPrice': ['unit price', 'price', 'unit_price'],
+    'taxAmount': ['tax amount', 'tax_amount'],
+    'taxPercentage': ['tax percentage', 'tax_percentage'],
+    'priceIncludingTax': ['price including tax', 'price_including_tax', 'inclusive price', 'price incl tax'],
+    'priceExcludingTax': ['price excluding tax', 'price_excluding_tax', 'exclusive price', 'price excl tax'],
     'totalAmount': ['total amount', 'total', 'total_amount'],
     'billingAddress': ['billing address', 'billing_address'],
     'shippingAddress': ['shipping address', 'shipping_address'],
@@ -442,6 +455,10 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
       productDescription: values[headerMap.productDescription] || '',
       quantity: values[headerMap.quantity] || '',
       unitPrice: values[headerMap.unitPrice] || '',
+      taxAmount: values[headerMap.taxAmount] || '',
+      taxPercentage: values[headerMap.taxPercentage] || '',
+      priceIncludingTax: values[headerMap.priceIncludingTax] || '',
+      priceExcludingTax: values[headerMap.priceExcludingTax] || '',
       totalAmount: values[headerMap.totalAmount] || '',
       billingAddress: values[headerMap.billingAddress] || '',
       shippingAddress: values[headerMap.shippingAddress] || '',
@@ -1276,6 +1293,13 @@ async function processOrderChunk(
           const quantity = parseInt(orderData.quantity);
           const unitPrice = parseFloat(orderData.unitPrice);
           const totalPrice = quantity * unitPrice;
+          
+          // Parse tax fields
+          const taxAmount = orderData.taxAmount && orderData.taxAmount.trim() !== '' ? parseFloat(orderData.taxAmount) : 0;
+          const taxPercentage = orderData.taxPercentage && orderData.taxPercentage.trim() !== '' ? parseFloat(orderData.taxPercentage) : 0;
+          const priceIncludingTax = orderData.priceIncludingTax && orderData.priceIncludingTax.trim() !== '' ? parseFloat(orderData.priceIncludingTax) : unitPrice;
+          const priceExcludingTax = orderData.priceExcludingTax && orderData.priceExcludingTax.trim() !== '' ? parseFloat(orderData.priceExcludingTax) : unitPrice;
+          
           subtotal += totalPrice;
 
           const orderItem = {
@@ -1295,6 +1319,10 @@ async function processOrderChunk(
             quantity: quantity,
             price: unitPrice.toFixed(2),
             totalPrice: totalPrice.toFixed(2),
+            taxAmount: taxAmount.toFixed(2),
+            taxPercentage: taxPercentage.toFixed(2),
+            priceIncludingTax: priceIncludingTax.toFixed(2),
+            priceExcludingTax: priceExcludingTax.toFixed(2),
             itemSequence: i + 1, // Item order within the order (1, 2, 3, etc.)
           };
 
@@ -1311,6 +1339,11 @@ async function processOrderChunk(
               productSku: orderData.productSku,
               productName: orderData.productName,
               quantity: quantity,
+              unitPrice: unitPrice,
+              taxAmount: taxAmount,
+              taxPercentage: taxPercentage,
+              priceIncludingTax: priceIncludingTax,
+              priceExcludingTax: priceExcludingTax,
               orderNumber: finalOrderNumber,
               orderId: orderId
             }
