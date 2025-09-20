@@ -641,22 +641,35 @@ export default function BulkUserUpload() {
                     <CheckCircle className="h-5 w-5" />
                     Successfully Created Orders
                   </CardTitle>
-                  <CardDescription>Showing first 20 orders</CardDescription>
+                  <CardDescription>
+                    {currentJob.results.successfulOrders.length} orders created from {currentJob.processedRecords} CSV rows
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {currentJob.results.successfulOrders.slice(0, 20).map((order, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
-                        <ShoppingCart className="h-4 w-4 text-green-600" />
-                        <div className="text-sm">
-                          <span className="font-medium">{order.orderNumber}</span>
-                          <span className="text-muted-foreground"> ({order.customerEmail})</span>
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {currentJob.results.successfulOrders.slice(0, 15).map((order, index) => (
+                      <div key={index} className="p-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ShoppingCart className="h-4 w-4 text-green-600" />
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {order.orderNumber}
+                          </span>
+                          {order.customOrderNumberImport && (
+                            <span className="text-xs bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
+                              Original: {order.customOrderNumberImport}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          <div>Customer: <span className="font-medium">{order.customerEmail}</span></div>
+                          <div>Items: <span className="font-medium">{order.itemCount}</span></div>
+                          <div>CSV Rows: <span className="font-mono text-xs">{order.rowNumbers?.join(', ') || 'N/A'}</span></div>
                         </div>
                       </div>
                     ))}
-                    {currentJob.results.successfulOrders.length > 20 && (
+                    {currentJob.results.successfulOrders.length > 15 && (
                       <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.results.successfulOrders.length - 20} more orders
+                        ... and {currentJob.results.successfulOrders.length - 15} more orders
                       </div>
                     )}
                   </div>
@@ -672,31 +685,45 @@ export default function BulkUserUpload() {
                     <XCircle className="h-5 w-5" />
                     Import Errors
                   </CardTitle>
-                  <CardDescription>Showing first 20 errors</CardDescription>
+                  <CardDescription>
+                    {currentJob.errors.length} errors found - showing first 15 with detailed reasons
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {currentJob.errors.slice(0, 20).map((error, index) => (
+                    {currentJob.errors.slice(0, 15).map((error, index) => (
                       <div key={index} className="p-3 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
-                        <div className="font-medium text-red-800 dark:text-red-200">
-                          Row {error.row}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-red-800 dark:text-red-200">
+                            CSV Row {error.row}
+                          </span>
+                          <span className="text-xs bg-red-100 dark:bg-red-900 px-2 py-1 rounded font-mono">
+                            {error.identifier || 'N/A'}
+                          </span>
                         </div>
-                        <div className="text-sm text-red-700 dark:text-red-300">
-                          {error.message}
+                        <div className="text-sm text-red-700 dark:text-red-300 mb-1">
+                          <strong>Reason:</strong> {error.message}
                         </div>
-                        <div className="text-sm text-red-600 dark:text-red-400">
-                          {currentJob.type === 'users' 
-                            ? `Email: ${error.email || 'N/A'}`
-                            : currentJob.type === 'products'
-                              ? `SKU: ${error.identifier || 'N/A'}`
-                              : `Identifier: ${error.identifier || 'N/A'}`
-                          }
-                        </div>
+                        {currentJob.type === 'orders' && (
+                          <div className="text-xs text-red-600 dark:text-red-400">
+                            💡 <strong>Tip:</strong> Check that Customer Email, Product SKU, Quantity, and Unit Price are valid
+                          </div>
+                        )}
+                        {currentJob.type === 'users' && (
+                          <div className="text-xs text-red-600 dark:text-red-400">
+                            💡 <strong>Tip:</strong> Check that Name and Email are provided and email format is valid
+                          </div>
+                        )}
+                        {currentJob.type === 'products' && (
+                          <div className="text-xs text-red-600 dark:text-red-400">
+                            💡 <strong>Tip:</strong> Check that SKU and Unit Price are provided and price is a valid number
+                          </div>
+                        )}
                       </div>
                     ))}
-                    {currentJob.errors.length > 20 && (
+                    {currentJob.errors.length > 15 && (
                       <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.errors.length - 20} more errors
+                        ... and {currentJob.errors.length - 15} more errors
                       </div>
                     )}
                   </div>
@@ -708,19 +735,35 @@ export default function BulkUserUpload() {
             {currentJob.status === 'completed' && (
               <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <span className="font-medium text-green-800 dark:text-green-200">
                         Import completed successfully!
                       </span>
                     </div>
-                    <Button
-                      onClick={() => router.push(currentJob.type === 'users' ? '/users' : currentJob.type === 'products' ? '/products' : '/orders')}
-                      className="gap-2"
-                    >
-                      View All {currentJob.type === 'users' ? 'Users' : currentJob.type === 'products' ? 'Products' : 'Orders'}
-                    </Button>
+                    
+                    {currentJob.type === 'orders' && currentJob.results?.successfulOrders && (
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          <strong>Summary:</strong> Created {currentJob.results.successfulOrders.length} orders from {currentJob.processedRecords} CSV rows
+                          {currentJob.results.successfulOrders.length > 0 && (
+                            <div className="mt-1">
+                              Average: {(currentJob.processedRecords / currentJob.results.successfulOrders.length).toFixed(1)} items per order
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => router.push(currentJob.type === 'users' ? '/users' : currentJob.type === 'products' ? '/products' : '/orders')}
+                        className="gap-2"
+                      >
+                        View All {currentJob.type === 'users' ? 'Users' : currentJob.type === 'products' ? 'Products' : 'Orders'}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

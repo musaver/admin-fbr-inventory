@@ -80,8 +80,11 @@ interface ProcessingResult {
   }>;
   successfulOrders?: Array<{
     id: string;
-    orderNumber: string;
+    orderNumber: string; // Auto-generated order number
+    customOrderNumberImport: string | null; // Original order number from CSV
     customerEmail: string;
+    itemCount: number;
+    rowNumbers: number[]; // Array of CSV row numbers for this order
   }>;
 }
 
@@ -1102,45 +1105,8 @@ async function processOrderChunk(
 
   console.log(`📦 Grouped ${orderRows.length} rows into ${ordersByKey.size} orders`);
 
-  // Validate for duplicate order numbers across different customers
-  const orderNumberToCustomer = new Map<string, string>();
-  const duplicateOrderNumbers = new Set<string>();
-  
-  for (const [orderKey, customerOrders] of ordersByKey) {
-    const customerEmail = orderKey.split('|')[0];
-    const orderNumber = customerOrders[0].orderNumber;
-    
-    if (orderNumber) {
-      if (orderNumberToCustomer.has(orderNumber)) {
-        const existingCustomer = orderNumberToCustomer.get(orderNumber);
-        if (existingCustomer !== customerEmail) {
-          duplicateOrderNumbers.add(orderNumber);
-          console.warn(`⚠️ Duplicate order number ${orderNumber} found for different customers: ${existingCustomer} and ${customerEmail}`);
-        }
-      } else {
-        orderNumberToCustomer.set(orderNumber, customerEmail);
-      }
-    }
-  }
-
   for (const [orderKey, customerOrders] of ordersByKey) {
     const customerEmail = orderKey.split('|')[0]; // Extract email from key
-    
-    // Check if this order has a duplicate order number issue
-    const orderNumber = customerOrders[0].orderNumber;
-    if (orderNumber && duplicateOrderNumbers.has(orderNumber)) {
-      // Skip processing this order and mark all items as failed
-      customerOrders.forEach((orderData) => {
-        const globalRowIndex = (orderData as any).globalRowIndex;
-        result.errors.push({
-          row: globalRowIndex,
-          identifier: `${customerEmail} (Order: ${orderNumber}) - ${orderData.productSku}`,
-          message: `Duplicate order number ${orderNumber} used by different customers. Each order number must be unique.`
-        });
-        result.failed++;
-      });
-      continue;
-    }
     
     try {
       // Find or create user
@@ -1194,13 +1160,14 @@ async function processOrderChunk(
       const orderId = uuidv4();
       const firstOrder = customerOrders[0];
       
-      // Use provided order number or generate a unique one
-      let finalOrderNumber: string;
-      if (firstOrder.orderNumber?.trim()) {
-        finalOrderNumber = firstOrder.orderNumber.trim();
-      } else {
-        finalOrderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-      }
+      // Always generate a unique order number for database
+      const finalOrderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      // Store the original custom order number from CSV (can be duplicate)
+      const customOrderNumberImport = firstOrder.orderNumber?.trim() || null;
+      
+      // Collect row numbers for this order
+      const rowNumbers = customerOrders.map(order => (order as any).globalRowIndex);
       
       let subtotal = 0;
       const orderItemsToCreate: any[] = [];
@@ -1340,7 +1307,8 @@ async function processOrderChunk(
         const order = {
           id: orderId,
           tenantId,
-          orderNumber: finalOrderNumber,
+          orderNumber: finalOrderNumber, // Auto-generated unique order number
+          customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
           userId: customerId,
           email: customerEmail,
           phone: firstOrder.customerPhone?.trim() || null,
@@ -1373,10 +1341,14 @@ async function processOrderChunk(
         result.successfulOrders!.push({
           id: orderId,
           orderNumber: finalOrderNumber,
-          customerEmail
+          customOrderNumberImport: customOrderNumberImport,
+          customerEmail,
+          itemCount: orderItemsToCreate.length,
+          rowNumbers: rowNumbers
         });
 
-        console.log(`✅ Created order ${finalOrderNumber} with ${orderItemsToCreate.length} items for ${customerEmail}`);
+        const customOrderRef = customOrderNumberImport ? ` (Original: ${customOrderNumberImport})` : '';
+        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for ${customerEmail} (Rows: ${rowNumbers.join(', ')})`);
       } else {
         console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for ${customerEmail}`);
       }
