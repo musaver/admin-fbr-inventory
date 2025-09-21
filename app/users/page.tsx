@@ -47,6 +47,7 @@ export default function UsersList() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -56,10 +57,14 @@ export default function UsersList() {
     hasPrevPage: false
   });
 
-  const fetchUsers = async (page = 1, limit = 10) => {
+  const fetchUsers = async (page = 1, limit = pageSize) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/users?page=${page}&limit=${limit}`);
+      // Handle "view all" case
+      const apiUrl = limit === -1 
+        ? '/api/users?limit=999999' // Very large number for "view all"
+        : `/api/users?page=${page}&limit=${limit}`;
+      const res = await fetch(apiUrl);
       const response = await res.json();
       
       if (response.data && response.pagination) {
@@ -90,8 +95,18 @@ export default function UsersList() {
   };
 
   useEffect(() => {
-    fetchUsers(currentPage, pagination.limit);
+    fetchUsers(currentPage, pageSize);
   }, [currentPage]);
+  
+  // Effect for page size changes
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when changing page size
+    fetchUsers(1, pageSize);
+  }, [pageSize]);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this user?')) {
@@ -406,7 +421,7 @@ export default function UsersList() {
               Bulk Import
             </Link>
           </Button>
-          <Button onClick={() => fetchUsers(currentPage, pagination.limit)} disabled={loading} variant="outline" size="sm">
+          <Button onClick={() => fetchUsers(currentPage, pageSize)} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -491,58 +506,97 @@ export default function UsersList() {
       />
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
+      {(pagination.totalPages > 1 || pageSize === -1) && (
         <div className="flex items-center justify-between px-2">
-          <div className="text-sm text-muted-foreground">
-            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePreviousPage}
-              disabled={!pagination.hasPrevPage || loading}
-            >
-              Previous
-            </Button>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span>
+              {pageSize === -1 ? (
+                `Showing all ${pagination.total} users`
+              ) : (
+                <>
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+                </>
+              )}
+            </span>
             
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                let pageNum;
-                if (pagination.totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (pagination.page <= 3) {
-                  pageNum = i + 1;
-                } else if (pagination.page >= pagination.totalPages - 2) {
-                  pageNum = pagination.totalPages - 4 + i;
-                } else {
-                  pageNum = pagination.page - 2 + i;
-                }
-                
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={pageNum === pagination.page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handlePageChange(pageNum)}
-                    disabled={loading}
-                    className="w-10"
-                  >
-                    {pageNum}
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Show:</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    {pageSize === -1 ? 'View All' : pageSize} 
+                    <span className="ml-1">▼</span>
                   </Button>
-                );
-              })}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handlePageSizeChange(10)}>
+                    10 per page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePageSizeChange(20)}>
+                    20 per page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePageSizeChange(50)}>
+                    50 per page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePageSizeChange(100)}>
+                    100 per page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePageSizeChange(-1)}>
+                    View All
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={!pagination.hasNextPage || loading}
-            >
-              Next
-            </Button>
           </div>
+          {pageSize !== -1 && (
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousPage}
+                disabled={!pagination.hasPrevPage || loading}
+              >
+                Previous
+              </Button>
+              
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pageNum === pagination.page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(pageNum)}
+                      disabled={loading}
+                      className="w-10"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={!pagination.hasNextPage || loading}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

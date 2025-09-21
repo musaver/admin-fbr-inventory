@@ -115,6 +115,7 @@ export default function OrdersList() {
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -128,10 +129,14 @@ export default function OrdersList() {
     endDate: ''
   });
 
-  const fetchOrders = async (page = 1, limit = 10) => {
+  const fetchOrders = async (page = 1, limit = pageSize) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/orders?page=${page}&limit=${limit}`);
+      // Handle "view all" case
+      const apiUrl = limit === -1 
+        ? '/api/orders?limit=999999' // Very large number for "view all"
+        : `/api/orders?page=${page}&limit=${limit}`;
+      const res = await fetch(apiUrl);
       const response = await res.json();
       const data = response.data || response; // Handle both paginated and non-paginated responses
       
@@ -180,14 +185,24 @@ export default function OrdersList() {
   };
 
   useEffect(() => {
-    fetchOrders(1, pagination.limit);
+    fetchOrders(1, pageSize);
     fetchAddons();
   }, []);
   
   // Effect for page changes
   useEffect(() => {
-    fetchOrders(currentPage, pagination.limit);
+    fetchOrders(currentPage, pageSize);
   }, [currentPage]);
+  
+  // Effect for page size changes
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when changing page size
+    fetchOrders(1, pageSize);
+  }, [pageSize]);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+  };
 
   useEffect(() => {
     filterOrders();
@@ -949,69 +964,106 @@ export default function OrdersList() {
       </div>
 
       {/* Pagination Controls */}
-      {pagination.totalPages > 1 && (
+      {(pagination.totalPages > 1 || pageSize === -1) && (
         <Card className="mt-4">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                  {pagination.total} orders
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(pagination.page - 1)}
-                  disabled={!pagination.hasPrevPage}
-                >
-                  Previous
-                </Button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    const page = i + 1;
-                    const isActive = page === pagination.page;
-                    return (
-                      <Button
-                        key={page}
-                        variant={isActive ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className="w-8 h-8 p-0"
-                      >
-                        {page}
-                      </Button>
-                    );
-                  })}
-                  
-                  {pagination.totalPages > 5 && (
+                  {pageSize === -1 ? (
+                    `Showing all ${pagination.total} orders`
+                  ) : (
                     <>
-                      <span className="px-2">...</span>
-                      <Button
-                        variant={pagination.page === pagination.totalPages ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(pagination.totalPages)}
-                        className="w-8 h-8 p-0"
-                      >
-                        {pagination.totalPages}
-                      </Button>
+                      Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                      {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                      {pagination.total} orders
                     </>
                   )}
-                </div>
+                </span>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(pagination.page + 1)}
-                  disabled={!pagination.hasNextPage}
-                >
-                  Next
-                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Show:</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        {pageSize === -1 ? 'View All' : pageSize} 
+                        <span className="ml-1">▼</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handlePageSizeChange(10)}>
+                        10 per page
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePageSizeChange(20)}>
+                        20 per page
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePageSizeChange(50)}>
+                        50 per page
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePageSizeChange(100)}>
+                        100 per page
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePageSizeChange(-1)}>
+                        View All
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
+              
+              {pageSize !== -1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(pagination.page - 1)}
+                    disabled={!pagination.hasPrevPage}
+                  >
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      const page = i + 1;
+                      const isActive = page === pagination.page;
+                      return (
+                        <Button
+                          key={page}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    
+                    {pagination.totalPages > 5 && (
+                      <>
+                        <span className="px-2">...</span>
+                        <Button
+                          variant={pagination.page === pagination.totalPages ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pagination.totalPages)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pagination.totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(pagination.page + 1)}
+                    disabled={!pagination.hasNextPage}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
