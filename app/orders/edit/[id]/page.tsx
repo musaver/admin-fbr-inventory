@@ -2362,7 +2362,7 @@ export default function EditOrder() {
                         <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Identification</h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="serial-number-edit" className="text-sm">Serial Number</Label>
+                            <Label htmlFor="serial-number-edit" className="text-sm">SRO Item Serial No. (FBR)</Label>
                             <Input
                               id="serial-number-edit"
                               type="text"
@@ -2774,8 +2774,8 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className='hidden'>
-                              <Label className="text-sm">Serial Number</Label>
+                            <div className=''>
+                              <Label className="text-sm">SRO Item Serial No. (FBR)</Label>
                               <Input
                                 value={item.serialNumber || ''}
                                 onChange={(e) => updateOrderItem(index, 'serialNumber', e.target.value)}
