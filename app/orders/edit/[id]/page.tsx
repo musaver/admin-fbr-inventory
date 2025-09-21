@@ -3462,7 +3462,7 @@ export default function EditOrder() {
               ref={sidebarRef}
               className={`transition-all duration-300 will-change-transform z-30 ${
                 isSticky 
-                  ? 'fixed top-6 right-6 w-80 max-w-[calc(100vw-3rem)]' 
+                  ? 'fixed top-6 right-6 w-[200px] min-w-56 max-w-[calc(100vw-3rem)]' 
                   : 'sticky top-6'
               } h-fit max-h-[calc(100vh-3rem)] overflow-y-auto`}
             >
