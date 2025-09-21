@@ -10,63 +10,109 @@ export const GET = withTenant(async (request: NextRequest, context) => {
   try {
     // Get query parameters for pagination
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = (page - 1) * limit;
+    const page = searchParams.get('page');
+    const limit = searchParams.get('limit');
     
-    // Get total count for pagination
-    const totalCountResult = await db
-      .select({ count: sql`COUNT(*)` })
-      .from(products)
-      .where(eq(products.tenantId, context.tenantId));
-    const totalCount = Number(totalCountResult[0]?.count || 0);
+    // Check if this is a paginated request (has page or limit params)
+    const isPaginatedRequest = page !== null || limit !== null;
     
-    const allProducts = await db
-      .select({
-        product: products,
-        category: {
-          id: categories.id,
-          name: categories.name
-        },
-        subcategory: {
-          id: subcategories.id,
-          name: subcategories.name
-        },
-        supplier: {
-          id: suppliers.id,
-          name: suppliers.name,
-          companyName: suppliers.companyName
-        }
-      })
-      .from(products)
-      .leftJoin(categories, and(
-        eq(products.categoryId, categories.id),
-        eq(categories.tenantId, context.tenantId)
-      ))
-      .leftJoin(subcategories, and(
-        eq(products.subcategoryId, subcategories.id),
-        eq(subcategories.tenantId, context.tenantId)
-      ))
-      .leftJoin(suppliers, and(
-        eq(products.supplierId, suppliers.id),
-        eq(suppliers.tenantId, context.tenantId)
-      ))
-      .where(eq(products.tenantId, context.tenantId))
-      .orderBy(desc(products.createdAt))
-      .limit(limit)
-      .offset(offset);
+    if (isPaginatedRequest) {
+      // Handle paginated request (for orders listing page)
+      const pageNum = parseInt(page || '1');
+      const limitNum = parseInt(limit || '10');
+      const offset = (pageNum - 1) * limitNum;
       
-    return NextResponse.json({
-      data: allProducts,
-      pagination: {
-        page,
-        limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit),
-        hasNextPage: page < Math.ceil(totalCount / limit),
-        hasPrevPage: page > 1
-      }
-    });
+      // Get total count for pagination
+      const totalCountResult = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(products)
+        .where(eq(products.tenantId, context.tenantId));
+      const totalCount = Number(totalCountResult[0]?.count || 0);
+      
+      const allProducts = await db
+        .select({
+          product: products,
+          category: {
+            id: categories.id,
+            name: categories.name
+          },
+          subcategory: {
+            id: subcategories.id,
+            name: subcategories.name
+          },
+          supplier: {
+            id: suppliers.id,
+            name: suppliers.name,
+            companyName: suppliers.companyName
+          }
+        })
+        .from(products)
+        .leftJoin(categories, and(
+          eq(products.categoryId, categories.id),
+          eq(categories.tenantId, context.tenantId)
+        ))
+        .leftJoin(subcategories, and(
+          eq(products.subcategoryId, subcategories.id),
+          eq(subcategories.tenantId, context.tenantId)
+        ))
+        .leftJoin(suppliers, and(
+          eq(products.supplierId, suppliers.id),
+          eq(suppliers.tenantId, context.tenantId)
+        ))
+        .where(eq(products.tenantId, context.tenantId))
+        .orderBy(desc(products.createdAt))
+        .limit(limitNum)
+        .offset(offset);
+        
+      return NextResponse.json({
+        data: allProducts,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limitNum),
+          hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+          hasPrevPage: pageNum > 1
+        }
+      });
+    } else {
+      // Handle non-paginated request (for add order page - backward compatibility)
+      const allProducts = await db
+        .select({
+          product: products,
+          category: {
+            id: categories.id,
+            name: categories.name
+          },
+          subcategory: {
+            id: subcategories.id,
+            name: subcategories.name
+          },
+          supplier: {
+            id: suppliers.id,
+            name: suppliers.name,
+            companyName: suppliers.companyName
+          }
+        })
+        .from(products)
+        .leftJoin(categories, and(
+          eq(products.categoryId, categories.id),
+          eq(categories.tenantId, context.tenantId)
+        ))
+        .leftJoin(subcategories, and(
+          eq(products.subcategoryId, subcategories.id),
+          eq(subcategories.tenantId, context.tenantId)
+        ))
+        .leftJoin(suppliers, and(
+          eq(products.supplierId, suppliers.id),
+          eq(suppliers.tenantId, context.tenantId)
+        ))
+        .where(eq(products.tenantId, context.tenantId))
+        .orderBy(desc(products.createdAt));
+        
+      // Return original format for backward compatibility
+      return NextResponse.json(allProducts);
+    }
   } catch (error) {
     console.error('Error fetching products:', error);
     return ErrorResponses.serverError('Failed to fetch products');
