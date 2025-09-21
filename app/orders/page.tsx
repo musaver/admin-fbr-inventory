@@ -477,27 +477,22 @@ export default function OrdersList() {
     {
       key: 'orderInfo',
       title: 'Order',
-      width: '200px',
+      width: '150px',
       render: (_: any, order: Order) => (
         <div className="min-w-0">
           <div className="font-medium text-sm">#{order.orderNumber}</div>
-          <div className="text-xs text-muted-foreground truncate">ID: {order.id.slice(0, 8)}...</div>
         </div>
       )
     },
     {
       key: 'customer',
       title: 'Customer',
-      width: '200px',
+      width: '150px',
       render: (_: any, order: Order) => (
         <div className="min-w-0">
           <div className="font-medium text-sm truncate">
             {order.user?.name || 'Guest'}
           </div>
-          <div className="text-xs text-muted-foreground truncate">{order.email}</div>
-          {order.phone && (
-            <div className="text-xs text-muted-foreground">{order.phone}</div>
-          )}
         </div>
       ),
       mobileLabel: 'Customer'
