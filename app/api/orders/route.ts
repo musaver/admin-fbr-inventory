@@ -61,82 +61,43 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       .where(and(...whereConditions));
     const totalCount = Number(totalCountResult[0]?.count || 0);
     
-    // Fetch orders with their items, customer information, supplier information, and assigned driver
+    // Fetch orders with customer information and item counts (optimized for performance)
     const ordersWithDetails = await db
       .select({
         order: orders,
         user: user,
-        supplier: suppliers,
+        itemCount: sql`(SELECT COUNT(*) FROM ${orderItems} WHERE ${orderItems.orderId} = ${orders.id})`.as('itemCount')
       })
       .from(orders)
       .leftJoin(user, and(
         eq(orders.userId, user.id),
         eq(user.tenantId, context.tenantId)
       ))
-      .leftJoin(suppliers, and(
-        eq(orders.supplierId, suppliers.id),
-        eq(suppliers.tenantId, context.tenantId)
-      ))
       .where(and(...whereConditions))
       .orderBy(desc(orders.createdAt))
       .limit(limit)
       .offset(offset);
 
-    // Fetch order items and driver information for each order
-    const ordersWithItems = await Promise.all(
-      ordersWithDetails.map(async (orderData) => {
-        const items = await db
-          .select()
-          .from(orderItems)
-          .where(eq(orderItems.orderId, orderData.order.id));
-
-        // Parse addons JSON for each item
-        const itemsWithParsedAddons = items.map(item => ({
-          ...item,
-          addons: item.addons ? JSON.parse(item.addons as string) : null
-        }));
-
-        // Fetch assigned driver information if exists
-        let assignedDriver = null;
-        if (orderData.order.assignedDriverId) {
-          const driverData = await db
-            .select({
-              id: drivers.id,
-              user: {
-                name: user.name,
-                phone: user.phone,
-              },
-              driver: {
-                licenseNumber: drivers.licenseNumber,
-                vehicleType: drivers.vehicleType,
-                vehiclePlateNumber: drivers.vehiclePlateNumber,
-                status: drivers.status,
-              }
-            })
-            .from(drivers)
-            .innerJoin(user, eq(drivers.userId, user.id))
-            .where(eq(drivers.id, orderData.order.assignedDriverId))
-            .limit(1);
-
-          if (driverData.length > 0) {
-            assignedDriver = driverData[0];
-          }
-        }
-
-        return {
-          ...orderData.order,
-          user: orderData.user,
-          supplier: orderData.supplier,
-          supplierName: orderData.supplier?.name,
-          supplierCompany: orderData.supplier?.companyName,
-          items: itemsWithParsedAddons,
-          assignedDriver
-        };
-      })
-    );
+    // Map simplified order data without heavy fields
+    const simplifiedOrders = ordersWithDetails.map((orderData) => ({
+      id: orderData.order.id,
+      orderNumber: orderData.order.orderNumber,
+      email: orderData.order.email,
+      phone: orderData.order.phone,
+      subtotal: orderData.order.subtotal,
+      taxAmount: orderData.order.taxAmount,
+      shippingAmount: orderData.order.shippingAmount,
+      discountAmount: orderData.order.discountAmount,
+      totalAmount: orderData.order.totalAmount,
+      currency: orderData.order.currency,
+      createdAt: orderData.order.createdAt,
+      updatedAt: orderData.order.updatedAt,
+      user: orderData.user,
+      itemCount: Number(orderData.itemCount) || 0
+    }));
 
     return NextResponse.json({
-      data: ordersWithItems,
+      data: simplifiedOrders,
       pagination: {
         page,
         limit,

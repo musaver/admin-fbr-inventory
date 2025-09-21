@@ -56,62 +56,27 @@ interface Order {
   orderNumber: string;
   email: string;
   phone?: string;
-  status: string;
-  paymentStatus: string;
-  fulfillmentStatus: string;
   subtotal: number;
   taxAmount: number;
   shippingAmount: number;
   discountAmount: number;
   totalAmount: number;
   currency: string;
-  fbrEnvironment?: string;
-  shippingFirstName?: string;
-  shippingLastName?: string;
-  shippingAddress1?: string;
-  shippingCity?: string;
-  shippingState?: string;
-  shippingCountry?: string;
   createdAt: string;
   updatedAt: string;
-  items?: OrderItem[];
+  itemCount: number;
   user?: {
     id: string;
     name?: string;
     email: string;
   };
-  // Driver assignment fields
-  assignedDriverId?: string;
-  deliveryStatus?: string;
-  assignedDriver?: {
-    id: string;
-    user: {
-      name?: string;
-      phone?: string;
-    };
-    driver: {
-      licenseNumber: string;
-      vehicleType: string;
-      vehiclePlateNumber: string;
-      status: string;
-    };
-  };
-  // Invoice and validation fields
-  invoiceType?: string;
-  invoiceRefNo?: string;
-  scenarioId?: string;
-  invoiceNumber?: string;
-  validationResponse?: string;
 }
 
 export default function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
-  const [addons, setAddons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,27 +105,8 @@ export default function OrdersList() {
       const response = await res.json();
       const data = response.data || response; // Handle both paginated and non-paginated responses
       
-      // Process orders to add weight-based information to items
-      const processedOrders = data.map((order: Order) => {
-        if (order.items) {
-          order.items = order.items.map((item: any) => {
-            // Determine if item is weight-based by checking if weightQuantity exists and is > 0
-            const weightQuantity = item.weightQuantity ? parseFloat(item.weightQuantity) : 0;
-            const isWeightBased = weightQuantity > 0;
-
-            return {
-              ...item,
-              isWeightBased,
-              weightQuantity: weightQuantity > 0 ? weightQuantity : undefined,
-              weightUnit: item.weightUnit || undefined
-            };
-          });
-        }
-        return order;
-      });
-      
-      setOrders(processedOrders);
-      setFilteredOrders(processedOrders);
+      setOrders(data);
+      setFilteredOrders(data);
       
       // Update pagination if response includes pagination data
       if (response.pagination) {
@@ -174,19 +120,8 @@ export default function OrdersList() {
     }
   };
 
-  const fetchAddons = async () => {
-    try {
-      const res = await fetch('/api/addons');
-      const data = await res.json();
-      setAddons(data);
-    } catch (err) {
-      console.error('Error fetching addons:', err);
-    }
-  };
-
   useEffect(() => {
     fetchOrders(1, pageSize);
-    fetchAddons();
   }, []);
   
   // Effect for page changes
@@ -206,7 +141,7 @@ export default function OrdersList() {
 
   useEffect(() => {
     filterOrders();
-  }, [orders, searchTerm, statusFilter, dateRange]);
+  }, [orders, searchTerm, dateRange]);
 
   const filterOrders = () => {
     let filtered = [...orders];
@@ -216,14 +151,8 @@ export default function OrdersList() {
       filtered = filtered.filter(order =>
         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.shippingFirstName ? order.shippingFirstName.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
-        (order.shippingLastName ? order.shippingLastName.toLowerCase().includes(searchTerm.toLowerCase()) : false)
+        (order.user?.name ? order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false)
       );
-    }
-
-    // Status filter
-    if (statusFilter) {
-      filtered = filtered.filter(order => order.status === statusFilter);
     }
 
     // Date range filter
@@ -556,10 +485,7 @@ export default function OrdersList() {
       render: (_: any, order: Order) => (
         <div className="min-w-0">
           <div className="font-medium text-sm truncate">
-            {order.shippingFirstName && order.shippingLastName 
-              ? `${order.shippingFirstName} ${order.shippingLastName}`
-              : order.user?.name || 'Guest'
-            }
+            {order.user?.name || 'Guest'}
           </div>
           <div className="text-xs text-muted-foreground truncate">{order.email}</div>
           {order.phone && (
@@ -572,45 +498,14 @@ export default function OrdersList() {
     {
       key: 'items',
       title: 'Items',
-      width: '250px',
+      width: '80px',
       render: (_: any, order: Order) => (
-        <div className="text-sm min-w-0">
-          {order.items && order.items.length > 0 ? (
-            <div>
-              <div className="font-medium text-sm">{order.items.length} item(s)</div>
-              <div className="text-muted-foreground space-y-1">
-                {order.items.slice(0, 2).map((item, idx) => (
-                  <div key={idx} className="border-l-2 border-gray-200 pl-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <span className="font-medium text-gray-700 text-xs truncate block">
-                          {item.productName} {item.variantTitle && `(${item.variantTitle})`}
-                        </span>
-                        {item.isWeightBased && item.weightQuantity ? (
-                          <span className="text-blue-600 text-xs">⚖️ {formatWeightAuto(item.weightQuantity).formattedString}</span>
-                        ) : (
-                          <span className="text-gray-500 text-xs"> x{item.quantity}</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600 flex-shrink-0">
-                        {formatCurrency(item.totalPrice)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {order.items.length > 2 && (
-                  <div className="text-xs text-muted-foreground">
-                    +{order.items.length - 2} more items
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">No items</span>
-          )}
+        <div className="text-sm">
+          <span className="font-medium">
+            {order.itemCount || 0} items
+          </span>
         </div>
-      ),
-      mobileHidden: true
+      )
     },
     {
       key: 'totalAmount',
@@ -653,105 +548,12 @@ export default function OrdersList() {
       mobileHidden: true
     },*/
     {
-      key: 'status',
-      title: 'Status',
-      width: '100px',
-      render: (_: any, order: Order) => getStatusBadge(order.status)
-    },
-    {
-      key: 'paymentStatus',
-      title: 'Payment',
-      width: '100px',
-      render: (_: any, order: Order) => getPaymentStatusBadge(order.paymentStatus),
-      mobileLabel: 'Payment'
-    },
-    {
-      key: 'fbrEnvironment',
-      title: 'FBR Type',
-      width: '90px',
-      render: (_: any, order: Order) => {
-        if (!order.fbrEnvironment) return <span className="text-xs text-gray-400">-</span>;
-        return (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-            order.fbrEnvironment === 'production' 
-              ? 'bg-orange-100 text-orange-800' 
-              : 'bg-blue-100 text-blue-800'
-          }`}>
-            {order.fbrEnvironment === 'production' ? '🚨 Prod' : '🧪 Sand'}
-          </span>
-        );
-      },
-      mobileHidden: true
-    },
-    {
-      key: 'driver',
-      title: 'Assigned Driver',
-      width: '180px',
-      render: (_: any, order: Order) => renderDriverInfo(order),
-      mobileHidden: true
-    },
-    {
-      key: 'deliveryStatus',
-      title: 'Delivery Status',
-      width: '130px',
-      render: (_: any, order: Order) => getDeliveryStatusBadge(order.deliveryStatus || 'pending'),
-      mobileLabel: 'Delivery'
-    },
-    {
       key: 'createdAt',
       title: 'Date',
       width: '140px',
       render: (_: any, order: Order) => (
         <div className="text-sm">
           {formatDateTime(order.createdAt)}
-        </div>
-      )
-    },
-    {
-      key: 'invoiceNumber',
-      title: 'Invoice #',
-      width: '120px',
-      render: (_: any, order: Order) => (
-        <div className="text-sm">
-          {order.invoiceNumber ? (
-            <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
-              {order.invoiceNumber}
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'invoiceType',
-      title: 'Invoice Type',
-      width: '120px',
-      render: (_: any, order: Order) => (
-        <div className="text-sm">
-          {order.invoiceType ? (
-            <Badge variant="outline" className="text-xs">
-              {order.invoiceType}
-            </Badge>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'invoiceRefNo',
-      title: 'Ref No',
-      width: '100px',
-      render: (_: any, order: Order) => (
-        <div className="text-sm">
-          {order.invoiceRefNo ? (
-            <div className="font-mono text-xs">
-              {order.invoiceRefNo}
-            </div>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
         </div>
       )
     }
@@ -913,21 +715,6 @@ export default function OrdersList() {
               />
             </div>
             
-            <div className="space-y-2 min-w-0">
-              <label className="text-sm font-medium">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="processing">Processing</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
             
             <div className="space-y-2 min-w-0">
               <label className="text-sm font-medium">Start Date</label>
