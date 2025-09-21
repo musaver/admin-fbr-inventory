@@ -78,7 +78,7 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       .limit(limit)
       .offset(offset);
 
-    // Map simplified order data without heavy fields
+    // Map simplified order data with essential invoice fields
     const simplifiedOrders = ordersWithDetails.map((orderData) => ({
       id: orderData.order.id,
       orderNumber: orderData.order.orderNumber,
@@ -93,7 +93,14 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       createdAt: orderData.order.createdAt,
       updatedAt: orderData.order.updatedAt,
       user: orderData.user,
-      itemCount: Number(orderData.itemCount) || 0
+      itemCount: Number(orderData.itemCount) || 0,
+      // Invoice and FBR fields
+      invoiceNumber: orderData.order.invoiceNumber,
+      invoiceType: orderData.order.invoiceType,
+      invoiceRefNo: orderData.order.invoiceRefNo,
+      fbrEnvironment: orderData.order.fbrEnvironment,
+      scenarioId: orderData.order.scenarioId,
+      validationResponse: orderData.order.validationResponse
     }));
 
     return NextResponse.json({

@@ -70,6 +70,13 @@ interface Order {
     name?: string;
     email: string;
   };
+  // Invoice and FBR fields
+  invoiceNumber?: string;
+  invoiceType?: string;
+  invoiceRefNo?: string;
+  fbrEnvironment?: string;
+  scenarioId?: string;
+  validationResponse?: string;
 }
 
 export default function OrdersList() {
@@ -556,6 +563,41 @@ export default function OrdersList() {
           {formatDateTime(order.createdAt)}
         </div>
       )
+    },
+    {
+      key: 'fbrEnvironment',
+      title: 'FBR Type',
+      width: '90px',
+      render: (_: any, order: Order) => {
+        if (!order.fbrEnvironment) return <span className="text-xs text-gray-400">-</span>;
+        return (
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            order.fbrEnvironment === 'production' 
+              ? 'bg-orange-100 text-orange-800' 
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {order.fbrEnvironment === 'production' ? '🚨 Prod' : '🧪 Sand'}
+          </span>
+        );
+      },
+      mobileHidden: true
+    },
+    {
+      key: 'invoiceNumber',
+      title: 'Invoice #',
+      width: '120px',
+      render: (_: any, order: Order) => (
+        <div className="text-sm">
+          {order.invoiceNumber ? (
+            <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
+              {order.invoiceNumber}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">-</span>
+          )}
+        </div>
+      ),
+      mobileHidden: true
     }
   ];
 
