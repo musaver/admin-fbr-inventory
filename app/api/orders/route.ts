@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, orderItems, productInventory, stockMovements, products, productVariants, user, drivers, userLoyaltyPoints, loyaltyPointsHistory, settings, suppliers } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
-import { eq, and, isNull, desc, or } from 'drizzle-orm';
+import { eq, and, isNull, desc, or, sql } from 'drizzle-orm';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
 import { isWeightBasedProduct, convertToGrams } from '@/utils/weightUtils';
 import { sendInvoiceEmails } from '@/lib/email';
@@ -41,6 +41,9 @@ export const GET = withTenant(async (req: NextRequest, context) => {
     const { searchParams } = new URL(req.url);
     const assignedDriverId = searchParams.get('assignedDriverId');
     const orderType = searchParams.get('orderType');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const offset = (page - 1) * limit;
 
     // Build where conditions including tenant filter
     const whereConditions = [eq(orders.tenantId, context.tenantId)];
@@ -51,6 +54,13 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       whereConditions.push(eq(orders.orderType, orderType));
     }
 
+    // Get total count for pagination
+    const totalCountResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(orders)
+      .where(and(...whereConditions));
+    const totalCount = Number(totalCountResult[0]?.count || 0);
+    
     // Fetch orders with their items, customer information, supplier information, and assigned driver
     const ordersWithDetails = await db
       .select({
@@ -68,7 +78,9 @@ export const GET = withTenant(async (req: NextRequest, context) => {
         eq(suppliers.tenantId, context.tenantId)
       ))
       .where(and(...whereConditions))
-      .orderBy(desc(orders.createdAt));
+      .orderBy(desc(orders.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     // Fetch order items and driver information for each order
     const ordersWithItems = await Promise.all(
@@ -123,7 +135,17 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       })
     );
 
-    return NextResponse.json(ordersWithItems);
+    return NextResponse.json({
+      data: ordersWithItems,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching orders:', error);
     return ErrorResponses.serverError('Failed to fetch orders');

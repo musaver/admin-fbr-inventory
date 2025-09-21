@@ -65,21 +65,38 @@ export default function ProductsList() {
   const [loading, setLoading] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      // Sort by createdAt desc (latest first)
-      const sorted = Array.isArray(data)
-        ? [...data].sort((a, b) => {
-            const aTime = a?.product?.createdAt ? new Date(a.product.createdAt).getTime() : 0;
-            const bTime = b?.product?.createdAt ? new Date(b.product.createdAt).getTime() : 0;
-            return bTime - aTime;
-          })
-        : data;
-      setProducts(sorted);
+      const res = await fetch(`/api/products?page=${page}&limit=${limit}`);
+      const response = await res.json();
+      
+      if (response.data && response.pagination) {
+        // Handle paginated response
+        setProducts(response.data);
+        setPagination(response.pagination);
+      } else {
+        // Handle non-paginated response (fallback)
+        const data = response.data || response;
+        const sorted = Array.isArray(data)
+          ? [...data].sort((a, b) => {
+              const aTime = a?.product?.createdAt ? new Date(a.product.createdAt).getTime() : 0;
+              const bTime = b?.product?.createdAt ? new Date(b.product.createdAt).getTime() : 0;
+              return bTime - aTime;
+            })
+          : data;
+        setProducts(sorted);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -88,8 +105,8 @@ export default function ProductsList() {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    fetchProducts(currentPage, pagination.limit);
+  }, [currentPage]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
@@ -229,7 +246,8 @@ export default function ProductsList() {
       return { totalProducts: 0, activeProducts: 0, featuredProducts: 0, groupProducts: 0 };
     }
     
-    const totalProducts = products.length;
+    // Use pagination total for overall count, but calculate other stats from current page
+    const totalProducts = pagination.total || products.length;
     const activeProducts = products.filter(item => item.product.isActive).length;
     const featuredProducts = products.filter(item => item.product.isFeatured).length;
     const groupProducts = products.filter(item => item.product.productType === 'group').length;
@@ -238,6 +256,22 @@ export default function ProductsList() {
   };
 
   const stats = getStats();
+
+  const handlePreviousPage = () => {
+    if (pagination.hasPrevPage) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const columns = [
     {
@@ -440,7 +474,7 @@ export default function ProductsList() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button onClick={fetchProducts} disabled={loading} variant="outline" size="sm">
+          <Button onClick={() => fetchProducts(currentPage, pagination.limit)} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -524,6 +558,62 @@ export default function ProductsList() {
         emptyMessage="No products found"
         actions={renderActions}
       />
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-muted-foreground">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} products
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePreviousPage}
+              disabled={!pagination.hasPrevPage || loading}
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                let pageNum;
+                if (pagination.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (pagination.page <= 3) {
+                  pageNum = i + 1;
+                } else if (pagination.page >= pagination.totalPages - 2) {
+                  pageNum = pagination.totalPages - 4 + i;
+                } else {
+                  pageNum = pagination.page - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === pagination.page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                    disabled={loading}
+                    className="w-10"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={!pagination.hasNextPage || loading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

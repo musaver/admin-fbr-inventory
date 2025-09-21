@@ -3,11 +3,32 @@ import { db } from '@/lib/db';
 import { user, userLoyaltyPoints } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
-import { ne, or, isNull, eq, and } from 'drizzle-orm';
+import { ne, or, isNull, eq, and, sql, desc } from 'drizzle-orm';
 import { withTenant, ErrorResponses } from '@/lib/api-helpers';
 
 export const GET = withTenant(async (request: NextRequest, context) => {
   try {
+    // Get query parameters for pagination
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const offset = (page - 1) * limit;
+    
+    const userFilter = and(
+      eq(user.tenantId, context.tenantId), // Filter by tenant
+      or(
+        ne(user.userType, 'driver'),
+        isNull(user.userType)
+      )
+    );
+    
+    // Get total count for pagination
+    const totalCountResult = await db
+      .select({ count: sql`COUNT(*)` })
+      .from(user)
+      .where(userFilter);
+    const totalCount = Number(totalCountResult[0]?.count || 0);
+    
     // Only fetch users that are not drivers (customer type or null for existing users) and belong to current tenant
     const allUsers = await db
       .select({
@@ -16,35 +37,40 @@ export const GET = withTenant(async (request: NextRequest, context) => {
       })
       .from(user)
       .leftJoin(userLoyaltyPoints, eq(user.id, userLoyaltyPoints.userId))
-      .where(
-        and(
-          eq(user.tenantId, context.tenantId), // Filter by tenant
-          or(
-            ne(user.userType, 'driver'),
-            isNull(user.userType)
-          )
-        )
-      );
+      .where(userFilter)
+      .orderBy(desc(user.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     // Transform the data to match the expected format
-            const usersWithPoints = allUsers.map(record => ({
-          ...record.user,
-          loyaltyPoints: record.loyaltyPoints ? {
-            availablePoints: record.loyaltyPoints.availablePoints,
-            pendingPoints: record.loyaltyPoints.pendingPoints,
-            totalPointsEarned: record.loyaltyPoints.totalPointsEarned,
-            totalPointsRedeemed: record.loyaltyPoints.totalPointsRedeemed,
-            pointsExpiringSoon: record.loyaltyPoints.pointsExpiringSoon
-          } : {
-            availablePoints: 0,
-            pendingPoints: 0,
-            totalPointsEarned: 0,
-            totalPointsRedeemed: 0,
-            pointsExpiringSoon: 0
-          }
-        }));
+    const usersWithPoints = allUsers.map(record => ({
+      ...record.user,
+      loyaltyPoints: record.loyaltyPoints ? {
+        availablePoints: record.loyaltyPoints.availablePoints,
+        pendingPoints: record.loyaltyPoints.pendingPoints,
+        totalPointsEarned: record.loyaltyPoints.totalPointsEarned,
+        totalPointsRedeemed: record.loyaltyPoints.totalPointsRedeemed,
+        pointsExpiringSoon: record.loyaltyPoints.pointsExpiringSoon
+      } : {
+        availablePoints: 0,
+        pendingPoints: 0,
+        totalPointsEarned: 0,
+        totalPointsRedeemed: 0,
+        pointsExpiringSoon: 0
+      }
+    }));
 
-    return NextResponse.json(usersWithPoints);
+    return NextResponse.json({
+      data: usersWithPoints,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage: page < Math.ceil(totalCount / limit),
+        hasPrevPage: page > 1
+      }
+    });
   } catch (error) {
     console.error('Error fetching users:', error);
     return ErrorResponses.serverError('Failed to fetch users');

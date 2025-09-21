@@ -46,37 +46,52 @@ export default function UsersList() {
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/users');
-      const data = await res.json();
+      const res = await fetch(`/api/users?page=${page}&limit=${limit}`);
+      const response = await res.json();
       
-      // Ensure data is an array
-      if (Array.isArray(data)) {
-        // Sort by createdAt desc (latest first)
-        const sorted = [...data].sort((a, b) => {
-          const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return bTime - aTime;
-        });
-        setUsers(sorted);
+      if (response.data && response.pagination) {
+        // Handle paginated response
+        setUsers(response.data);
+        setPagination(response.pagination);
       } else {
-        console.error('API returned non-array data:', data);
-        setUsers([]); // Fallback to empty array
+        // Handle non-paginated response (fallback)
+        const data = response.data || response;
+        if (Array.isArray(data)) {
+          const sorted = [...data].sort((a, b) => {
+            const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+          });
+          setUsers(sorted);
+        } else {
+          console.error('API returned non-array data:', data);
+          setUsers([]);
+        }
       }
     } catch (err) {
       console.error('Error fetching users:', err);
-      setUsers([]); // Fallback to empty array on error
+      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsers(currentPage, pagination.limit);
+  }, [currentPage]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this user?')) {
@@ -174,11 +189,28 @@ export default function UsersList() {
     }
   };
 
+  const handlePreviousPage = () => {
+    if (pagination.hasPrevPage) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination.hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const getStats = () => {
     // Ensure users is an array
     const userArray = Array.isArray(users) ? users : [];
     
-    const totalUsers = userArray.length;
+    // Use pagination total for overall count, but calculate other stats from current page
+    const totalUsers = pagination.total || userArray.length;
     const usersWithPhone = userArray.filter(user => user.phone).length;
     const usersWithAddress = userArray.filter(user => user.address).length;
     
@@ -374,7 +406,7 @@ export default function UsersList() {
               Bulk Import
             </Link>
           </Button>
-          <Button onClick={fetchUsers} disabled={loading} variant="outline" size="sm">
+          <Button onClick={() => fetchUsers(currentPage, pagination.limit)} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -457,6 +489,62 @@ export default function UsersList() {
         emptyMessage="No users found"
         actions={renderActions}
       />
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-muted-foreground">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePreviousPage}
+              disabled={!pagination.hasPrevPage || loading}
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                let pageNum;
+                if (pagination.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (pagination.page <= 3) {
+                  pageNum = i + 1;
+                } else if (pagination.page >= pagination.totalPages - 2) {
+                  pageNum = pagination.totalPages - 4 + i;
+                } else {
+                  pageNum = pagination.page - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === pagination.page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                    disabled={loading}
+                    className="w-10"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={!pagination.hasNextPage || loading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -114,16 +114,26 @@ export default function OrdersList() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
   });
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
+      const res = await fetch(`/api/orders?page=${page}&limit=${limit}`);
+      const response = await res.json();
+      const data = response.data || response; // Handle both paginated and non-paginated responses
       
       // Process orders to add weight-based information to items
       const processedOrders = data.map((order: Order) => {
@@ -146,6 +156,12 @@ export default function OrdersList() {
       
       setOrders(processedOrders);
       setFilteredOrders(processedOrders);
+      
+      // Update pagination if response includes pagination data
+      if (response.pagination) {
+        setPagination(response.pagination);
+        setCurrentPage(response.pagination.page);
+      }
     } catch (err) {
       console.error('Error fetching orders:', err);
     } finally {
@@ -164,9 +180,14 @@ export default function OrdersList() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(1, pagination.limit);
     fetchAddons();
   }, []);
+  
+  // Effect for page changes
+  useEffect(() => {
+    fetchOrders(currentPage, pagination.limit);
+  }, [currentPage]);
 
   useEffect(() => {
     filterOrders();
@@ -764,7 +785,7 @@ export default function OrdersList() {
           </p>
         </div>
         <div className="flex items-center space-x-2 flex-shrink-0">
-          <Button onClick={fetchOrders} disabled={loading} variant="outline" size="sm">
+          <Button onClick={() => fetchOrders(currentPage, pagination.limit)} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -926,6 +947,75 @@ export default function OrdersList() {
           actions={renderActions}
         />
       </div>
+
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                  {pagination.total} orders
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(pagination.page - 1)}
+                  disabled={!pagination.hasPrevPage}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    const page = i + 1;
+                    const isActive = page === pagination.page;
+                    return (
+                      <Button
+                        key={page}
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  
+                  {pagination.totalPages > 5 && (
+                    <>
+                      <span className="px-2">...</span>
+                      <Button
+                        variant={pagination.page === pagination.totalPages ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pagination.totalPages)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pagination.totalPages}
+                      </Button>
+                    </>
+                  )}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(pagination.page + 1)}
+                  disabled={!pagination.hasNextPage}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 
