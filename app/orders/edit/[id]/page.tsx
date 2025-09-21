@@ -402,6 +402,10 @@ export default function EditOrder() {
   const [showJsonPreview, setShowJsonPreview] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
+  // Sticky sidebar state
+  const [isSticky, setIsSticky] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+
   // Helper function to format date for FBR
   const formatDateForFbr = (dateString: string): string => {
     if (!dateString) return new Date().toISOString().split('T')[0];
@@ -634,6 +638,28 @@ export default function EditOrder() {
     fetchLoyaltySettings();
     fetchSellerInfo();
   }, [params.id]);
+
+  // Scroll detection for sticky sidebar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (sidebarContainerRef.current && sidebarRef.current) {
+        const containerRect = sidebarContainerRef.current.getBoundingClientRect();
+        const shouldStick = containerRect.top <= 24; // 24px offset for top spacing
+        setIsSticky(shouldStick);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+    
+    // Initial check
+    handleScroll();
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
 
   // Populate product selection form when product is selected
   useEffect(() => {
@@ -3430,12 +3456,28 @@ export default function EditOrder() {
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div ref={sidebarContainerRef} className="sticky top-4">
-              <Card>
+          {/* Order Summary - Right Side */}
+          <div ref={sidebarContainerRef} className="lg:col-span-1 relative">
+            <aside 
+              ref={sidebarRef}
+              className={`transition-all duration-300 will-change-transform z-30 ${
+                isSticky 
+                  ? 'fixed top-6 right-6 w-80 max-w-[calc(100vw-3rem)]' 
+                  : 'sticky top-6'
+              } h-fit max-h-[calc(100vh-3rem)] overflow-y-auto`}
+            >
+              <Card className={`border-2 transition-all duration-300 ${
+                isSticky 
+                  ? 'shadow-2xl bg-background/95 backdrop-blur-sm border-primary/20 scale-105' 
+                  : 'shadow-lg bg-background border-border'
+              }`}>
                 <CardHeader>
-                  <CardTitle>📊 Order Summary</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    📊 Order Summary
+                  </CardTitle>
+                  <CardDescription>
+                    Review your order details and total
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -3522,7 +3564,7 @@ export default function EditOrder() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </aside>
           </div>
         </div>
       </form>
