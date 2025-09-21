@@ -61,6 +61,12 @@ export const POST = withTenant(async (request: NextRequest, context) => {
       ...item,
       id: crypto.randomUUID(),
       orderId: newOrderId,
+      // Clear product identification fields to avoid duplicates
+      serialNumber: null,
+      itemSerialNumber: null,
+      listNumber: null,
+      bcNumber: null,
+      lotNumber: null,
       createdAt: new Date(),
       updatedAt: new Date()
     }));
