@@ -84,7 +84,6 @@ interface ImportJob {
         taxAmount?: number;
         taxPercentage?: number;
         priceIncludingTax?: number;
-        priceExcludingTax?: number;
         orderNumber?: string;
         orderId?: string;
         errorMessage?: string;
@@ -109,7 +108,6 @@ interface DetailedImportReportProps {
       taxAmount?: number;
       taxPercentage?: number;
       priceIncludingTax?: number;
-      priceExcludingTax?: number;
       orderNumber?: string;
       orderId?: string;
       errorMessage?: string;
@@ -140,7 +138,7 @@ function DetailedImportReport({ report, fileName }: DetailedImportReportProps) {
   const failedCount = report.filter(item => item.status === 'failed').length;
 
   const downloadReport = () => {
-    const csvHeaders = ['Row', 'Status', 'Action', 'Customer Email', 'Order Number', 'Custom Order Number', 'Product SKU', 'Product Name', 'Quantity', 'Unit Price', 'Tax Amount', 'Tax Percentage', 'Price Including Tax', 'Price Excluding Tax', 'Error Message'];
+    const csvHeaders = ['Row', 'Status', 'Action', 'Customer Email', 'Order Number', 'Custom Order Number', 'Product SKU', 'Product Name', 'Quantity', 'Unit Price', 'Tax Amount', 'Tax Percentage', 'Price Including Tax', 'Error Message'];
     const csvRows = [
       csvHeaders.join(','),
       ...report.map(item => [
@@ -157,7 +155,6 @@ function DetailedImportReport({ report, fileName }: DetailedImportReportProps) {
         item.data.taxAmount || '',
         item.data.taxPercentage || '',
         item.data.priceIncludingTax || '',
-        item.data.priceExcludingTax || '',
         item.data.errorMessage || ''
       ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
     ];
@@ -333,7 +330,7 @@ function DetailedImportReport({ report, fileName }: DetailedImportReportProps) {
                 
                 {item.data.unitPrice && (
                   <div>
-                    <span className="font-medium text-gray-600 dark:text-gray-400">Unit Price:</span>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Unit Price (Excl. Tax):</span>
                     <div className="text-xs">{item.data.unitPrice}</div>
                   </div>
                 )}
@@ -356,13 +353,6 @@ function DetailedImportReport({ report, fileName }: DetailedImportReportProps) {
                   <div>
                     <span className="font-medium text-gray-600 dark:text-gray-400">Price (Incl. Tax):</span>
                     <div className="text-xs">{item.data.priceIncludingTax}</div>
-                  </div>
-                )}
-                
-                {item.data.priceExcludingTax && (
-                  <div>
-                    <span className="font-medium text-gray-600 dark:text-gray-400">Price (Excl. Tax):</span>
-                    <div className="text-xs">{item.data.priceExcludingTax}</div>
                   </div>
                 )}
               </div>
@@ -445,11 +435,11 @@ export default function BulkUserUpload() {
 "PROD-003","45.00","48.60","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
     } else {
-      csvContent = `Order Number,Customer Email,Customer Name,Customer Phone,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,Price Excluding Tax,Order Status,Payment Status,Billing Address,Shipping Address,Service Date,Notes,Product Description,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date
-"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-001","Premium Widget","2","29.99","2.40","8.0","32.39","29.99","confirmed","paid","123 Main St, Lahore, Punjab","123 Main St, Lahore, Punjab","2024-12-25","Rush delivery - Holiday order","High quality widget for professional use","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31"
-"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-002","Standard Item","1","19.99","1.60","8.0","21.59","19.99","confirmed","paid","123 Main St, Lahore, Punjab","123 Main St, Lahore, Punjab","2024-12-25","Rush delivery - Holiday order","Additional item for same order","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30"
-"ORD-002","jane.smith@example.com","Jane Smith","+92321-9876543","PROD-003","Premium Product","3","45.00","3.60","8.0","48.60","45.00","processing","pending","456 Commerce Ave, Karachi, Sindh","456 Commerce Ave, Karachi, Sindh","2024-12-26","Standard delivery","Premium quality product for special customers","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31"
-"ORD-003","ahmed.khan@example.com","Ahmed Khan","+92333-1122334","PROD-001","Premium Widget","1","29.99","2.40","8.0","32.39","29.99","pending","pending","789 Market Rd, Peshawar, KPK","789 Market Rd, Peshawar, KPK","2024-12-27","Express delivery","Single item order example","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31"`;
+      csvContent = `Order Number,Customer Email,Customer Name,Customer Phone,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date
+"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-001","Premium Widget - High quality widget for professional use","2","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31"
+"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-002","Standard Item - Additional item for same order","1","19.99","1.60","8.0","21.59","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30"
+"ORD-002","jane.smith@example.com","Jane Smith","+92321-9876543","PROD-003","Premium Product - Premium quality product for special customers","3","45.00","3.60","8.0","48.60","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31"
+"ORD-003","ahmed.khan@example.com","Ahmed Khan","+92333-1122334","PROD-001","Premium Widget - Single item order example","1","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31"`;
       fileName = 'bulk_order_import_template.csv';
     }
     
@@ -722,7 +712,8 @@ export default function BulkUserUpload() {
                   <div>Download the CSV template below to see the required format</div>
                   <ul className="list-disc list-inside space-y-1 mt-2">
                     <li><strong>Required fields:</strong> Order Number, Customer Email, Product SKU, Quantity, Unit Price</li>
-                    <li><strong>Tax fields:</strong> Tax Amount, Tax Percentage, Price Including Tax, Price Excluding Tax (optional)</li>
+                    <li><strong>Tax fields:</strong> Tax Amount, Tax Percentage, Price Including Tax (optional)</li>
+                    <li><strong>Note:</strong> Unit Price should contain the price excluding tax. Product Name can include description.</li>
                     <li><strong>Order Grouping:</strong> Rows with same Order Number = same order with multiple items</li>
                     <li><strong>Template Structure:</strong> Order Number first for easy sorting and visual grouping</li>
                     <li><strong>Smart Defaults:</strong> Order Status defaults to "pending", Payment Status to "pending"</li>

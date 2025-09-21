@@ -39,21 +39,11 @@ interface OrderImportRow {
   orderNumber?: string; // Custom order ID for grouping items
   productSku: string;
   productName?: string;
-  productDescription?: string;
   quantity: string;
-  unitPrice: string;
+  unitPrice: string; // This will contain price excluding tax
   taxAmount?: string;
   taxPercentage?: string;
   priceIncludingTax?: string;
-  priceExcludingTax?: string;
-  totalAmount?: string;
-  billingAddress?: string;
-  shippingAddress?: string;
-  orderStatus?: string;
-  paymentStatus?: string;
-  serviceDate?: string;
-  serviceTime?: string;
-  notes?: string;
   hsCode?: string;
   uom?: string;
   serialNumber?: string;
@@ -375,21 +365,11 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
     'orderNumber': ['order number', 'order_number', 'order id', 'order_id'],
     'productSku': ['product sku', 'sku', 'product_sku'],
     'productName': ['product name', 'product_name'],
-    'productDescription': ['product description', 'description', 'product_description'],
     'quantity': ['quantity', 'qty'],
     'unitPrice': ['unit price', 'price', 'unit_price'],
     'taxAmount': ['tax amount', 'tax_amount'],
     'taxPercentage': ['tax percentage', 'tax_percentage'],
     'priceIncludingTax': ['price including tax', 'price_including_tax', 'inclusive price', 'price incl tax'],
-    'priceExcludingTax': ['price excluding tax', 'price_excluding_tax', 'exclusive price', 'price excl tax'],
-    'totalAmount': ['total amount', 'total', 'total_amount'],
-    'billingAddress': ['billing address', 'billing_address'],
-    'shippingAddress': ['shipping address', 'shipping_address'],
-    'orderStatus': ['order status', 'status', 'order_status'],
-    'paymentStatus': ['payment status', 'payment_status'],
-    'serviceDate': ['service date', 'service_date'],
-    'serviceTime': ['service time', 'service_time'],
-    'notes': ['notes', 'note'],
     'hsCode': ['hs code', 'hs_code', 'hscode'],
     'uom': ['uom', 'unit of measure', 'unit'],
     'serialNumber': ['serial number', 'serial_number', 'serial no'],
@@ -452,21 +432,11 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
       orderNumber: values[headerMap.orderNumber] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
-      productDescription: values[headerMap.productDescription] || '',
       quantity: values[headerMap.quantity] || '',
       unitPrice: values[headerMap.unitPrice] || '',
       taxAmount: values[headerMap.taxAmount] || '',
       taxPercentage: values[headerMap.taxPercentage] || '',
       priceIncludingTax: values[headerMap.priceIncludingTax] || '',
-      priceExcludingTax: values[headerMap.priceExcludingTax] || '',
-      totalAmount: values[headerMap.totalAmount] || '',
-      billingAddress: values[headerMap.billingAddress] || '',
-      shippingAddress: values[headerMap.shippingAddress] || '',
-      orderStatus: values[headerMap.orderStatus] || '',
-      paymentStatus: values[headerMap.paymentStatus] || '',
-      serviceDate: values[headerMap.serviceDate] || '',
-      serviceTime: values[headerMap.serviceTime] || '',
-      notes: values[headerMap.notes] || '',
       hsCode: values[headerMap.hsCode] || '',
       uom: values[headerMap.uom] || '',
       serialNumber: values[headerMap.serialNumber] || '',
@@ -1264,7 +1234,7 @@ async function processOrderChunk(
               tenantId,
               name: orderData.productName?.trim() || orderData.productSku.trim(),
               slug: `${orderData.productSku.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${productId.substring(0, 8)}`,
-              description: orderData.productDescription?.trim() || null,
+              description: null, // Description is now part of product name
               sku: orderData.productSku.trim(),
               price: unitPrice.toFixed(2),
               hsCode: orderData.hsCode?.trim() || null,
@@ -1294,11 +1264,11 @@ async function processOrderChunk(
           const unitPrice = parseFloat(orderData.unitPrice);
           const totalPrice = quantity * unitPrice;
           
-          // Parse tax fields
+          // Parse tax fields - unitPrice now contains price excluding tax
           const taxAmount = orderData.taxAmount && orderData.taxAmount.trim() !== '' ? parseFloat(orderData.taxAmount) : 0;
           const taxPercentage = orderData.taxPercentage && orderData.taxPercentage.trim() !== '' ? parseFloat(orderData.taxPercentage) : 0;
           const priceIncludingTax = orderData.priceIncludingTax && orderData.priceIncludingTax.trim() !== '' ? parseFloat(orderData.priceIncludingTax) : unitPrice;
-          const priceExcludingTax = orderData.priceExcludingTax && orderData.priceExcludingTax.trim() !== '' ? parseFloat(orderData.priceExcludingTax) : unitPrice;
+          const priceExcludingTax = unitPrice; // Unit price now contains price excluding tax
           
           subtotal += totalPrice;
 
@@ -1307,7 +1277,7 @@ async function processOrderChunk(
             orderId: orderId,
             productId: productId,
             productName: orderData.productName?.trim() || orderData.productSku.trim(),
-            productDescription: orderData.productDescription?.trim() || null,
+            productDescription: null, // Description is now part of product name
             sku: orderData.productSku.trim(),
             hsCode: orderData.hsCode?.trim() || null,
             uom: orderData.uom?.trim() || null,
@@ -1399,8 +1369,8 @@ async function processOrderChunk(
           };
         };
 
-        const billingAddr = parseBillingAddress(firstOrder.billingAddress || '');
-        const shippingAddr = parseShippingAddress(firstOrder.shippingAddress || firstOrder.billingAddress || '');
+        const billingAddr = parseBillingAddress(''); // Address fields removed from CSV
+        const shippingAddr = parseShippingAddress(''); // Address fields removed from CSV
 
         const order = {
           id: orderId,
@@ -1410,8 +1380,8 @@ async function processOrderChunk(
           userId: customerId,
           email: customerEmail,
           phone: firstOrder.customerPhone?.trim() || null,
-          status: firstOrder.orderStatus?.toLowerCase() || 'pending',
-          paymentStatus: firstOrder.paymentStatus?.toLowerCase() || 'pending',
+          status: 'pending', // Default status since removed from CSV
+          paymentStatus: 'pending', // Default payment status since removed from CSV
           fulfillmentStatus: 'pending',
           subtotal: subtotal.toFixed(2),
           taxAmount: '0.00',
@@ -1419,9 +1389,9 @@ async function processOrderChunk(
           discountAmount: '0.00',
           totalAmount: subtotal.toFixed(2),
           currency: 'PKR',
-          serviceDate: firstOrder.serviceDate?.trim() || null,
-          serviceTime: firstOrder.serviceTime?.trim() || null,
-          notes: firstOrder.notes?.trim() || null,
+          serviceDate: null, // Service date removed from CSV
+          serviceTime: null, // Service time removed from CSV  
+          notes: null, // Notes removed from CSV
           ...billingAddr,
           ...shippingAddr,
           createdAt: new Date(),
