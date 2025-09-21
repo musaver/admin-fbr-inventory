@@ -352,6 +352,8 @@ export default function EditOrder() {
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [selectedProductCategory, setSelectedProductCategory] = useState('all');
+  const [uomComboboxOpen, setUomComboboxOpen] = useState(false);
+  const [existingItemUomOpen, setExistingItemUomOpen] = useState<{[key: number]: boolean}>({});
 
   // Product selection state for detailed entry
   const [productSelection, setProductSelection] = useState({
@@ -2018,15 +2020,70 @@ export default function EditOrder() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="uom-edit" className="text-sm">UOM</Label>
-                            <Input
-                              id="uom-edit"
-                              type="text"
-                              value={productSelection.uom}
-                              onChange={(e) => setProductSelection({...productSelection, uom: e.target.value})}
-                              placeholder="Unit of measure"
-                              className="text-sm"
-                            />
+                            <Label htmlFor="uom-edit" className="text-sm">Unit of Measurement (UOM)</Label>
+                            <div className="flex gap-2">
+                              <Popover open={uomComboboxOpen} onOpenChange={setUomComboboxOpen}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={uomComboboxOpen}
+                                    className="justify-between text-sm flex-1"
+                                  >
+                                    {(() => {
+                                      const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+                                      const isCustomUom = productSelection.uom && !uomOptions.includes(productSelection.uom);
+                                      return productSelection.uom && uomOptions.includes(productSelection.uom)
+                                        ? productSelection.uom
+                                        : isCustomUom 
+                                          ? "Others"
+                                          : productSelection.uom
+                                            ? "Others"
+                                            : "Select UOM...";
+                                    })()}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                                  <Command>
+                                    <CommandInput placeholder="Search UOM..." />
+                                    <CommandList className="h-[200px]">
+                                      <CommandEmpty>No UOM found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"].map((uom) => (
+                                          <CommandItem
+                                            key={uom}
+                                            value={uom}
+                                            onSelect={() => {
+                                              setProductSelection({...productSelection, uom: uom});
+                                              setUomComboboxOpen(false);
+                                            }}
+                                          >
+                                            <Check
+                                              className={`mr-2 h-4 w-4 ${productSelection.uom === uom ? "opacity-100" : "opacity-0"}`}
+                                            />
+                                            {uom}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              {(() => {
+                                const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+                                const isCustomUom = productSelection.uom && !uomOptions.includes(productSelection.uom);
+                                return (isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom))) && (
+                                  <Input
+                                    className="flex-1 text-sm"
+                                    type="text"
+                                    value={isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom)) ? productSelection.uom : ""}
+                                    onChange={(e) => setProductSelection({...productSelection, uom: e.target.value})}
+                                    placeholder="Enter custom UOM"
+                                  />
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2468,13 +2525,73 @@ export default function EditOrder() {
                           </div>
 
                           <div>
-                            <Label className="text-sm">UOM</Label>
-                            <Input
-                              value={item.uom || ''}
-                              onChange={(e) => updateOrderItem(index, 'uom', e.target.value)}
-                              placeholder="Unit of measure"
-                              className="text-sm"
-                            />
+                            <Label className="text-sm">Unit of Measurement (UOM)</Label>
+                            <div className="flex gap-2">
+                              <Popover 
+                                open={existingItemUomOpen[index] || false} 
+                                onOpenChange={(open) => setExistingItemUomOpen(prev => ({ ...prev, [index]: open }))}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={existingItemUomOpen[index] || false}
+                                    className="justify-between text-sm flex-1"
+                                  >
+                                    {(() => {
+                                      const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+                                      const isCustomUom = item.uom && !uomOptions.includes(item.uom);
+                                      return item.uom && uomOptions.includes(item.uom)
+                                        ? item.uom
+                                        : isCustomUom 
+                                          ? "Others"
+                                          : item.uom
+                                            ? "Others"
+                                            : "Select UOM...";
+                                    })()}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                                  <Command>
+                                    <CommandInput placeholder="Search UOM..." />
+                                    <CommandList className="h-[200px]">
+                                      <CommandEmpty>No UOM found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"].map((uom) => (
+                                          <CommandItem
+                                            key={uom}
+                                            value={uom}
+                                            onSelect={() => {
+                                              updateOrderItem(index, 'uom', uom);
+                                              setExistingItemUomOpen(prev => ({ ...prev, [index]: false }));
+                                            }}
+                                          >
+                                            <Check
+                                              className={`mr-2 h-4 w-4 ${item.uom === uom ? "opacity-100" : "opacity-0"}`}
+                                            />
+                                            {uom}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              {(() => {
+                                const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
+                                const isCustomUom = item.uom && !uomOptions.includes(item.uom);
+                                return (isCustomUom || (item.uom && !uomOptions.includes(item.uom))) && (
+                                  <Input
+                                    className="flex-1 text-sm"
+                                    type="text"
+                                    value={isCustomUom || (item.uom && !uomOptions.includes(item.uom)) ? item.uom : ""}
+                                    onChange={(e) => updateOrderItem(index, 'uom', e.target.value)}
+                                    placeholder="Enter custom UOM"
+                                  />
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
 
