@@ -2050,12 +2050,16 @@ export default function EditOrder() {
                                     <CommandList className="h-[200px]">
                                       <CommandEmpty>No UOM found.</CommandEmpty>
                                       <CommandGroup>
-                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"].map((uom) => (
+                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh", "Others (custom)"].map((uom) => (
                                           <CommandItem
                                             key={uom}
                                             value={uom}
                                             onSelect={() => {
-                                              setProductSelection({...productSelection, uom: uom});
+                                              if (uom === "Others (custom)") {
+                                                setProductSelection({...productSelection, uom: ""});
+                                              } else {
+                                                setProductSelection({...productSelection, uom: uom});
+                                              }
                                               setUomComboboxOpen(false);
                                             }}
                                           >
@@ -2073,11 +2077,12 @@ export default function EditOrder() {
                               {(() => {
                                 const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
                                 const isCustomUom = productSelection.uom && !uomOptions.includes(productSelection.uom);
-                                return (isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom))) && (
+                                const showCustomInput = isCustomUom || productSelection.uom === "";
+                                return showCustomInput && (
                                   <Input
                                     className="flex-1 text-sm"
                                     type="text"
-                                    value={isCustomUom || (productSelection.uom && !uomOptions.includes(productSelection.uom)) ? productSelection.uom : ""}
+                                    value={isCustomUom ? productSelection.uom : ""}
                                     onChange={(e) => setProductSelection({...productSelection, uom: e.target.value})}
                                     placeholder="Enter custom UOM"
                                   />
@@ -2558,12 +2563,16 @@ export default function EditOrder() {
                                     <CommandList className="h-[200px]">
                                       <CommandEmpty>No UOM found.</CommandEmpty>
                                       <CommandGroup>
-                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"].map((uom) => (
+                                        {["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh", "Others (custom)"].map((uom) => (
                                           <CommandItem
                                             key={uom}
                                             value={uom}
                                             onSelect={() => {
-                                              updateOrderItem(index, 'uom', uom);
+                                              if (uom === "Others (custom)") {
+                                                updateOrderItem(index, 'uom', "");
+                                              } else {
+                                                updateOrderItem(index, 'uom', uom);
+                                              }
                                               setExistingItemUomOpen(prev => ({ ...prev, [index]: false }));
                                             }}
                                           >
@@ -2581,11 +2590,12 @@ export default function EditOrder() {
                               {(() => {
                                 const uomOptions = ["MT", "Bill of lading", "SET", "KWH", "40KG", "Liter", "SqY", "Bag", "KG", "MMBTU", "Meter", "Pcs", "Carat", "Cubic Metre", "Dozen", "Gram", "Gallon", "Kilogram", "Pound", "Timber Logs", "Numbers, pieces, units", "Packs", "Pair", "Square Foot", "Square Metre", "Thousand Unit", "Mega Watt", "Foot", "Barrels", "NO", "1000 kWh"];
                                 const isCustomUom = item.uom && !uomOptions.includes(item.uom);
-                                return (isCustomUom || (item.uom && !uomOptions.includes(item.uom))) && (
+                                const showCustomInput = isCustomUom || item.uom === "";
+                                return showCustomInput && (
                                   <Input
                                     className="flex-1 text-sm"
                                     type="text"
-                                    value={isCustomUom || (item.uom && !uomOptions.includes(item.uom)) ? item.uom : ""}
+                                    value={isCustomUom ? item.uom : ""}
                                     onChange={(e) => updateOrderItem(index, 'uom', e.target.value)}
                                     placeholder="Enter custom UOM"
                                   />
