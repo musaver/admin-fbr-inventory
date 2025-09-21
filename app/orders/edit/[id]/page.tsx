@@ -2518,7 +2518,7 @@ export default function EditOrder() {
                             </div>
                           )}
 
-                          <div>
+                          <div className='hidden'>
                             <Label className="text-sm">Base Price</Label>
                             <Input
                               type="number"
@@ -2725,7 +2725,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div>
+                            <div className='hidden'>
                               <Label className="text-sm">Total Price</Label>
                               <div className="flex items-center h-9 px-3 py-2 border rounded bg-gray-50 text-sm">
                                 {formatCurrency(item.totalPrice)}
@@ -2748,7 +2748,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div>
+                            <div className='hidden'>
                               <Label className="text-sm">Serial Number</Label>
                               <Input
                                 value={item.serialNumber || ''}
@@ -2952,7 +2952,7 @@ export default function EditOrder() {
             )}
 
             {/* Shipping Information */}
-            <Card>
+            <Card className='hidden'>
               <CardHeader>
                 <CardTitle>🚛 Shipping Information</CardTitle>
               </CardHeader>
@@ -3033,7 +3033,7 @@ export default function EditOrder() {
             </Card>
 
             {/* Order Settings */}
-            <Card>
+            <Card className='hidden'>
               <CardHeader>
                 <CardTitle>⚙️ Order Settings</CardTitle>
               </CardHeader>
