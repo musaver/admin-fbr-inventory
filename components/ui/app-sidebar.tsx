@@ -92,6 +92,7 @@ export function AppSidebar() {
       children: [
         { name: 'All Orders', href: '/orders' },
         { name: 'Add Order', href: '/orders/add' },
+        { name: 'Bulk Upload', href: '/users/bulk-upload?tab=orders' },
       ],
     },
     {

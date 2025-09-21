@@ -661,6 +661,11 @@ export default function OrdersList() {
             <TrashIcon className="h-4 w-4 mr-2" />
             Delete All
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/users/bulk-upload?tab=orders">
+              📤 Bulk Import
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/orders/add">
               <PlusIcon className="h-4 w-4 mr-2" />
