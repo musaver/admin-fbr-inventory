@@ -285,6 +285,7 @@ export default function EditOrder() {
   const [skipFbrSubmission, setSkipFbrSubmission] = useState(false);
   const [isProductionSubmission, setIsProductionSubmission] = useState(false);
   const [productionToken, setProductionToken] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
   
   // Order form data
   const [orderData, setOrderData] = useState({
@@ -927,6 +928,89 @@ export default function EditOrder() {
     }
   };
 
+  const fetchProductsDataBySku = async () => {
+    if (orderItems.length === 0) {
+      alert('No order items to update');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      console.log('Fetching product data for all SKUs...');
+      
+      const updatedItems = await Promise.all(
+        orderItems.map(async (item, index) => {
+          if (!item.sku) {
+            console.warn(`Item ${index + 1} has no SKU, skipping...`);
+            return item;
+          }
+
+          try {
+            // Fetch product data by SKU
+            const response = await fetch(`/api/products?sku=${encodeURIComponent(item.sku)}`);
+            if (!response.ok) {
+              console.warn(`Failed to fetch product for SKU: ${item.sku}`);
+              return item;
+            }
+
+            const data = await response.json();
+            const productData = data.find((p: any) => p.product?.sku === item.sku)?.product;
+            
+            if (!productData) {
+              console.warn(`No product found for SKU: ${item.sku}`);
+              return item;
+            }
+
+            console.log(`Updating item with SKU ${item.sku} with fresh data:`, productData);
+
+            // Update item with fresh product data from database
+            const updatedItem = {
+              ...item,
+              productId: productData.id,
+              productName: productData.name || item.productName,
+              productDescription: productData.description || item.productDescription,
+              price: Number(productData.price) || item.price,
+              hsCode: productData.hsCode || item.hsCode,
+              uom: productData.uom || item.uom,
+              serialNumber: productData.serialNumber || item.serialNumber,
+              listNumber: productData.listNumber || item.listNumber,
+              bcNumber: productData.bcNumber || item.bcNumber,
+              lotNumber: productData.lotNumber || item.lotNumber,
+              expiryDate: productData.expiryDate || item.expiryDate,
+              taxAmount: productData.taxAmount || item.taxAmount,
+              taxPercentage: productData.taxPercentage || item.taxPercentage,
+              priceIncludingTax: productData.priceIncludingTax || item.priceIncludingTax,
+              priceExcludingTax: productData.priceExcludingTax || item.priceExcludingTax,
+              extraTax: productData.extraTax || item.extraTax,
+              furtherTax: productData.furtherTax || item.furtherTax,
+              fedPayableTax: productData.fedPayableTax || item.fedPayableTax,
+              discount: productData.discount || item.discount,
+              fixedNotifiedValueOrRetailPrice: productData.fixedNotifiedValueOrRetailPrice || item.fixedNotifiedValueOrRetailPrice,
+              saleType: productData.saleType || item.saleType,
+            };
+
+            // Recalculate total price based on updated price and existing quantity
+            updatedItem.totalPrice = updatedItem.price * updatedItem.quantity;
+
+            return updatedItem;
+          } catch (error) {
+            console.error(`Error fetching product data for SKU ${item.sku}:`, error);
+            return item;
+          }
+        })
+      );
+
+      setOrderItems(updatedItems);
+      console.log('Successfully updated all order items with fresh product data');
+      alert(`Successfully updated ${updatedItems.length} order items with fresh product data from database`);
+      
+    } catch (error) {
+      console.error('Error updating products data:', error);
+      alert('Failed to update products data. Please try again.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const fetchLoyaltySettings = async () => {
     try {
@@ -1512,61 +1596,6 @@ export default function EditOrder() {
     }
   };
 
-  // Fetch product data by SKU and populate fields
-  const handleFetchProductData = async (itemIndex: number, sku?: string) => {
-    if (!sku?.trim()) {
-      alert('⚠️ Please enter a SKU first');
-      return;
-    }
-
-    try {
-      // First try to find the product in the existing products array
-      let product = products.find(p => p.sku?.toLowerCase() === sku.toLowerCase());
-      
-      if (!product) {
-        // If not found in existing products, fetch from API
-        const response = await fetch(`/api/products?sku=${encodeURIComponent(sku)}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Find product with matching SKU
-          product = data.find((p: any) => p.sku?.toLowerCase() === sku.toLowerCase());
-        }
-      }
-
-      if (!product) {
-        alert(`❌ Product with SKU "${sku}" not found`);
-        return;
-      }
-
-      // Update the order item with product data
-      const updatedItems = [...orderItems];
-      const currentItem = updatedItems[itemIndex];
-      
-      updatedItems[itemIndex] = {
-        ...currentItem,
-        productId: product.id,
-        productName: product.name,
-        productDescription: product.description || product.name,
-        price: Number(product.price) || 0,
-        priceExcludingTax: Number(product.priceExcludingTax) || Number(product.price) || 0,
-        priceIncludingTax: Number(product.priceIncludingTax) || Number(product.price) || 0,
-        taxAmount: Number(product.taxAmount) || 0,
-        taxPercentage: Number(product.taxPercentage) || 0,
-        hsCode: product.hsCode || '',
-        uom: product.baseWeightUnit || '',
-        // Recalculate total price based on current quantity
-        totalPrice: (Number(product.price) || 0) * (currentItem.quantity || 1)
-      };
-
-      setOrderItems(updatedItems);
-      alert(`✅ Product data fetched successfully for SKU "${sku}"`);
-      
-    } catch (error) {
-      console.error('Error fetching product data:', error);
-      alert(`❌ Error fetching product data: ${error}`);
-    }
-  };
-
   // Submit order update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1868,7 +1897,7 @@ export default function EditOrder() {
                             {orderData.customerId 
                               ? (() => {
                                   const customer = customers.find(c => c.id === orderData.customerId);
-                                  return customer ? (customer.name || customer.phone) : `Customer ID: ${orderData.customerId}`;
+                                  return customer ? (customer.name || customer.phone || customer.email) : `Customer ID: ${orderData.customerId}`;
                                 })()
                               : "Select customer..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1877,7 +1906,7 @@ export default function EditOrder() {
                         <PopoverContent className="w-full p-0">
                           <Command>
                             <CommandInput
-                              placeholder="Search customers by name or phone..."
+                              placeholder="Search customers by name, phone, or email..."
                               value={customerSearchTerm}
                               onValueChange={setCustomerSearchTerm}
                             />
@@ -1890,6 +1919,7 @@ export default function EditOrder() {
                                   .filter(customer => {
                                     if (!customerSearchTerm) return true;
                                     return customer.name?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                                           customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
                                            customer.phone?.toLowerCase().includes(customerSearchTerm.toLowerCase());
                                   })
                                   .map((customer) => (
@@ -1903,9 +1933,9 @@ export default function EditOrder() {
                                         }`}
                                       />
                                       <div>
-                                        <div className="font-medium">{customer.name || customer.phone}</div>
-                                        <div className="text-sm text-gray-500">{customer.phone}</div>
-                                        {customer.email && (
+                                        <div className="font-medium">{customer.name || customer.phone || customer.email}</div>
+                                        <div className="text-sm text-gray-500">{customer.phone || customer.email}</div>
+                                        {customer.phone && customer.email && (
                                           <div className="text-xs text-gray-400">{customer.email}</div>
                                         )}
                                       </div>
@@ -2045,10 +2075,26 @@ export default function EditOrder() {
             {/* Add Products */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PackagePlus className="h-5 w-5" />
-                  Order Items
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <PackagePlus className="h-5 w-5" />
+                    Order Items
+                  </CardTitle>
+                  <Button 
+                    onClick={fetchProductsDataBySku}
+                    variant="outline" 
+                    size="sm"
+                    disabled={orderItems.length === 0 || isUpdating}
+                    className="gap-2"
+                  >
+                    {isUpdating ? (
+                      <Loader className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PackagePlus className="h-4 w-4" />
+                    )}
+                    Fetch Products Data by SKU
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
@@ -2887,28 +2933,6 @@ export default function EditOrder() {
                         <div className="mb-4">
                           <h6 className="text-sm font-medium mb-3 text-muted-foreground">🔍 Product Identification</h6>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                              <Label className="text-sm">Product SKU</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  value={item.sku || ''}
-                                  onChange={(e) => updateOrderItem(index, 'sku', e.target.value)}
-                                  placeholder="Product SKU"
-                                  className="text-sm flex-1"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleFetchProductData(index, item.sku)}
-                                  disabled={!item.sku?.trim()}
-                                  className="px-3 text-xs"
-                                >
-                                  📦 Fetch
-                                </Button>
-                              </div>
-                            </div>
-                            
                             <div>
                               <Label className="text-sm">HS Code</Label>
                               <Input

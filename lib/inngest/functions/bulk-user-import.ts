@@ -33,14 +33,14 @@ interface ProductImportRow {
 }
 
 interface OrderImportRow {
-  customerEmail?: string;
-  customerName?: string;
   customerPhone: string;
+  customerName?: string;
+  customerEmail?: string;
   orderNumber?: string; // Custom order ID for grouping items
   productSku: string;
   productName?: string;
-  quantity: string;
-  unitPrice: string; // This will contain price excluding tax
+  quantity?: string; // Made optional
+  unitPrice?: string; // Made optional - This will contain price excluding tax
   taxAmount?: string;
   taxPercentage?: string;
   priceIncludingTax?: string;
@@ -76,7 +76,7 @@ interface ProcessingResult {
     id: string;
     orderNumber: string; // Auto-generated order number
     customOrderNumberImport: string | null; // Original order number from CSV
-    customerPhone: string;
+    customerEmail: string;
     itemCount: number;
     rowNumbers: number[]; // Array of CSV row numbers for this order
   }>;
@@ -86,7 +86,7 @@ interface ProcessingResult {
     status: 'success' | 'failed';
     action: string; // 'created_order' | 'added_to_order' | 'created_user' | 'created_product' | 'validation_error' | 'processing_error'
     data: {
-      customerPhone?: string;
+      customerEmail?: string;
       customOrderNumber?: string;
       productSku?: string;
       productName?: string;
@@ -359,9 +359,9 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
   
   // Expected columns (case-insensitive)
   const columnMap = {
-    'customerEmail': ['customer email', 'email', 'customer_email'],
-    'customerName': ['customer name', 'name', 'customer_name'],
     'customerPhone': ['customer phone', 'phone', 'customer_phone'],
+    'customerName': ['customer name', 'name', 'customer_name'],
+    'customerEmail': ['customer email', 'email', 'customer_email'],
     'orderNumber': ['order number', 'order_number', 'order id', 'order_id'],
     'productSku': ['product sku', 'sku', 'product_sku'],
     'productName': ['product name', 'product_name'],
@@ -425,14 +425,14 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
 
     // Extract order data
     const orderData: OrderImportRow = {
-      customerEmail: values[headerMap.customerEmail] || '',
-      customerName: values[headerMap.customerName] || '',
       customerPhone: values[headerMap.customerPhone] || '',
+      customerName: values[headerMap.customerName] || '',
+      customerEmail: values[headerMap.customerEmail] || '',
       orderNumber: values[headerMap.orderNumber] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
-      quantity: values[headerMap.quantity] || '1', // Default to 1 if not provided
-      unitPrice: values[headerMap.unitPrice] || '0', // Default to 0 if not provided
+      quantity: values[headerMap.quantity] || '',
+      unitPrice: values[headerMap.unitPrice] || '',
       taxAmount: values[headerMap.taxAmount] || '',
       taxPercentage: values[headerMap.taxPercentage] || '',
       priceIncludingTax: values[headerMap.priceIncludingTax] || '',
@@ -501,32 +501,30 @@ function validateOrder(orderData: OrderImportRow): string | null {
     return 'Customer Phone is required';
   }
 
-  // Basic phone validation (allow various formats)
-  const phoneRegex = /^[\+]?[0-9\-\(\)\s]{7,20}$/;
-  if (!phoneRegex.test(orderData.customerPhone.replace(/\s+/g, ''))) {
-    return 'Invalid phone format';
+  // Basic phone validation (at least 7 digits)
+  const phoneRegex = /\d{7,}/;
+  if (!phoneRegex.test(orderData.customerPhone.replace(/[^\d]/g, ''))) {
+    return 'Invalid phone format - must contain at least 7 digits';
   }
 
   if (!orderData.productSku?.trim()) {
     return 'Product SKU is required';
   }
 
-  if (!orderData.quantity?.trim()) {
-    return 'Quantity is required';
+  // Quantity is now optional
+  if (orderData.quantity?.trim()) {
+    const quantity = parseInt(orderData.quantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      return 'Quantity must be a valid positive number when provided';
+    }
   }
 
-  const quantity = parseInt(orderData.quantity);
-  if (isNaN(quantity) || quantity <= 0) {
-    return 'Quantity must be a valid positive number';
-  }
-
-  if (!orderData.unitPrice?.trim()) {
-    return 'Unit Price is required';
-  }
-
-  const price = parseFloat(orderData.unitPrice);
-  if (isNaN(price) || price < 0) {
-    return 'Unit Price must be a valid positive number';
+  // Unit Price is now optional
+  if (orderData.unitPrice?.trim()) {
+    const price = parseFloat(orderData.unitPrice);
+    if (isNaN(price) || price < 0) {
+      return 'Unit Price must be a valid positive number when provided';
+    }
   }
 
   return null;
@@ -1084,7 +1082,7 @@ async function processOrderChunk(
     detailedReport: []
   };
 
-  // Group orders by customer email + order number to create proper orders
+  // Group orders by customer phone + order number to create proper orders
   // If order number is provided, group by phone+orderNumber, otherwise by phone only
   const ordersByKey = new Map<string, OrderImportRow[]>();
   orderRows.forEach((orderRow, index) => {
@@ -1114,7 +1112,7 @@ async function processOrderChunk(
     try {
       // Find or create user
       let customerId: string;
-      let existingUser = await db.select({ id: user.id })
+      let existingUser = await db.select({ id: user.id, email: user.email })
         .from(user)
         .where(and(
           eq(user.phone, customerPhone),
@@ -1124,17 +1122,20 @@ async function processOrderChunk(
 
       if (existingUser.length > 0) {
         customerId = existingUser[0].id;
-        console.log(`✅ Found existing user: ${customerPhone}`);
+        console.log(`✅ Found existing user by phone: ${customerPhone}`);
       } else {
         // Create new user from first order's customer data
         const firstOrder = customerOrders[0];
         customerId = uuidv4();
         
+        // Use email if provided, otherwise generate one from phone
+        const userEmail = firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`;
+        
         const newUser = {
           id: customerId,
           tenantId,
           name: firstOrder.customerName?.trim() || `Customer ${customerPhone}`,
-          email: firstOrder.customerEmail?.trim() || null,
+          email: userEmail,
           phone: customerPhone,
           userType: 'customer',
           createdAt: new Date(),
@@ -1156,7 +1157,7 @@ async function processOrderChunk(
           updatedAt: new Date(),
         });
 
-        console.log(`✅ Created new user: ${customerPhone}`);
+        console.log(`✅ Created new user by phone: ${customerPhone}`);
       }
 
       // Create order
@@ -1197,11 +1198,11 @@ async function processOrderChunk(
               status: 'failed',
               action: 'validation_error',
               data: {
-                customerPhone: customerPhone,
+                customerEmail: orderData.customerEmail || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`,
                 customOrderNumber: orderData.orderNumber,
                 productSku: orderData.productSku,
                 productName: orderData.productName,
-                quantity: parseInt(orderData.quantity) || 0,
+                quantity: orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1,
                 errorMessage: validationError
               }
             });
@@ -1258,9 +1259,9 @@ async function processOrderChunk(
             console.log(`✅ Created new product: ${orderData.productSku}`);
           }
 
-          // Create order item
-          const quantity = parseInt(orderData.quantity);
-          const unitPrice = parseFloat(orderData.unitPrice);
+          // Create order item with default values for optional fields
+          const quantity = orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1; // Default to 1 if not provided
+          const unitPrice = orderData.unitPrice?.trim() ? parseFloat(orderData.unitPrice) : 0.00; // Default to 0 if not provided
           const totalPrice = quantity * unitPrice;
           
           // Parse tax fields - unitPrice now contains price excluding tax
@@ -1303,7 +1304,7 @@ async function processOrderChunk(
             status: 'success',
             action: i === 0 ? 'created_order' : 'added_to_order',
             data: {
-              customerPhone: customerPhone,
+              customerEmail: existingUser.length > 0 ? existingUser[0].email : (orderData.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
@@ -1332,11 +1333,11 @@ async function processOrderChunk(
             status: 'failed',
             action: 'processing_error',
             data: {
-              customerPhone: customerPhone,
+              customerEmail: orderData.customerEmail || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`,
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
-              quantity: parseInt(orderData.quantity) || 0,
+              quantity: orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1,
               errorMessage: error.message || 'Unknown error occurred'
             }
           });
@@ -1377,7 +1378,7 @@ async function processOrderChunk(
           orderNumber: finalOrderNumber, // Auto-generated unique order number
           customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
           userId: customerId,
-          email: firstOrder.customerEmail?.trim() || null,
+          email: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
           phone: customerPhone,
           status: 'pending', // Default status since removed from CSV
           paymentStatus: 'pending', // Default payment status since removed from CSV
@@ -1409,15 +1410,15 @@ async function processOrderChunk(
           id: orderId,
           orderNumber: finalOrderNumber,
           customOrderNumberImport: customOrderNumberImport,
-          customerPhone,
+          customerEmail: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
           itemCount: orderItemsToCreate.length,
           rowNumbers: rowNumbers
         });
 
         const customOrderRef = customOrderNumberImport ? ` (Original: ${customOrderNumberImport})` : '';
-        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for ${customerPhone} (Rows: ${rowNumbers.join(', ')})`);
+        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for phone ${customerPhone} (Rows: ${rowNumbers.join(', ')})`);
       } else {
-        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for ${customerPhone}`);
+        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for phone ${customerPhone}`);
       }
 
     } catch (error: any) {

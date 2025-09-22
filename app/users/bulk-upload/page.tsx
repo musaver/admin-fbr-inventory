@@ -405,6 +405,7 @@ export default function BulkUserUpload() {
   const [uploading, setUploading] = useState(false);
   const [currentJob, setCurrentJob] = useState<ImportJob | null>(null);
   const [error, setError] = useState('');
+  const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -435,11 +436,11 @@ export default function BulkUserUpload() {
 "PROD-003","45.00","48.60","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
     } else {
-      csvContent = `Order Number,Customer Email,Customer Name,Customer Phone,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date
-"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-001","Premium Widget - High quality widget for professional use","2","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31"
-"ORD-001","john.doe@example.com","John Doe","+92300-1234567","PROD-002","Standard Item - Additional item for same order","1","19.99","1.60","8.0","21.59","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30"
-"ORD-002","jane.smith@example.com","Jane Smith","+92321-9876543","PROD-003","Premium Product - Premium quality product for special customers","3","45.00","3.60","8.0","48.60","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31"
-"ORD-003","ahmed.khan@example.com","Ahmed Khan","+92333-1122334","PROD-001","Premium Widget - Single item order example","1","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31"`;
+      csvContent = `Order Number,Customer Phone,Customer Name,Customer Email,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date
+"ORD-001","+92300-1234567","John Doe","john.doe@example.com","PROD-001","Premium Widget - High quality widget for professional use","2","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31"
+"ORD-001","+92300-1234567","John Doe","john.doe@example.com","PROD-002","Standard Item - Additional item for same order","","","1.60","8.0","21.59","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30"
+"ORD-002","+92321-9876543","Jane Smith","jane.smith@example.com","PROD-003","Premium Product - Premium quality product for special customers","3","45.00","3.60","8.0","48.60","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31"
+"ORD-003","+92333-1122334","Ahmed Khan","ahmed.khan@example.com","PROD-001","Premium Widget - Single item order example","","","2.40","8.0","32.39","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31"`;
       fileName = 'bulk_order_import_template.csv';
     }
     
@@ -549,6 +550,115 @@ export default function BulkUserUpload() {
       case 'processing': return <Clock className="h-4 w-4" />;
       default: return <AlertCircle className="h-4 w-4" />;
     }
+  };
+
+  const getTechnicalLogs = (): string[] => {
+    if (!currentJob) return [];
+    
+    const logs: string[] = [];
+    
+    // Basic job information
+    logs.push(`🚀 Import Job Started: ${currentJob.fileName}`);
+    logs.push(`📁 Import Type: ${currentJob.type}`);
+    logs.push(`⏰ Created At: ${new Date(currentJob.createdAt).toLocaleString()}`);
+    
+    if (currentJob.startedAt) {
+      logs.push(`▶️ Processing Started: ${new Date(currentJob.startedAt).toLocaleString()}`);
+    }
+    
+    // Progress information
+    if (currentJob.totalRecords > 0) {
+      logs.push(`📊 Total Records to Process: ${currentJob.totalRecords}`);
+      logs.push(`✅ Successfully Processed: ${currentJob.successfulRecords}`);
+      logs.push(`❌ Failed Records: ${currentJob.failedRecords}`);
+      logs.push(`📈 Progress: ${currentJob.progressPercent}%`);
+    }
+    
+    // Status updates
+    if (currentJob.status === 'processing') {
+      logs.push(`🔄 Status: Processing... (${currentJob.processedRecords}/${currentJob.totalRecords})`);
+      if (currentJob.estimatedTimeRemaining) {
+        logs.push(`⏱️ Estimated Time Remaining: ${formatTimeRemaining(currentJob.estimatedTimeRemaining)}`);
+      }
+    } else if (currentJob.status === 'completed') {
+      logs.push(`🎉 Status: Completed Successfully`);
+      if (currentJob.completedAt) {
+        logs.push(`🏁 Completed At: ${new Date(currentJob.completedAt).toLocaleString()}`);
+      }
+    } else if (currentJob.status === 'failed') {
+      logs.push(`💥 Status: Failed`);
+      if (currentJob.completedAt) {
+        logs.push(`💔 Failed At: ${new Date(currentJob.completedAt).toLocaleString()}`);
+      }
+    }
+    
+    // Error details
+    if (currentJob.errors && currentJob.errors.length > 0) {
+      logs.push(`⚠️ Error Summary: ${currentJob.errors.length} errors encountered`);
+      logs.push(`📝 Error Details:`);
+      currentJob.errors.slice(0, 10).forEach((error, index) => {
+        logs.push(`   ${index + 1}. Row ${error.row}: ${error.message}`);
+        if (error.identifier && error.identifier !== 'N/A') {
+          logs.push(`      Identifier: ${error.identifier}`);
+        }
+      });
+      if (currentJob.errors.length > 10) {
+        logs.push(`   ... and ${currentJob.errors.length - 10} more errors`);
+      }
+    }
+    
+    // Success details for orders
+    if (currentJob.type === 'orders' && currentJob.results?.successfulOrders) {
+      logs.push(`📦 Orders Created: ${currentJob.results.successfulOrders.length}`);
+      logs.push(`📊 Average Items per Order: ${currentJob.results.successfulOrders.length > 0 ? (currentJob.processedRecords / currentJob.results.successfulOrders.length).toFixed(1) : '0'}`);
+      
+      // Show first few successful orders
+      if (currentJob.results.successfulOrders.length > 0) {
+        logs.push(`✅ Sample Successful Orders:`);
+        currentJob.results.successfulOrders.slice(0, 5).forEach((order, index) => {
+          logs.push(`   ${index + 1}. ${order.orderNumber} for ${order.customerEmail} (${order.itemCount} items)`);
+          if (order.customOrderNumberImport) {
+            logs.push(`      Original Order Number: ${order.customOrderNumberImport}`);
+          }
+          if (order.rowNumbers) {
+            logs.push(`      CSV Rows: ${order.rowNumbers.join(', ')}`);
+          }
+        });
+        if (currentJob.results.successfulOrders.length > 5) {
+          logs.push(`   ... and ${currentJob.results.successfulOrders.length - 5} more orders`);
+        }
+      }
+    }
+    
+    // Success details for users
+    if (currentJob.type === 'users' && currentJob.results?.successfulUsers) {
+      logs.push(`👥 Users Created/Updated: ${currentJob.results.successfulUsers.length}`);
+      if (currentJob.results.successfulUsers.length > 0) {
+        logs.push(`✅ Sample Successful Users:`);
+        currentJob.results.successfulUsers.slice(0, 5).forEach((user, index) => {
+          logs.push(`   ${index + 1}. ${user.name} (${user.email})`);
+        });
+        if (currentJob.results.successfulUsers.length > 5) {
+          logs.push(`   ... and ${currentJob.results.successfulUsers.length - 5} more users`);
+        }
+      }
+    }
+    
+    // Success details for products
+    if (currentJob.type === 'products' && currentJob.results?.successfulProducts) {
+      logs.push(`🛍️ Products Created: ${currentJob.results.successfulProducts.length}`);
+      if (currentJob.results.successfulProducts.length > 0) {
+        logs.push(`✅ Sample Successful Products:`);
+        currentJob.results.successfulProducts.slice(0, 5).forEach((product, index) => {
+          logs.push(`   ${index + 1}. ${product.name} (SKU: ${product.sku})`);
+        });
+        if (currentJob.results.successfulProducts.length > 5) {
+          logs.push(`   ... and ${currentJob.results.successfulProducts.length - 5} more products`);
+        }
+      }
+    }
+    
+    return logs;
   };
 
   return (
@@ -711,13 +821,13 @@ export default function BulkUserUpload() {
                 <AlertDescription className="space-y-2">
                   <div>Download the CSV template below to see the required format</div>
                   <ul className="list-disc list-inside space-y-1 mt-2">
-                    <li><strong>Required fields:</strong> Order Number, Customer Email, Product SKU, Quantity, Unit Price</li>
+                    <li><strong>Required fields:</strong> Order Number, Customer Phone, Product SKU</li>
                     <li><strong>Tax fields:</strong> Tax Amount, Tax Percentage, Price Including Tax (optional)</li>
-                    <li><strong>Note:</strong> Unit Price should contain the price excluding tax. Product Name can include description.</li>
+                    <li><strong>Note:</strong> Unit Price and Quantity are now optional. Product Name can include description.</li>
                     <li><strong>Order Grouping:</strong> Rows with same Order Number = same order with multiple items</li>
                     <li><strong>Template Structure:</strong> Order Number first for easy sorting and visual grouping</li>
                     <li><strong>Smart Defaults:</strong> Order Status defaults to "pending", Payment Status to "pending"</li>
-                    <li><strong>User/Product Matching:</strong> Existing emails/SKUs are matched; new ones are auto-created</li>
+                    <li><strong>User/Product Matching:</strong> Existing phone numbers/SKUs are matched; new ones are auto-created</li>
                     <li><strong>Example:</strong> ORD-001 with 2 items = 1 order, ORD-002 with 1 item = separate order</li>
                     <li>Supports up to 100MB files (~50,000 order items)</li>
                     <li>Processing happens in background with real-time progress tracking</li>
@@ -1035,7 +1145,7 @@ export default function BulkUserUpload() {
                         </div>
                         {currentJob.type === 'orders' && (
                           <div className="text-xs text-red-600 dark:text-red-400">
-                            💡 <strong>Tip:</strong> Check that Customer Email, Product SKU, Quantity, and Unit Price are valid
+                            💡 <strong>Tip:</strong> Check that Customer Phone and Product SKU are provided and valid
                           </div>
                         )}
                         {currentJob.type === 'users' && (
@@ -1095,6 +1205,59 @@ export default function BulkUserUpload() {
                     </div>
                   </div>
                 </CardContent>
+              </Card>
+            )}
+
+            {/* Technical Logs */}
+            {currentJob && (currentJob.status === 'processing' || currentJob.status === 'completed' || currentJob.status === 'failed') && (
+              <Card className="border-blue-200">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <CardTitle className="text-blue-800 dark:text-blue-200">
+                        Technical Logs
+                      </CardTitle>
+                    </div>
+                    <Button
+                      onClick={() => setShowTechnicalLogs(!showTechnicalLogs)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      {showTechnicalLogs ? (
+                        <>
+                          <ChevronUp className="h-4 w-4" />
+                          Hide Logs
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4" />
+                          Show Logs
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <CardDescription>
+                    Detailed processing logs for technical debugging
+                  </CardDescription>
+                </CardHeader>
+                {showTechnicalLogs && (
+                  <CardContent>
+                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                      {getTechnicalLogs().map((log, index) => (
+                        <div key={index} className="mb-1">
+                          {log}
+                        </div>
+                      ))}
+                      {currentJob.status === 'processing' && (
+                        <div className="text-yellow-400 animate-pulse">
+                          ⏳ Processing in progress...
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
 
