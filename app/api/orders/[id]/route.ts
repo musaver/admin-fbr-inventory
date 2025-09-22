@@ -398,7 +398,65 @@ export const PUT = withTenant(async (req: NextRequest, context: any) => {
       newTotalAmount = Math.max(0, subtotalAfterDiscounts + Number(order.taxAmount || 0) + newShipping);
     }
 
-    // Update the order
+    // Update order items if provided (for cases like "Fetch Products Data by SKU")
+    if (items && Array.isArray(items)) {
+      console.log(`\n=== UPDATING ORDER ITEMS ===`);
+      console.log(`Updating ${items.length} order items with fresh data`);
+      
+      // Update each order item with the new data
+      for (const item of items) {
+        if (!item.id) {
+          console.warn('Skipping item without ID:', item);
+          continue;
+        }
+        
+        const itemUpdateData: any = {
+          updatedAt: new Date(),
+        };
+        
+        // Update all the fields that might have been calculated
+        if (item.productName !== undefined) itemUpdateData.productName = item.productName;
+        if (item.productDescription !== undefined) itemUpdateData.productDescription = item.productDescription;
+        if (item.price !== undefined) itemUpdateData.price = item.price.toString();
+        if (item.totalPrice !== undefined) itemUpdateData.totalPrice = item.totalPrice.toString();
+        if (item.hsCode !== undefined) itemUpdateData.hsCode = item.hsCode;
+        if (item.uom !== undefined) itemUpdateData.uom = item.uom;
+        if (item.serialNumber !== undefined) itemUpdateData.serialNumber = item.serialNumber;
+        if (item.listNumber !== undefined) itemUpdateData.listNumber = item.listNumber;
+        if (item.bcNumber !== undefined) itemUpdateData.bcNumber = item.bcNumber;
+        if (item.lotNumber !== undefined) itemUpdateData.lotNumber = item.lotNumber;
+        if (item.expiryDate !== undefined) itemUpdateData.expiryDate = item.expiryDate;
+        if (item.saleType !== undefined) itemUpdateData.saleType = item.saleType;
+        
+        // Tax and pricing fields - these are the key ones for the fix
+        if (item.taxAmount !== undefined) itemUpdateData.taxAmount = item.taxAmount.toString();
+        if (item.taxPercentage !== undefined) itemUpdateData.taxPercentage = item.taxPercentage.toString();
+        if (item.priceIncludingTax !== undefined) itemUpdateData.priceIncludingTax = item.priceIncludingTax.toString();
+        if (item.priceExcludingTax !== undefined) itemUpdateData.priceExcludingTax = item.priceExcludingTax.toString();
+        if (item.extraTax !== undefined) itemUpdateData.extraTax = item.extraTax.toString();
+        if (item.furtherTax !== undefined) itemUpdateData.furtherTax = item.furtherTax.toString();
+        if (item.fedPayableTax !== undefined) itemUpdateData.fedPayableTax = item.fedPayableTax.toString();
+        if (item.discount !== undefined) itemUpdateData.discount = item.discount.toString();
+        if (item.fixedNotifiedValueOrRetailPrice !== undefined) itemUpdateData.fixedNotifiedValueOrRetailPrice = item.fixedNotifiedValueOrRetailPrice.toString();
+        
+        console.log(`Updating order item ${item.id} with calculated pricing:`, {
+          taxAmount: item.taxAmount,
+          taxPercentage: item.taxPercentage,
+          priceIncludingTax: item.priceIncludingTax,
+          priceExcludingTax: item.priceExcludingTax,
+          totalPrice: item.totalPrice
+        });
+        
+        await db
+          .update(orderItems)
+          .set(itemUpdateData)
+          .where(eq(orderItems.id, item.id));
+      }
+      console.log(`Successfully updated ${items.length} order items in database`);
+      console.log(`=== END UPDATING ORDER ITEMS ===\n`);
+    }
+
+    // Update the main order record
     const updateData: any = {
       updatedAt: new Date(),
     };
@@ -424,6 +482,11 @@ export const PUT = withTenant(async (req: NextRequest, context: any) => {
     if (validationResponse !== undefined || fbrResponse) updateData.validationResponse = fbrResponse ? JSON.stringify(fbrResponse) : validationResponse;
     if (isProductionSubmission !== undefined) updateData.fbrEnvironment = isProductionSubmission ? 'production' : 'sandbox';
     if (newTotalAmount !== Number(order.totalAmount)) updateData.totalAmount = newTotalAmount;
+    
+    // Update calculated totals if provided
+    if (subtotal !== undefined) updateData.subtotal = subtotal;
+    if (taxAmount !== undefined) updateData.taxAmount = taxAmount;
+    if (totalAmount !== undefined) updateData.totalAmount = totalAmount;
 
     await db
       .update(orders)
