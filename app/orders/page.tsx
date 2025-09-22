@@ -101,6 +101,16 @@ export default function OrdersList() {
     startDate: '',
     endDate: ''
   });
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    cancelledOrders: 0,
+    processingOrders: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const fetchOrders = async (page = 1, limit = pageSize) => {
     setLoading(true);
@@ -128,8 +138,28 @@ export default function OrdersList() {
     }
   };
 
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateRange.startDate) params.append('startDate', dateRange.startDate);
+      if (dateRange.endDate) params.append('endDate', dateRange.endDate);
+      
+      const apiUrl = `/api/orders/stats${params.toString() ? '?' + params.toString() : ''}`;
+      const res = await fetch(apiUrl);
+      const statsData = await res.json();
+      
+      setStats(statsData);
+    } catch (err) {
+      console.error('Error fetching order stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchOrders(1, pageSize);
+    fetchStats(); // Fetch stats on initial load
   }, []);
   
   // Effect for page changes
@@ -142,6 +172,11 @@ export default function OrdersList() {
     setCurrentPage(1); // Reset to first page when changing page size
     fetchOrders(1, pageSize);
   }, [pageSize]);
+
+  // Effect for date range changes - refetch stats when date filters change
+  useEffect(() => {
+    fetchStats();
+  }, [dateRange]);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -422,25 +457,6 @@ export default function OrdersList() {
     }
   };
 
-  const getOrderStats = () => {
-    const totalOrders = filteredOrders.length;
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
-    
-    const { totalProfit, totalCost } = filteredOrders.reduce((acc, order) => {
-      const profit = calculateOrderProfit(order);
-      return {
-        totalProfit: acc.totalProfit + profit.totalProfit,
-        totalCost: acc.totalCost + profit.totalCost
-      };
-    }, { totalProfit: 0, totalCost: 0 });
-
-    const pendingOrders = filteredOrders.filter(order => order.status === 'pending').length;
-    const completedOrders = filteredOrders.filter(order => order.status === 'completed').length;
-
-    return { totalOrders, totalRevenue, totalProfit, totalCost, pendingOrders, completedOrders };
-  };
-
-  const stats = getOrderStats();
 
   // Format date and time to "Aug 5, 2025 at 5:57 PM" format
   const formatDateTime = (dateString: string) => {
@@ -631,8 +647,11 @@ export default function OrdersList() {
           </p>
         </div>
         <div className="flex items-center space-x-2 flex-shrink-0">
-          <Button onClick={() => fetchOrders(currentPage, pagination.limit)} disabled={loading} variant="outline" size="sm">
-            <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <Button onClick={() => {
+            fetchOrders(currentPage, pagination.limit);
+            fetchStats();
+          }} disabled={loading || statsLoading} variant="outline" size="sm">
+            <RefreshCwIcon className={`h-4 w-4 mr-2 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button 
@@ -675,7 +694,13 @@ export default function OrdersList() {
             <ShoppingCartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders}</div>
+            <div className="text-2xl font-bold">
+              {statsLoading ? (
+                <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+              ) : (
+                stats.totalOrders
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">All time orders</p>
           </CardContent>
         </Card>
@@ -687,7 +712,11 @@ export default function OrdersList() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold text-green-600">
-              {formatCurrency(stats.totalRevenue)}
+              {statsLoading ? (
+                <div className="animate-pulse bg-gray-200 h-7 w-20 rounded"></div>
+              ) : (
+                formatCurrency(stats.totalRevenue)
+              )}
             </div>
             <p className="text-xs text-muted-foreground">Gross revenue</p>
           </CardContent>
@@ -712,7 +741,13 @@ export default function OrdersList() {
             <CalendarIcon className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {statsLoading ? (
+                <div className="animate-pulse bg-gray-200 h-8 w-12 rounded"></div>
+              ) : (
+                stats.pendingOrders
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Awaiting processing</p>
           </CardContent>
         </Card>
@@ -723,7 +758,13 @@ export default function OrdersList() {
             <CheckCircleIcon className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-green-600">{stats.completedOrders}</div>
+            <div className="text-xl font-bold text-green-600">
+              {statsLoading ? (
+                <div className="animate-pulse bg-gray-200 h-7 w-12 rounded"></div>
+              ) : (
+                stats.completedOrders
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Successfully fulfilled</p>
           </CardContent>
         </Card>
