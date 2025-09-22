@@ -827,7 +827,23 @@ export default function EditOrder() {
           fixedNotifiedValueOrRetailPrice: Number(item.fixedNotifiedValueOrRetailPrice) || 0,
           saleType: item.saleType
         }));
-        setOrderItems(processedItems);
+        
+        // Sort items by Item Serial Number (itemSerialNumber) - empty values go to the end
+        const sortedItems = processedItems.sort((a, b) => {
+          const aSerial = a.itemSerialNumber || '';
+          const bSerial = b.itemSerialNumber || '';
+          
+          // If both are empty, maintain original order
+          if (!aSerial && !bSerial) return 0;
+          // Empty values go to the end
+          if (!aSerial) return 1;
+          if (!bSerial) return -1;
+          
+          // Compare serial numbers (alphanumeric sort)
+          return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        setOrderItems(sortedItems);
       }
 
       // Fetch customer points if loyalty is enabled and customer exists
@@ -1205,7 +1221,23 @@ export default function EditOrder() {
         saleType: productSelection.saleType || 'Goods at standard rate'
       };
 
-      setOrderItems([...orderItems, newItem]);
+      // Add new item and sort by Item Serial Number
+      const updatedItems = [...orderItems, newItem];
+      const sortedItems = updatedItems.sort((a, b) => {
+        const aSerial = a.itemSerialNumber || '';
+        const bSerial = b.itemSerialNumber || '';
+        
+        // If both are empty, maintain original order
+        if (!aSerial && !bSerial) return 0;
+        // Empty values go to the end
+        if (!aSerial) return 1;
+        if (!bSerial) return -1;
+        
+        // Compare serial numbers (alphanumeric sort)
+        return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
+      });
+      
+      setOrderItems(sortedItems);
       
       // Reset selection
       setProductSelection({
@@ -1348,7 +1380,25 @@ export default function EditOrder() {
       }
     }
     
-    setOrderItems(updatedItems);
+    // If itemSerialNumber was updated, sort the items to maintain order
+    if (field === 'itemSerialNumber') {
+      const sortedItems = updatedItems.sort((a, b) => {
+        const aSerial = a.itemSerialNumber || '';
+        const bSerial = b.itemSerialNumber || '';
+        
+        // If both are empty, maintain original order
+        if (!aSerial && !bSerial) return 0;
+        // Empty values go to the end
+        if (!aSerial) return 1;
+        if (!bSerial) return -1;
+        
+        // Compare serial numbers (alphanumeric sort)
+        return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
+      });
+      setOrderItems(sortedItems);
+    } else {
+      setOrderItems(updatedItems);
+    }
   };
 
   // Remove order item
@@ -1441,6 +1491,45 @@ export default function EditOrder() {
         pointsDiscountAmount: finalDiscountAmount,
         useAllPoints: true
       }));
+    }
+  };
+
+  // Validate and format HS codes for FBR compliance
+  const handleFbrValidation = () => {
+    const updatedItems = orderItems.map(item => {
+      if (item.hsCode && item.hsCode.trim()) {
+        let hsCode = item.hsCode.trim();
+        
+        // Check if it already has 4 digits after decimal
+        const parts = hsCode.split('.');
+        if (parts.length === 2) {
+          const decimalPart = parts[1];
+          if (decimalPart.length < 4) {
+            // Pad with zeros to make it 4 digits
+            const paddedDecimal = decimalPart.padEnd(4, '0');
+            hsCode = `${parts[0]}.${paddedDecimal}`;
+          }
+        } else if (parts.length === 1) {
+          // No decimal point, add .0000
+          hsCode = `${hsCode}.0000`;
+        }
+        
+        return { ...item, hsCode };
+      }
+      return item;
+    });
+    
+    setOrderItems(updatedItems);
+    
+    // Show success message
+    const updatedCount = updatedItems.filter((item, index) => 
+      item.hsCode !== orderItems[index].hsCode
+    ).length;
+    
+    if (updatedCount > 0) {
+      alert(`✅ FBR Validation Complete! Updated ${updatedCount} HS code${updatedCount > 1 ? 's' : ''} for FBR compliance.`);
+    } else {
+      alert('ℹ️ All HS codes are already in correct FBR format.');
     }
   };
 
@@ -3536,6 +3625,16 @@ export default function EditOrder() {
                       className="w-full"
                     >
                       🔍 Preview JSON Data
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mb-3 border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={handleFbrValidation}
+                      disabled={orderItems.length === 0}
+                    >
+                      🛡️ Validate data for FBR
                     </Button>
                     
                     <Button

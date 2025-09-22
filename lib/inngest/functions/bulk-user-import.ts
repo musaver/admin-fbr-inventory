@@ -1281,7 +1281,8 @@ async function processOrderChunk(
             sku: orderData.productSku.trim(),
             hsCode: orderData.hsCode?.trim() || null,
             uom: orderData.uom?.trim() || null,
-            serialNumber: orderData.serialNumber?.trim() || null,
+            itemSerialNumber: orderData.serialNumber?.trim() || null, // Fixed: Map to itemSerialNumber instead of serialNumber
+            serialNumber: null, // Keep product serial number separate
             listNumber: orderData.listNumber?.trim() || null,
             bcNumber: orderData.bcNumber?.trim() || null,
             lotNumber: orderData.lotNumber?.trim() || null,
