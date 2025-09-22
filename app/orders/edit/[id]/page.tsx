@@ -962,14 +962,62 @@ export default function EditOrder() {
             }
 
             console.log(`Updating item with SKU ${item.sku} with fresh data:`, productData);
+            console.log(`Current item pricing:`, {
+              price: item.price,
+              taxPercentage: item.taxPercentage,
+              taxAmount: item.taxAmount,
+              priceIncludingTax: item.priceIncludingTax,
+              priceExcludingTax: item.priceExcludingTax
+            });
 
             // Update item with fresh product data from database
+            const basePrice = Number(productData.price) || item.price;
+            const taxPercentage = Number(productData.taxPercentage) || Number(item.taxPercentage) || 0;
+            const priceIncludingTax = Number(productData.priceIncludingTax) || Number(item.priceIncludingTax) || 0;
+            const priceExcludingTax = Number(productData.priceExcludingTax) || Number(item.priceExcludingTax) || 0;
+            let taxAmount = Number(productData.taxAmount) || Number(item.taxAmount) || 0;
+
+            // Calculate missing tax fields based on available data
+            let calculatedPriceExcludingTax = priceExcludingTax;
+            let calculatedPriceIncludingTax = priceIncludingTax;
+            let calculatedTaxAmount = taxAmount;
+
+            // If we have price including tax and tax percentage, but missing price excluding tax
+            if (priceIncludingTax > 0 && taxPercentage > 0 && !priceExcludingTax) {
+              calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
+              calculatedTaxAmount = priceIncludingTax - calculatedPriceExcludingTax;
+            }
+            // If we have price excluding tax and tax percentage, but missing other fields
+            else if (calculatedPriceExcludingTax > 0 && taxPercentage > 0) {
+              calculatedTaxAmount = (calculatedPriceExcludingTax * taxPercentage) / 100;
+              calculatedPriceIncludingTax = calculatedPriceExcludingTax + calculatedTaxAmount;
+            }
+            // If we have base price but no tax calculations, use base price as including tax
+            else if (basePrice > 0 && !calculatedPriceIncludingTax && !calculatedPriceExcludingTax) {
+              if (taxPercentage > 0) {
+                // Assume base price is including tax
+                calculatedPriceIncludingTax = basePrice;
+                calculatedPriceExcludingTax = basePrice / (1 + taxPercentage / 100);
+                calculatedTaxAmount = calculatedPriceIncludingTax - calculatedPriceExcludingTax;
+              } else {
+                // No tax, price excluding and including are the same
+                calculatedPriceExcludingTax = basePrice;
+                calculatedPriceIncludingTax = basePrice;
+                calculatedTaxAmount = 0;
+              }
+            }
+
+            // Round calculated values to 2 decimal places
+            calculatedPriceExcludingTax = Math.round(calculatedPriceExcludingTax * 100) / 100;
+            calculatedPriceIncludingTax = Math.round(calculatedPriceIncludingTax * 100) / 100;
+            calculatedTaxAmount = Math.round(calculatedTaxAmount * 100) / 100;
+
             const updatedItem = {
               ...item,
               productId: productData.id,
               productName: productData.name || item.productName,
               productDescription: productData.description || item.productDescription,
-              price: Number(productData.price) || item.price,
+              price: basePrice,
               hsCode: productData.hsCode || item.hsCode,
               uom: productData.uom || item.uom,
               serialNumber: productData.serialNumber || item.serialNumber,
@@ -977,20 +1025,29 @@ export default function EditOrder() {
               bcNumber: productData.bcNumber || item.bcNumber,
               lotNumber: productData.lotNumber || item.lotNumber,
               expiryDate: productData.expiryDate || item.expiryDate,
-              taxAmount: productData.taxAmount || item.taxAmount,
-              taxPercentage: productData.taxPercentage || item.taxPercentage,
-              priceIncludingTax: productData.priceIncludingTax || item.priceIncludingTax,
-              priceExcludingTax: productData.priceExcludingTax || item.priceExcludingTax,
-              extraTax: productData.extraTax || item.extraTax,
-              furtherTax: productData.furtherTax || item.furtherTax,
-              fedPayableTax: productData.fedPayableTax || item.fedPayableTax,
-              discount: productData.discount || item.discount,
-              fixedNotifiedValueOrRetailPrice: productData.fixedNotifiedValueOrRetailPrice || item.fixedNotifiedValueOrRetailPrice,
+              taxAmount: calculatedTaxAmount,
+              taxPercentage: taxPercentage,
+              priceIncludingTax: calculatedPriceIncludingTax,
+              priceExcludingTax: calculatedPriceExcludingTax,
+              extraTax: Number(productData.extraTax) || Number(item.extraTax) || 0,
+              furtherTax: Number(productData.furtherTax) || Number(item.furtherTax) || 0,
+              fedPayableTax: Number(productData.fedPayableTax) || Number(item.fedPayableTax) || 0,
+              discount: Number(productData.discount) || Number(item.discount) || 0,
+              fixedNotifiedValueOrRetailPrice: Number(productData.fixedNotifiedValueOrRetailPrice) || Number(item.fixedNotifiedValueOrRetailPrice) || 0,
               saleType: productData.saleType || item.saleType,
             };
 
-            // Recalculate total price based on updated price and existing quantity
-            updatedItem.totalPrice = updatedItem.price * updatedItem.quantity;
+            // Recalculate total price based on price including tax and existing quantity
+            updatedItem.totalPrice = calculatedPriceIncludingTax * updatedItem.quantity;
+
+            console.log(`Updated item pricing for SKU ${item.sku}:`, {
+              price: updatedItem.price,
+              taxPercentage: updatedItem.taxPercentage,
+              taxAmount: updatedItem.taxAmount,
+              priceIncludingTax: updatedItem.priceIncludingTax,
+              priceExcludingTax: updatedItem.priceExcludingTax,
+              totalPrice: updatedItem.totalPrice
+            });
 
             return updatedItem;
           } catch (error) {
@@ -1002,7 +1059,13 @@ export default function EditOrder() {
 
       setOrderItems(updatedItems);
       console.log('Successfully updated all order items with fresh product data');
-      alert(`Successfully updated ${updatedItems.length} order items with fresh product data from database`);
+      
+      // Count how many items were actually updated with pricing data
+      const itemsWithPricing = updatedItems.filter(item => 
+        Number(item.priceIncludingTax || 0) > 0 || Number(item.priceExcludingTax || 0) > 0 || Number(item.taxAmount || 0) > 0
+      ).length;
+      
+      alert(`Successfully updated ${updatedItems.length} order items with fresh product data from database. ${itemsWithPricing} items now have complete pricing information.`);
       
     } catch (error) {
       console.error('Error updating products data:', error);
