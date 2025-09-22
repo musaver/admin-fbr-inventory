@@ -1512,6 +1512,61 @@ export default function EditOrder() {
     }
   };
 
+  // Fetch product data by SKU and populate fields
+  const handleFetchProductData = async (itemIndex: number, sku?: string) => {
+    if (!sku?.trim()) {
+      alert('⚠️ Please enter a SKU first');
+      return;
+    }
+
+    try {
+      // First try to find the product in the existing products array
+      let product = products.find(p => p.sku?.toLowerCase() === sku.toLowerCase());
+      
+      if (!product) {
+        // If not found in existing products, fetch from API
+        const response = await fetch(`/api/products?sku=${encodeURIComponent(sku)}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Find product with matching SKU
+          product = data.find((p: any) => p.sku?.toLowerCase() === sku.toLowerCase());
+        }
+      }
+
+      if (!product) {
+        alert(`❌ Product with SKU "${sku}" not found`);
+        return;
+      }
+
+      // Update the order item with product data
+      const updatedItems = [...orderItems];
+      const currentItem = updatedItems[itemIndex];
+      
+      updatedItems[itemIndex] = {
+        ...currentItem,
+        productId: product.id,
+        productName: product.name,
+        productDescription: product.description || product.name,
+        price: Number(product.price) || 0,
+        priceExcludingTax: Number(product.priceExcludingTax) || Number(product.price) || 0,
+        priceIncludingTax: Number(product.priceIncludingTax) || Number(product.price) || 0,
+        taxAmount: Number(product.taxAmount) || 0,
+        taxPercentage: Number(product.taxPercentage) || 0,
+        hsCode: product.hsCode || '',
+        uom: product.baseWeightUnit || '',
+        // Recalculate total price based on current quantity
+        totalPrice: (Number(product.price) || 0) * (currentItem.quantity || 1)
+      };
+
+      setOrderItems(updatedItems);
+      alert(`✅ Product data fetched successfully for SKU "${sku}"`);
+      
+    } catch (error) {
+      console.error('Error fetching product data:', error);
+      alert(`❌ Error fetching product data: ${error}`);
+    }
+  };
+
   // Submit order update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2832,6 +2887,28 @@ export default function EditOrder() {
                         <div className="mb-4">
                           <h6 className="text-sm font-medium mb-3 text-muted-foreground">🔍 Product Identification</h6>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Product SKU</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  value={item.sku || ''}
+                                  onChange={(e) => updateOrderItem(index, 'sku', e.target.value)}
+                                  placeholder="Product SKU"
+                                  className="text-sm flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleFetchProductData(index, item.sku)}
+                                  disabled={!item.sku?.trim()}
+                                  className="px-3 text-xs"
+                                >
+                                  📦 Fetch
+                                </Button>
+                              </div>
+                            </div>
+                            
                             <div>
                               <Label className="text-sm">HS Code</Label>
                               <Input
