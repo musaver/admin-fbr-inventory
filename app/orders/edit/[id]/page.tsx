@@ -1813,7 +1813,7 @@ export default function EditOrder() {
                             {orderData.customerId 
                               ? (() => {
                                   const customer = customers.find(c => c.id === orderData.customerId);
-                                  return customer ? (customer.name || customer.email) : `Customer ID: ${orderData.customerId}`;
+                                  return customer ? (customer.name || customer.phone) : `Customer ID: ${orderData.customerId}`;
                                 })()
                               : "Select customer..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1822,7 +1822,7 @@ export default function EditOrder() {
                         <PopoverContent className="w-full p-0">
                           <Command>
                             <CommandInput
-                              placeholder="Search customers..."
+                              placeholder="Search customers by name or phone..."
                               value={customerSearchTerm}
                               onValueChange={setCustomerSearchTerm}
                             />
@@ -1835,7 +1835,7 @@ export default function EditOrder() {
                                   .filter(customer => {
                                     if (!customerSearchTerm) return true;
                                     return customer.name?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-                                           customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase());
+                                           customer.phone?.toLowerCase().includes(customerSearchTerm.toLowerCase());
                                   })
                                   .map((customer) => (
                                     <CommandItem
@@ -1848,10 +1848,10 @@ export default function EditOrder() {
                                         }`}
                                       />
                                       <div>
-                                        <div className="font-medium">{customer.name || customer.email}</div>
-                                        <div className="text-sm text-gray-500">{customer.email}</div>
-                                        {customer.phone && (
-                                          <div className="text-xs text-gray-400">{customer.phone}</div>
+                                        <div className="font-medium">{customer.name || customer.phone}</div>
+                                        <div className="text-sm text-gray-500">{customer.phone}</div>
+                                        {customer.email && (
+                                          <div className="text-xs text-gray-400">{customer.email}</div>
                                         )}
                                       </div>
                                     </CommandItem>

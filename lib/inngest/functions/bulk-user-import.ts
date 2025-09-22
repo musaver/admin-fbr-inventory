@@ -33,9 +33,9 @@ interface ProductImportRow {
 }
 
 interface OrderImportRow {
-  customerEmail: string;
+  customerEmail?: string;
   customerName?: string;
-  customerPhone?: string;
+  customerPhone: string;
   orderNumber?: string; // Custom order ID for grouping items
   productSku: string;
   productName?: string;
@@ -76,7 +76,7 @@ interface ProcessingResult {
     id: string;
     orderNumber: string; // Auto-generated order number
     customOrderNumberImport: string | null; // Original order number from CSV
-    customerEmail: string;
+    customerPhone: string;
     itemCount: number;
     rowNumbers: number[]; // Array of CSV row numbers for this order
   }>;
@@ -86,7 +86,7 @@ interface ProcessingResult {
     status: 'success' | 'failed';
     action: string; // 'created_order' | 'added_to_order' | 'created_user' | 'created_product' | 'validation_error' | 'processing_error'
     data: {
-      customerEmail?: string;
+      customerPhone?: string;
       customOrderNumber?: string;
       productSku?: string;
       productName?: string;
@@ -395,9 +395,8 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
   console.log('📊 Order CSV Final headerMap:', headerMap);
 
   // Validate required columns
-  if (headerMap.customerEmail === undefined || headerMap.productSku === undefined || 
-      headerMap.quantity === undefined || headerMap.unitPrice === undefined) {
-    throw new Error('Required columns missing: Customer Email, Product SKU, Quantity, and Unit Price are required');
+  if (headerMap.customerPhone === undefined || headerMap.productSku === undefined) {
+    throw new Error('Required columns missing: Customer Phone and Product SKU are required');
   }
 
   // Parse data rows
@@ -432,8 +431,8 @@ function parseOrderCSV(csvText: string): OrderImportRow[] {
       orderNumber: values[headerMap.orderNumber] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
-      quantity: values[headerMap.quantity] || '',
-      unitPrice: values[headerMap.unitPrice] || '',
+      quantity: values[headerMap.quantity] || '1', // Default to 1 if not provided
+      unitPrice: values[headerMap.unitPrice] || '0', // Default to 0 if not provided
       taxAmount: values[headerMap.taxAmount] || '',
       taxPercentage: values[headerMap.taxPercentage] || '',
       priceIncludingTax: values[headerMap.priceIncludingTax] || '',
@@ -498,14 +497,14 @@ function validateProduct(productData: ProductImportRow): string | null {
 
 // Validate order data
 function validateOrder(orderData: OrderImportRow): string | null {
-  if (!orderData.customerEmail?.trim()) {
-    return 'Customer Email is required';
+  if (!orderData.customerPhone?.trim()) {
+    return 'Customer Phone is required';
   }
 
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(orderData.customerEmail)) {
-    return 'Invalid email format';
+  // Basic phone validation (allow various formats)
+  const phoneRegex = /^[\+]?[0-9\-\(\)\s]{7,20}$/;
+  if (!phoneRegex.test(orderData.customerPhone.replace(/\s+/g, ''))) {
+    return 'Invalid phone format';
   }
 
   if (!orderData.productSku?.trim()) {
@@ -1086,19 +1085,19 @@ async function processOrderChunk(
   };
 
   // Group orders by customer email + order number to create proper orders
-  // If order number is provided, group by email+orderNumber, otherwise by email only
+  // If order number is provided, group by phone+orderNumber, otherwise by phone only
   const ordersByKey = new Map<string, OrderImportRow[]>();
   orderRows.forEach((orderRow, index) => {
-    const email = orderRow.customerEmail.toLowerCase().trim();
+    const phone = orderRow.customerPhone.trim();
     const orderNumber = orderRow.orderNumber?.trim();
     
-    // Create unique key: if orderNumber exists, use email+orderNumber, otherwise use email+auto-increment
+    // Create unique key: if orderNumber exists, use phone+orderNumber, otherwise use phone+auto-increment
     let orderKey: string;
     if (orderNumber) {
-      orderKey = `${email}|${orderNumber}`;
+      orderKey = `${phone}|${orderNumber}`;
     } else {
       // If no order number provided, each row becomes a separate order (for backward compatibility)
-      orderKey = `${email}|auto-${startIndex + index + 1}`;
+      orderKey = `${phone}|auto-${startIndex + index + 1}`;
     }
     
     if (!ordersByKey.has(orderKey)) {
@@ -1110,7 +1109,7 @@ async function processOrderChunk(
   console.log(`📦 Grouped ${orderRows.length} rows into ${ordersByKey.size} orders`);
 
   for (const [orderKey, customerOrders] of ordersByKey) {
-    const customerEmail = orderKey.split('|')[0]; // Extract email from key
+    const customerPhone = orderKey.split('|')[0]; // Extract phone from key
     
     try {
       // Find or create user
@@ -1118,14 +1117,14 @@ async function processOrderChunk(
       let existingUser = await db.select({ id: user.id })
         .from(user)
         .where(and(
-          eq(user.email, customerEmail),
+          eq(user.phone, customerPhone),
           eq(user.tenantId, tenantId)
         ))
         .limit(1);
 
       if (existingUser.length > 0) {
         customerId = existingUser[0].id;
-        console.log(`✅ Found existing user: ${customerEmail}`);
+        console.log(`✅ Found existing user: ${customerPhone}`);
       } else {
         // Create new user from first order's customer data
         const firstOrder = customerOrders[0];
@@ -1134,9 +1133,9 @@ async function processOrderChunk(
         const newUser = {
           id: customerId,
           tenantId,
-          name: firstOrder.customerName?.trim() || customerEmail.split('@')[0],
-          email: customerEmail,
-          phone: firstOrder.customerPhone?.trim() || null,
+          name: firstOrder.customerName?.trim() || `Customer ${customerPhone}`,
+          email: firstOrder.customerEmail?.trim() || null,
+          phone: customerPhone,
           userType: 'customer',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -1157,7 +1156,7 @@ async function processOrderChunk(
           updatedAt: new Date(),
         });
 
-        console.log(`✅ Created new user: ${customerEmail}`);
+        console.log(`✅ Created new user: ${customerPhone}`);
       }
 
       // Create order
@@ -1188,7 +1187,7 @@ async function processOrderChunk(
             const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
             result.errors.push({
               row: globalRowIndex,
-              identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
+              identifier: `${customerPhone}${orderRef} - ${orderData.productSku}`,
               message: `${validationError}${orderRef}`
             });
             
@@ -1198,7 +1197,7 @@ async function processOrderChunk(
               status: 'failed',
               action: 'validation_error',
               data: {
-                customerEmail: customerEmail,
+                customerPhone: customerPhone,
                 customOrderNumber: orderData.orderNumber,
                 productSku: orderData.productSku,
                 productName: orderData.productName,
@@ -1304,7 +1303,7 @@ async function processOrderChunk(
             status: 'success',
             action: i === 0 ? 'created_order' : 'added_to_order',
             data: {
-              customerEmail: customerEmail,
+              customerPhone: customerPhone,
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
@@ -1323,7 +1322,7 @@ async function processOrderChunk(
           const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
           result.errors.push({
             row: globalRowIndex,
-            identifier: `${customerEmail}${orderRef} - ${orderData.productSku}`,
+            identifier: `${customerPhone}${orderRef} - ${orderData.productSku}`,
             message: `${error.message || 'Unknown error occurred'}${orderRef}`
           });
           
@@ -1333,7 +1332,7 @@ async function processOrderChunk(
             status: 'failed',
             action: 'processing_error',
             data: {
-              customerEmail: customerEmail,
+              customerPhone: customerPhone,
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
@@ -1378,8 +1377,8 @@ async function processOrderChunk(
           orderNumber: finalOrderNumber, // Auto-generated unique order number
           customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
           userId: customerId,
-          email: customerEmail,
-          phone: firstOrder.customerPhone?.trim() || null,
+          email: firstOrder.customerEmail?.trim() || null,
+          phone: customerPhone,
           status: 'pending', // Default status since removed from CSV
           paymentStatus: 'pending', // Default payment status since removed from CSV
           fulfillmentStatus: 'pending',
@@ -1410,15 +1409,15 @@ async function processOrderChunk(
           id: orderId,
           orderNumber: finalOrderNumber,
           customOrderNumberImport: customOrderNumberImport,
-          customerEmail,
+          customerPhone,
           itemCount: orderItemsToCreate.length,
           rowNumbers: rowNumbers
         });
 
         const customOrderRef = customOrderNumberImport ? ` (Original: ${customOrderNumberImport})` : '';
-        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for ${customerEmail} (Rows: ${rowNumbers.join(', ')})`);
+        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for ${customerPhone} (Rows: ${rowNumbers.join(', ')})`);
       } else {
-        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for ${customerEmail}`);
+        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for ${customerPhone}`);
       }
 
     } catch (error: any) {
@@ -1428,7 +1427,7 @@ async function processOrderChunk(
         const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
         result.errors.push({
           row: globalRowIndex,
-          identifier: `${customerEmail}${orderRef} - Order Creation`,
+          identifier: `${customerPhone}${orderRef} - Order Creation`,
           message: `Order creation failed: ${error.message || 'Unknown error occurred'}${orderRef}`
         });
         result.failed++;
