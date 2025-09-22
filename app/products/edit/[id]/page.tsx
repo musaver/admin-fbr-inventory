@@ -1059,6 +1059,21 @@ export default function EditProduct() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Pricing & Details</h3>
             
+            <div>
+              <label className="block text-gray-700 mb-2" htmlFor="sku">
+                SKU <span className="text-sm text-gray-500">(Stock Keeping Unit)</span>
+              </label>
+              <input
+                type="text"
+                id="sku"
+                name="sku"
+                value={formData.sku}
+                onChange={handleChange}
+                className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                placeholder="e.g., PROD-001"
+              />
+            </div>
+            
             {/* Only show pricing fields for simple products and quantity-based */}
             {formData.productType === 'simple' && formData.stockManagementType === 'quantity' && (
               <>

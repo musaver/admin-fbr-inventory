@@ -20,7 +20,8 @@ import {
   EyeIcon, 
   TrashIcon,
   RefreshCwIcon,
-  PackageIcon
+  PackageIcon,
+  SearchIcon
 } from 'lucide-react';
 
 interface Product {
@@ -67,6 +68,7 @@ export default function ProductsList() {
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -76,13 +78,24 @@ export default function ProductsList() {
     hasPrevPage: false
   });
 
-  const fetchProducts = async (page = 1, limit = pageSize) => {
+  const fetchProducts = async (page = 1, limit = pageSize, search = searchTerm) => {
     setLoading(true);
     try {
-      // Handle "view all" case
-      const apiUrl = limit === -1 
-        ? '/api/products?limit=999999' // Very large number for "view all"
-        : `/api/products?page=${page}&limit=${limit}`;
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      if (limit === -1) {
+        params.append('limit', '999999'); // Very large number for "view all"
+      } else {
+        params.append('page', page.toString());
+        params.append('limit', limit.toString());
+      }
+      
+      if (search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const apiUrl = `/api/products?${params.toString()}`;
       const res = await fetch(apiUrl);
       const response = await res.json();
       
@@ -118,6 +131,12 @@ export default function ProductsList() {
     setCurrentPage(1); // Reset to first page when changing page size
     fetchProducts(1, pageSize);
   }, [pageSize]);
+
+  // Effect for search changes
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when searching
+    fetchProducts(1, pageSize, searchTerm);
+  }, [searchTerm]);
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
@@ -489,7 +508,7 @@ export default function ProductsList() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button onClick={() => fetchProducts(currentPage, pageSize)} disabled={loading} variant="outline" size="sm">
+          <Button onClick={() => fetchProducts(currentPage, pageSize, searchTerm)} disabled={loading} variant="outline" size="sm">
             <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -523,6 +542,29 @@ export default function ProductsList() {
             </Link>
           </Button>
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-sm">
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <input
+            type="text"
+            placeholder="Search by product name or SKU..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+        </div>
+        {searchTerm && (
+          <Button 
+            onClick={() => setSearchTerm('')} 
+            variant="outline" 
+            size="sm"
+          >
+            Clear
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

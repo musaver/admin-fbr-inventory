@@ -54,6 +54,7 @@ interface OrderItem {
 interface Order {
   id: string;
   orderNumber: string;
+  customOrderNumberImport?: string;
   email: string;
   phone?: string;
   subtotal: number;
@@ -157,6 +158,8 @@ export default function OrdersList() {
     if (searchTerm) {
       filtered = filtered.filter(order =>
         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.customOrderNumberImport && order.customOrderNumberImport.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (order.invoiceNumber && order.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         order.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (order.user?.name ? order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false)
       );
@@ -481,6 +484,12 @@ export default function OrdersList() {
       render: (_: any, order: Order) => (
         <div className="min-w-0">
           <div className="font-medium text-sm">#{order.orderNumber}</div>
+          {order.customOrderNumberImport && (
+            <div className="text-xs text-muted-foreground">Custom: {order.customOrderNumberImport}</div>
+          )}
+          {order.invoiceNumber && (
+            <div className="text-xs text-muted-foreground font-mono">Invoice: {order.invoiceNumber}</div>
+          )}
         </div>
       )
     },
@@ -575,23 +584,6 @@ export default function OrdersList() {
           </span>
         );
       },
-      mobileHidden: true
-    },
-    {
-      key: 'invoiceNumber',
-      title: 'Invoice #',
-      width: '120px',
-      render: (_: any, order: Order) => (
-        <div className="text-sm">
-          {order.invoiceNumber ? (
-            <div className="font-mono text-xs bg-muted px-2 py-1 rounded">
-              {order.invoiceNumber}
-            </div>
-          ) : (
-            <span className="text-xs text-gray-400">-</span>
-          )}
-        </div>
-      ),
       mobileHidden: true
     }
   ];
@@ -750,7 +742,7 @@ export default function OrdersList() {
             <div className="space-y-2 min-w-0">
               <label className="text-sm font-medium">Search</label>
               <Input
-                placeholder="Order number, email, customer..."
+                placeholder="Order number, custom order number, invoice number, email, customer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full"
