@@ -828,21 +828,8 @@ export default function EditOrder() {
           saleType: item.saleType
         }));
         
-        // Sort items by Item Serial Number (itemSerialNumber) - empty values go to the end
-        const sortedItems = processedItems.sort((a, b) => {
-          const aSerial = a.itemSerialNumber || '';
-          const bSerial = b.itemSerialNumber || '';
-          
-          // If both are empty, maintain original order
-          if (!aSerial && !bSerial) return 0;
-          // Empty values go to the end
-          if (!aSerial) return 1;
-          if (!bSerial) return -1;
-          
-          // Compare serial numbers (alphanumeric sort)
-          return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
-        });
-        
+        // Sort items by SRO Item Serial No. (FBR) - empty values go to the end
+        const sortedItems = sortItemsBySerialNumber(processedItems);
         setOrderItems(sortedItems);
       }
 
@@ -1221,22 +1208,9 @@ export default function EditOrder() {
         saleType: productSelection.saleType || 'Goods at standard rate'
       };
 
-      // Add new item and sort by Item Serial Number
+      // Add new item and sort by SRO Item Serial No. (FBR)
       const updatedItems = [...orderItems, newItem];
-      const sortedItems = updatedItems.sort((a, b) => {
-        const aSerial = a.itemSerialNumber || '';
-        const bSerial = b.itemSerialNumber || '';
-        
-        // If both are empty, maintain original order
-        if (!aSerial && !bSerial) return 0;
-        // Empty values go to the end
-        if (!aSerial) return 1;
-        if (!bSerial) return -1;
-        
-        // Compare serial numbers (alphanumeric sort)
-        return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
-      });
-      
+      const sortedItems = sortItemsBySerialNumber(updatedItems);
       setOrderItems(sortedItems);
       
       // Reset selection
@@ -1380,21 +1354,9 @@ export default function EditOrder() {
       }
     }
     
-    // If itemSerialNumber was updated, sort the items to maintain order
-    if (field === 'itemSerialNumber') {
-      const sortedItems = updatedItems.sort((a, b) => {
-        const aSerial = a.itemSerialNumber || '';
-        const bSerial = b.itemSerialNumber || '';
-        
-        // If both are empty, maintain original order
-        if (!aSerial && !bSerial) return 0;
-        // Empty values go to the end
-        if (!aSerial) return 1;
-        if (!bSerial) return -1;
-        
-        // Compare serial numbers (alphanumeric sort)
-        return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
-      });
+    // If serialNumber was updated, sort the items to maintain order
+    if (field === 'serialNumber') {
+      const sortedItems = sortItemsBySerialNumber(updatedItems);
       setOrderItems(sortedItems);
     } else {
       setOrderItems(updatedItems);
@@ -1492,6 +1454,23 @@ export default function EditOrder() {
         useAllPoints: true
       }));
     }
+  };
+
+  // Sort items by SRO Item Serial No. (FBR) - serialNumber field
+  const sortItemsBySerialNumber = (items: OrderItem[]) => {
+    return items.sort((a, b) => {
+      const aSerial = a.serialNumber || '';
+      const bSerial = b.serialNumber || '';
+      
+      // If both are empty, maintain original order
+      if (!aSerial && !bSerial) return 0;
+      // Empty values go to the end
+      if (!aSerial) return 1;
+      if (!bSerial) return -1;
+      
+      // Compare serial numbers (alphanumeric sort)
+      return aSerial.localeCompare(bSerial, undefined, { numeric: true, sensitivity: 'base' });
+    });
   };
 
   // Validate and format HS codes for FBR compliance
