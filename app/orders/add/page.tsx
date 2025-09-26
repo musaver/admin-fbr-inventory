@@ -959,15 +959,39 @@ export default function AddOrder() {
     }
 
     // Calculate total price including addons for group products
-    // Use priceIncludingTax if available, otherwise fall back to base price
+    // Check if we have manually configured tax values in productSelection (already include quantity)
     const priceIncludingTax = typeof productSelection.priceIncludingTax === 'string' 
       ? parseFloat(productSelection.priceIncludingTax) || 0 
       : productSelection.priceIncludingTax || 0;
-    const effectivePrice = priceIncludingTax || price;
-    let totalPrice = effectivePrice * finalQuantity;
-    if (product.productType === 'group' && selectedAddons.length > 0) {
-      const addonsPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
-      totalPrice = (effectivePrice + addonsPrice) * finalQuantity;
+    const priceExcludingTax = typeof productSelection.priceExcludingTax === 'string' 
+      ? parseFloat(productSelection.priceExcludingTax) || 0 
+      : productSelection.priceExcludingTax || 0;
+    const taxAmount = typeof productSelection.taxAmount === 'string' 
+      ? parseFloat(productSelection.taxAmount) || 0 
+      : productSelection.taxAmount || 0;
+    
+    // If we have manually configured values, use them exactly as they are (no quantity multiplication)
+    const hasManualPricing = priceIncludingTax > 0 || priceExcludingTax > 0 || taxAmount > 0;
+    
+    let totalPrice;
+    if (hasManualPricing) {
+      // Use the manually configured values exactly as they are - they already include all calculations
+      totalPrice = priceIncludingTax || (priceExcludingTax + taxAmount);
+      
+      // For group products with addons, still need to add addon costs
+      if (product.productType === 'group' && selectedAddons.length > 0) {
+        const addonsPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+        totalPrice = totalPrice + (addonsPrice * finalQuantity);
+      }
+    } else {
+      // Fall back to automatic calculation based on base price
+      totalPrice = price * finalQuantity;
+      
+      // Handle addons for group products
+      if (product.productType === 'group' && selectedAddons.length > 0) {
+        const addonsPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+        totalPrice = (price + addonsPrice) * finalQuantity;
+      }
     }
 
     // Generate a unique ID for this item to track updates
@@ -1087,29 +1111,6 @@ export default function AddOrder() {
     setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
-  const handleUpdateItemQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) return;
-    
-    const updatedItems = [...orderItems];
-    const item = updatedItems[index];
-    updatedItems[index].quantity = quantity;
-    
-    // Use priceIncludingTax if available, otherwise fall back to base price
-    const priceIncludingTax = typeof item.priceIncludingTax === 'string' 
-      ? parseFloat(item.priceIncludingTax) || 0 
-      : item.priceIncludingTax || 0;
-    const effectivePrice = priceIncludingTax || item.price;
-    let totalPrice = effectivePrice * quantity;
-    
-    // Add addon prices for group products
-    if (item.addons && Array.isArray(item.addons) && item.addons.length > 0) {
-      const addonsPrice = item.addons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
-      totalPrice = (effectivePrice + addonsPrice) * quantity;
-    }
-    
-    updatedItems[index].totalPrice = totalPrice;
-    setOrderItems(updatedItems);
-  };
 
   const handleEditItem = (index: number) => {
     const item = orderItems[index];
@@ -1264,8 +1265,15 @@ export default function AddOrder() {
       const priceIncludingTax = typeof item.priceIncludingTax === 'string' 
         ? parseFloat(item.priceIncludingTax) || 0 
         : item.priceIncludingTax || 0;
-      const itemPrice = priceIncludingTax || item.price;
-      let itemTotal = itemPrice * item.quantity;
+      
+      // If we have priceIncludingTax, it's already a total (includes quantity), so use it directly
+      // Only multiply by quantity if we're using the unit price fallback
+      let itemTotal;
+      if (priceIncludingTax > 0) {
+        itemTotal = priceIncludingTax; // Already a total amount
+      } else {
+        itemTotal = item.price * item.quantity; // Calculate from unit price
+      }
       
       // Add addon prices for group products
       if (item.addons && Array.isArray(item.addons) && item.addons.length > 0) {
@@ -1836,30 +1844,26 @@ export default function AddOrder() {
             const src = orderItems[idx] || {} as any;
             const qty = Number(src.quantity ?? it.quantity ?? 1) || 1;
             const pct = Number(src.taxPercentage ?? it.taxPercentage ?? 0) || 0;
-            const unitEx = (() => {
-              const ex = Number(src.priceExcludingTax ?? it.priceExcludingTax ?? 0) || 0;
-              if (ex > 0) return ex;
-              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
-              if (inc > 0 && pct > 0) return inc / (1 + pct / 100);
-              return Number(src.price ?? it.rate ?? 0) || 0;
-            })();
-            const unitTax = (() => {
-              const t = Number(src.taxAmount ?? it.taxAmount ?? 0) || 0;
-              if (t > 0) return t;
-              if (pct > 0 && unitEx > 0) return (unitEx * pct) / 100;
-              const inc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
-              if (inc > 0 && unitEx > 0) return inc - unitEx;
-              return 0;
-            })();
-            const unitInc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || (unitEx + unitTax);
+            
+            // Use stored total values directly (they are already calculated with quantity)
+            const totalEx = Number(src.priceExcludingTax ?? it.priceExcludingTax ?? 0) || 0;
+            const totalInc = Number(src.priceIncludingTax ?? it.priceIncludingTax ?? 0) || 0;
+            const totalTax = Number(src.taxAmount ?? it.taxAmount ?? 0) || 0;
+            
+            // If we don't have total values, fall back to calculating from unit price
+            const finalTotalEx = totalEx > 0 ? totalEx : ((Number(src.price ?? it.rate ?? 0) || 0) * qty);
+            const finalTotalTax = totalTax > 0 ? totalTax : (finalTotalEx * pct / 100);
+            const finalTotalInc = totalInc > 0 ? totalInc : (finalTotalEx + finalTotalTax);
+            
             return {
               ...it,
               quantity: qty,
-              priceExcludingTaxTotal: unitEx * qty,
-              priceIncludingTaxTotal: unitInc * qty,
-              salesTaxApplicable: unitTax * qty, // for display
-              valueSalesExcludingST: unitEx * qty,
-              totalValues: unitInc * qty,
+              priceExcludingTaxTotal: finalTotalEx,
+              priceIncludingTaxTotal: finalTotalInc,
+              salesTaxApplicable: finalTotalTax, // for display
+              valueSalesExcludingST: finalTotalEx,
+              totalValues: finalTotalInc,
+              taxPercentage: pct, // Ensure taxPercentage is a number, not string
             };
           });
         }
@@ -3180,11 +3184,49 @@ export default function AddOrder() {
                     type="number"
                     min="1"
                     value={productSelection.quantity}
-                    onChange={(e) => {
-                      const qty = parseInt(e.target.value) || 1;
-                      setProductSelection(prev => ({ ...prev, quantity: qty }));
-                      // If unit prices are set, keep unit values and recompute totals dynamically in UI sections
-                      // Item-level recomputation happens when item is added; here we just ensure live summaries use qty
+                    onChange={async (e) => {
+                      const newQty = parseInt(e.target.value) || 1;
+                      const oldQty = productSelection.quantity;
+                      
+                      setProductSelection(prev => {
+                        const updatedSelection = { ...prev, quantity: newQty };
+                        
+                        // If we have price excluding tax set, update it proportionally with quantity change
+                        if (prev.priceExcludingTax > 0) {
+                          const perUnitPriceExcludingTax = prev.priceExcludingTax / oldQty;
+                          const newTotalPriceExcludingTax = perUnitPriceExcludingTax * newQty;
+                          updatedSelection.priceExcludingTax = Math.round(newTotalPriceExcludingTax * 100) / 100;
+                          
+                          // Also update related tax calculations if we have tax percentage
+                          if (prev.taxPercentage > 0) {
+                            const taxPercentageNum = parseFloat(prev.taxPercentage.toString());
+                            calculateTaxAmount(newTotalPriceExcludingTax, taxPercentageNum).then(calculatedTaxAmount => {
+                              const calculatedPriceIncludingTax = newTotalPriceExcludingTax + calculatedTaxAmount;
+                              setProductSelection(current => ({
+                                ...current,
+                                taxAmount: Math.round(calculatedTaxAmount * 100) / 100,
+                                priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
+                              }));
+                            });
+                          }
+                        }
+                        
+                        // If we have price including tax set, update it proportionally with quantity change
+                        if (prev.priceIncludingTax > 0) {
+                          const perUnitPriceIncludingTax = prev.priceIncludingTax / oldQty;
+                          const newTotalPriceIncludingTax = perUnitPriceIncludingTax * newQty;
+                          updatedSelection.priceIncludingTax = Math.round(newTotalPriceIncludingTax * 100) / 100;
+                        }
+                        
+                        // If we have tax amount set, update it proportionally with quantity change
+                        if (prev.taxAmount > 0) {
+                          const perUnitTaxAmount = prev.taxAmount / oldQty;
+                          const newTotalTaxAmount = perUnitTaxAmount * newQty;
+                          updatedSelection.taxAmount = Math.round(newTotalTaxAmount * 100) / 100;
+                        }
+                        
+                        return updatedSelection;
+                      });
                     }}
                   />
                 </div>
@@ -3783,13 +3825,7 @@ export default function AddOrder() {
                 <div className="flex items-center gap-1">Addons: <CurrencySymbol />{safeFormatPrice(item.addons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0))}</div>
                 <div className="font-medium border-t pt-1 flex items-center gap-1">
                   <CurrencySymbol />{safeFormatPrice((item.priceIncludingTax || item.price) + item.addons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0))} x 
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => handleUpdateItemQuantity(index, parseInt(e.target.value) || 1)}
-                    className="w-16 mx-1 p-1 border rounded text-center"
-                  />
+                  <span className="mx-1 font-medium">{item.quantity}</span>
                   = <CurrencySymbol />{safeFormatPrice(item.totalPrice)}
                 </div>
                               </div>
@@ -3800,13 +3836,7 @@ export default function AddOrder() {
                             ) : (
                               <div className="flex items-center gap-1">
                                 Price Inc. Tax: <CurrencySymbol />{safeFormatPrice(item.priceIncludingTax || item.price)} x 
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => handleUpdateItemQuantity(index, parseInt(e.target.value) || 1)}
-                                  className="w-16 mx-1 p-1 border rounded text-center"
-                                />
+                                <span className="mx-1 font-medium">{item.quantity}</span>
                                 = <CurrencySymbol />{safeFormatPrice(item.totalPrice)}
                               </div>
                             )}
@@ -3864,28 +3894,23 @@ export default function AddOrder() {
                             {(() => {
                               const qty = Number(item.quantity) || 1;
                               const pct = Number(item.taxPercentage) || 0;
-                              const unitEx = (() => {
-                                const ex = Number(item.priceExcludingTax) || 0;
-                                if (ex > 0) return ex;
-                                const inc = Number(item.priceIncludingTax) || 0;
-                                if (inc > 0 && pct > 0) return inc / (1 + pct / 100);
-                                return Number(item.price) || 0;
-                              })();
-                              const unitTax = (() => {
-                                const t = Number(item.taxAmount) || 0;
-                                if (t > 0) return t;
-                                if (pct > 0 && unitEx > 0) return (unitEx * pct) / 100;
-                                const inc = Number(item.priceIncludingTax) || 0;
-                                if (inc > 0 && unitEx > 0) return inc - unitEx;
-                                return 0;
-                              })();
-                              const unitInc = Number(item.priceIncludingTax) || (unitEx + unitTax);
+                              
+                              // Use stored total values directly (they are already calculated with quantity)
+                              const totalEx = Number(item.priceExcludingTax) || 0;
+                              const totalInc = Number(item.priceIncludingTax) || 0;
+                              const totalTax = Number(item.taxAmount) || 0;
+                              
+                              // If we don't have total values, fall back to calculating from unit price
+                              const finalTotalEx = totalEx > 0 ? totalEx : ((Number(item.price) || 0) * qty);
+                              const finalTotalTax = totalTax > 0 ? totalTax : (finalTotalEx * pct / 100);
+                              const finalTotalInc = totalInc > 0 ? totalInc : (finalTotalEx + finalTotalTax);
+                              
                               return (
                                 <>
-                                  {(unitTax > 0) && (
+                                  {(finalTotalTax > 0) && (
                                     <div className="flex justify-between">
                                       <span>Tax Amount:</span>
-                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitTax * qty)}</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(finalTotalTax)}</span>
                                     </div>
                                   )}
                                   {(pct > 0) && (
@@ -3894,16 +3919,16 @@ export default function AddOrder() {
                                       <span>{safeFormatPrice(pct)}%</span>
                                     </div>
                                   )}
-                                  {(unitInc > 0) && (
+                                  {(finalTotalInc > 0) && (
                                     <div className="flex justify-between">
                                       <span>Price Inc. Tax:</span>
-                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitInc * qty)}</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(finalTotalInc)}</span>
                                     </div>
                                   )}
-                                  {(unitEx > 0) && (
+                                  {(finalTotalEx > 0) && (
                                     <div className="flex justify-between">
                                       <span>Price Ex. Tax:</span>
-                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(unitEx * qty)}</span>
+                                      <span className="flex items-center gap-1"><CurrencySymbol />{safeFormatPrice(finalTotalEx)}</span>
                                     </div>
                                   )}
                                 </>
