@@ -183,6 +183,15 @@ export async function validateInvoice(payload: FbrInvoice, customToken?: string,
     }
   }
 
+  // Auto-switch to production base URL if production mode is enabled
+  if (isProductionMode && baseUrl && !customBaseUrl) {
+    // Convert sandbox URL to production URL
+    if (baseUrl.includes('sandbox.fbr.gov.pk')) {
+      baseUrl = baseUrl.replace('sandbox.fbr.gov.pk/api', 'gw.fbr.gov.pk');
+      console.log('🚨 Production mode: Switched base URL to', baseUrl);
+    }
+  }
+
   if (!baseUrl) {
     throw new Error('FBR_BASE_URL environment variable is not configured and no tenant-specific base URL found');
   }
@@ -270,6 +279,15 @@ export async function postInvoice(payload: FbrInvoice, customToken?: string, ten
     }
     if (tenantSettings.token && !customToken) {
       token = tenantSettings.token;
+    }
+  }
+
+  // Auto-switch to production base URL if production mode is enabled
+  if (isProductionMode && baseUrl && !customBaseUrl) {
+    // Convert sandbox URL to production URL
+    if (baseUrl.includes('sandbox.fbr.gov.pk')) {
+      baseUrl = baseUrl.replace('sandbox.fbr.gov.pk/api', 'gw.fbr.gov.pk');
+      console.log('🚨 Production mode: Switched base URL to', baseUrl);
     }
   }
 
