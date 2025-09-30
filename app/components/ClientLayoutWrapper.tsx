@@ -35,9 +35,10 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange
+      forcedTheme="light"
     >
       <SessionProvider>
         <CurrencyProvider>

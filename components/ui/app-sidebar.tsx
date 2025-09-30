@@ -162,7 +162,8 @@ export function AppSidebar() {
               Hisaab360 Admin
             </h2>
           </div>
-          <div className="flex items-center gap-2 hidden">
+          {/* Theme Toggle - Hidden (forced light mode) */}
+          <div className="hidden">
            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

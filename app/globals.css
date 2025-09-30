@@ -55,6 +55,15 @@
   flex-shrink: 0;
 }
 
+/* Mobile layout improvements - automatically switches to header layout */
+@media (max-width: 767px) {
+  /* Since we use header layout on mobile, ensure proper spacing */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 /* Header consistency fixes */
 .header-fixed {
   height: 4rem; /* 64px - matches h-16 */

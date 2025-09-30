@@ -376,8 +376,8 @@ export default function AddOrder() {
   
   // New user/product form data
   const [newUserData, setNewUserData] = useState({
-    name: '',
-    email: ''
+    ntn: '',
+    businessName: ''
   });
   const [newProductData, setNewProductData] = useState({
     name: '',
@@ -1310,8 +1310,8 @@ export default function AddOrder() {
 
   // Add new user function
   const handleAddNewUser = async () => {
-    if (!newUserData.name || !newUserData.email) {
-      alert('Please fill in both name and email');
+    if (!newUserData.ntn && !newUserData.businessName) {
+      alert('Please fill in at least NTN/CNIC or business name');
       return;
     }
 
@@ -1321,10 +1321,12 @@ export default function AddOrder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newUserData.name,
-          email: newUserData.email,
-          firstName: newUserData.name.split(' ')[0] || '',
-          lastName: newUserData.name.split(' ').slice(1).join(' ') || '',
+          name: newUserData.businessName || `Customer-${newUserData.ntn}` || `Customer-${Date.now()}`,
+          email: `customer-${Date.now()}@temp.local`, // Temporary email since it's not provided
+          firstName: newUserData.businessName || 'Customer',
+          lastName: '',
+          buyerNTNCNIC: newUserData.ntn,
+          buyerBusinessName: newUserData.businessName,
         })
       });
 
@@ -1340,12 +1342,18 @@ export default function AddOrder() {
       setOrderData(prev => ({ 
         ...prev, 
         customerId: newUser.id,
-        email: newUser.email,
-        phone: newUser.phone || ''
+        email: newUser.email || '', // Allow empty email
+        phone: newUser.phone || '',
+        // Auto-fill buyer section with the newly created user info
+        buyerNTNCNIC: newUserData.ntn,
+        buyerBusinessName: newUserData.businessName,
+        buyerFirstName: newUserData.businessName || '',
+        buyerLastName: '',
+        buyerFullName: newUserData.businessName || '',
       }));
       
       // Reset form and close dialog
-      setNewUserData({ name: '', email: '' });
+      setNewUserData({ ntn: '', businessName: '' });
       setShowAddUserDialog(false);
       setCustomerComboboxOpen(false);
     } catch (error: any) {
@@ -2122,6 +2130,7 @@ export default function AddOrder() {
                       {orderData.customerId
                         ? customers.find((customer) => customer.id === orderData.customerId)?.name || 
                           `${customers.find((customer) => customer.id === orderData.customerId)?.firstName} ${customers.find((customer) => customer.id === orderData.customerId)?.lastName}` ||
+                          customers.find((customer) => customer.id === orderData.customerId)?.buyerNTNCNIC ||
                           customers.find((customer) => customer.id === orderData.customerId)?.email
                         : "Select customer..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -2148,7 +2157,7 @@ export default function AddOrder() {
                           {customers.map((customer) => (
                             <CommandItem
                               key={customer.id}
-                              value={`${customer.name || `${customer.firstName} ${customer.lastName}`} ${customer.email}`}
+                              value={`${customer.name || `${customer.firstName} ${customer.lastName}`} ${customer.buyerNTNCNIC || customer.email}`}
                               onSelect={() => {
                                 handleCustomerChange({ target: { value: customer.id } } as any);
                                 setCustomerComboboxOpen(false);
@@ -2157,7 +2166,7 @@ export default function AddOrder() {
                               <Check
                                 className={`mr-2 h-4 w-4 ${orderData.customerId === customer.id ? "opacity-100" : "opacity-0"}`}
                               />
-                      {customer.name || `${customer.firstName} ${customer.lastName}`} ({customer.email})
+                      {customer.name || `${customer.firstName} ${customer.lastName}`} ({customer.buyerNTNCNIC || customer.email || 'No NTN/CNIC'})
                             </CommandItem>
                           ))}
                           <CommandItem
@@ -2718,7 +2727,7 @@ export default function AddOrder() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 hidden">
                   <Label htmlFor="invoice-number">Invoice Number</Label>
                   <Input
                     id="invoice-number"
@@ -2752,7 +2761,7 @@ export default function AddOrder() {
                 </div>
             </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 hidden">
                 <Label htmlFor="validation-response">Validation Response</Label>
                 <Input
                   id="validation-response"
@@ -2760,11 +2769,11 @@ export default function AddOrder() {
                 onChange={(e) => setOrderData({...orderData, validationResponse: e.target.value})}
                 placeholder="Validation response data..."
               />
-            </div>
+              </div>
             
             {/* FBR Submission Options */}
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex items-center space-x-2">
+            <div className="space-y-3 border-t">
+              <div className="flex items-center space-x-2 hidden">
                 <input
                   type="checkbox"
                   id="skip-fbr-submission"
@@ -3176,61 +3185,7 @@ export default function AddOrder() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    value={productSelection.quantity}
-                    onChange={async (e) => {
-                      const newQty = parseInt(e.target.value) || 1;
-                      const oldQty = productSelection.quantity;
-                      
-                      setProductSelection(prev => {
-                        const updatedSelection = { ...prev, quantity: newQty };
-                        
-                        // If we have price excluding tax set, update it proportionally with quantity change
-                        if (prev.priceExcludingTax > 0) {
-                          const perUnitPriceExcludingTax = prev.priceExcludingTax / oldQty;
-                          const newTotalPriceExcludingTax = perUnitPriceExcludingTax * newQty;
-                          updatedSelection.priceExcludingTax = Math.round(newTotalPriceExcludingTax * 100) / 100;
-                          
-                          // Also update related tax calculations if we have tax percentage
-                          if (prev.taxPercentage > 0) {
-                            const taxPercentageNum = parseFloat(prev.taxPercentage.toString());
-                            calculateTaxAmount(newTotalPriceExcludingTax, taxPercentageNum).then(calculatedTaxAmount => {
-                              const calculatedPriceIncludingTax = newTotalPriceExcludingTax + calculatedTaxAmount;
-                              setProductSelection(current => ({
-                                ...current,
-                                taxAmount: Math.round(calculatedTaxAmount * 100) / 100,
-                                priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
-                              }));
-                            });
-                          }
-                        }
-                        
-                        // If we have price including tax set, update it proportionally with quantity change
-                        if (prev.priceIncludingTax > 0) {
-                          const perUnitPriceIncludingTax = prev.priceIncludingTax / oldQty;
-                          const newTotalPriceIncludingTax = perUnitPriceIncludingTax * newQty;
-                          updatedSelection.priceIncludingTax = Math.round(newTotalPriceIncludingTax * 100) / 100;
-                        }
-                        
-                        // If we have tax amount set, update it proportionally with quantity change
-                        if (prev.taxAmount > 0) {
-                          const perUnitTaxAmount = prev.taxAmount / oldQty;
-                          const newTotalTaxAmount = perUnitTaxAmount * newQty;
-                          updatedSelection.taxAmount = Math.round(newTotalTaxAmount * 100) / 100;
-                        }
-                        
-                        return updatedSelection;
-                      });
-                    }}
-                  />
-                </div>
-              )}
+              ) : null}
 
               <div className="space-y-2 hidden">
                 <Label htmlFor="custom-price">Custom Price (optional)</Label>
@@ -3550,9 +3505,10 @@ export default function AddOrder() {
                         const value = e.target.value;
                         // Allow empty string, numbers, and decimal point
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                          const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                          // Store as string if ending with decimal, otherwise store as number
+                          const priceIncludingTax = value.endsWith('.') ? value : (value === '' ? 0 : parseFloat(value) || 0);
                           
-                          // Update price including tax immediately (store as number, not string)
+                          // Update price including tax immediately
                           setProductSelection(prev => ({...prev, priceIncludingTax: priceIncludingTax}));
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point)
@@ -3565,7 +3521,7 @@ export default function AddOrder() {
                               setProductSelection(prev => ({...prev, taxAmount: calculatedTaxAmount}));
                             }
                             // Otherwise, calculate tax percentage and amount from price difference (backward compatibility)
-                            else if (priceIncludingTax > 0 && productSelection.priceExcludingTax > 0) {
+                            else if (typeof priceIncludingTax === 'number' && priceIncludingTax > 0 && productSelection.priceExcludingTax > 0) {
                               const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
                               const taxAmount = priceIncludingTax - priceExcludingTaxNum;
                               const taxPercentage = (taxAmount / priceExcludingTaxNum) * 100;
@@ -3593,15 +3549,16 @@ export default function AddOrder() {
                         const value = e.target.value;
                         // Allow empty string, numbers, and decimal point
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                          const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
+                          // Store as string if ending with decimal, otherwise store as number
+                          const priceExcludingTax = value.endsWith('.') ? value : (value === '' ? 0 : parseFloat(value) || 0);
                           
-                          // Update price excluding tax immediately (store as number, not string)
+                          // Update price excluding tax immediately
                           setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point)
                           if (!value.endsWith('.') && value !== '') {
                             // Calculate tax amount and price including tax if we have tax percentage
-                            if (priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
+                            if (typeof priceExcludingTax === 'number' && priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
                               const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
                               const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, taxPercentageNum);
                               const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
@@ -3612,7 +3569,7 @@ export default function AddOrder() {
                               }));
                             }
                             // Auto-calculate tax percentage if both prices are available but no existing tax percentage
-                            else if (priceExcludingTax > 0 && productSelection.priceIncludingTax > 0 && productSelection.taxPercentage === 0) {
+                            else if (typeof priceExcludingTax === 'number' && priceExcludingTax > 0 && productSelection.priceIncludingTax > 0 && productSelection.taxPercentage === 0) {
                               const priceIncludingTaxNum = parseFloat(productSelection.priceIncludingTax.toString());
                               const taxAmount = priceIncludingTaxNum - priceExcludingTax;
                               const taxPercentage = (taxAmount / priceExcludingTax) * 100;
@@ -3741,6 +3698,64 @@ export default function AddOrder() {
                           className="text-sm"
                         />
                       </div>
+
+                      {/* Quantity field - moved from above */}
+                      {selectedProduct && !isWeightBasedProduct(selectedProduct.stockManagementType || 'quantity') && (
+                        <div className="space-y-2">
+                          <Label htmlFor="quantity-edit" className="text-sm">Quantity</Label>
+                          <Input
+                            id="quantity-edit"
+                            type="number"
+                            min="1"
+                            value={productSelection.quantity}
+                            onChange={async (e) => {
+                              const newQty = parseInt(e.target.value) || 1;
+                              const oldQty = productSelection.quantity;
+                              
+                              setProductSelection(prev => {
+                                const updatedSelection = { ...prev, quantity: newQty };
+                                
+                                // If we have price excluding tax set, update it proportionally with quantity change
+                                if (prev.priceExcludingTax > 0) {
+                                  const perUnitPriceExcludingTax = prev.priceExcludingTax / oldQty;
+                                  const newTotalPriceExcludingTax = perUnitPriceExcludingTax * newQty;
+                                  updatedSelection.priceExcludingTax = Math.round(newTotalPriceExcludingTax * 100) / 100;
+                                  
+                                  // Also update related tax calculations if we have tax percentage
+                                  if (prev.taxPercentage > 0) {
+                                    const taxPercentageNum = parseFloat(prev.taxPercentage.toString());
+                                    calculateTaxAmount(newTotalPriceExcludingTax, taxPercentageNum).then(calculatedTaxAmount => {
+                                      const calculatedPriceIncludingTax = newTotalPriceExcludingTax + calculatedTaxAmount;
+                                      setProductSelection(current => ({
+                                        ...current,
+                                        taxAmount: Math.round(calculatedTaxAmount * 100) / 100,
+                                        priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
+                                      }));
+                                    });
+                                  }
+                                }
+                                
+                                // If we have price including tax set, update it proportionally with quantity change
+                                if (prev.priceIncludingTax > 0) {
+                                  const perUnitPriceIncludingTax = prev.priceIncludingTax / oldQty;
+                                  const newTotalPriceIncludingTax = perUnitPriceIncludingTax * newQty;
+                                  updatedSelection.priceIncludingTax = Math.round(newTotalPriceIncludingTax * 100) / 100;
+                                }
+                                
+                                // If we have tax amount set, update it proportionally with quantity change
+                                if (prev.taxAmount > 0) {
+                                  const perUnitTaxAmount = prev.taxAmount / oldQty;
+                                  const newTotalTaxAmount = perUnitTaxAmount * newQty;
+                                  updatedSelection.taxAmount = Math.round(newTotalTaxAmount * 100) / 100;
+                                }
+                                
+                                return updatedSelection;
+                              });
+                            }}
+                            className="text-sm"
+                          />
+                        </div>
+                      )}
                   </div>
                 </div>
                 </CardContent>
@@ -4257,35 +4272,35 @@ export default function AddOrder() {
           <DialogHeader>
             <DialogTitle>Add New Customer</DialogTitle>
             <DialogDescription>
-              Create a new customer to add to your order. Enter their basic information below.
+              Create a new customer for your order. Enter their NTN/CNIC and business information.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="name" className="text-right">
-                Name
+              <label htmlFor="ntn" className="text-right">
+                NTN/CNIC
               </label>
               <input
-                id="name"
-                value={newUserData.name}
-                onChange={(e) => setNewUserData({...newUserData, name: e.target.value})}
+                id="ntn"
+                value={newUserData.ntn}
+                onChange={(e) => setNewUserData({...newUserData, ntn: e.target.value})}
                 className="col-span-3 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Customer name"
+                placeholder="Enter NTN or CNIC"
               />
-        </div>
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="email" className="text-right">
-                Email
+              <label htmlFor="businessName" className="text-right">
+                Business Name
               </label>
               <input
-                id="email"
-                type="email"
-                value={newUserData.email}
-                onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
+                id="businessName"
+                type="text"
+                value={newUserData.businessName}
+                onChange={(e) => setNewUserData({...newUserData, businessName: e.target.value})}
                 className="col-span-3 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="customer@example.com"
+                placeholder="Enter business name"
               />
-      </div>
+            </div>
           </div>
           <DialogFooter>
             <Button 
@@ -4531,20 +4546,20 @@ export default function AddOrder() {
 
           <div className="space-y-6">
             {/* Order Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Order Summary</h3>
+            <div className="bg-muted/50 p-4 rounded-lg border">
+              <h3 className="font-semibold mb-2 text-foreground">Order Summary</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium">Customer:</span> {orderData.email}
+                  <span className="font-medium text-muted-foreground">Customer:</span> <span className="text-foreground">{orderData.email}</span>
                 </div>
                 <div>
-                  <span className="font-medium">Total Amount:</span> {currentCurrency === 'USD' ? '$' : currentCurrency === 'AED' ? 'AED ' : 'Rs. '}{calculateTotals().totalAmount.toFixed(2)}
+                  <span className="font-medium text-muted-foreground">Total Amount:</span> <span className="text-foreground">{currentCurrency === 'USD' ? '$' : currentCurrency === 'AED' ? 'AED ' : 'Rs. '}{calculateTotals().totalAmount.toFixed(2)}</span>
                 </div>
                 <div>
-                  <span className="font-medium">Items:</span> {orderItems.length}
+                  <span className="font-medium text-muted-foreground">Items:</span> <span className="text-foreground">{orderItems.length}</span>
                 </div>
                 <div>
-                  <span className="font-medium">Status:</span> {orderData.status}
+                  <span className="font-medium text-muted-foreground">Status:</span> <span className="text-foreground">{orderData.status}</span>
                 </div>
               </div>
             </div>
@@ -4565,90 +4580,90 @@ export default function AddOrder() {
                 ) : fbrPreviewData ? (
                   <div className="space-y-4">
                     {/* Key Invoice Information */}
-                    <div className="grid grid-cols-2 gap-4 text-sm bg-blue-50 p-3 rounded">
+                    <div className="grid grid-cols-2 gap-4 text-sm bg-primary/5 border border-primary/20 p-3 rounded">
                       <div>
-                        <span className="font-medium">Invoice Type:</span> {fbrPreviewData.invoiceType}
+                        <span className="font-medium text-muted-foreground">Invoice Type:</span> <span className="text-foreground">{fbrPreviewData.invoiceType}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Invoice Date:</span> {fbrPreviewData.invoiceDate}
+                        <span className="font-medium text-muted-foreground">Invoice Date:</span> <span className="text-foreground">{fbrPreviewData.invoiceDate}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Scenario ID:</span> {fbrPreviewData.scenarioId}
+                        <span className="font-medium text-muted-foreground">Scenario ID:</span> <span className="text-foreground">{fbrPreviewData.scenarioId}</span>
                       </div>
                       <div>
-                        <span className="font-medium">Invoice Ref No:</span> {fbrPreviewData.invoiceRefNo || 'N/A'}
+                        <span className="font-medium text-muted-foreground">Invoice Ref No:</span> <span className="text-foreground">{fbrPreviewData.invoiceRefNo || 'N/A'}</span>
                       </div>
                     </div>
 
                     {/* Seller Information */}
-                    <div className="bg-purple-50 p-3 rounded">
-                      <h4 className="font-medium text-purple-800 mb-2">📤 Seller Information</h4>
+                    <div className="bg-secondary/50 border border-secondary p-3 rounded">
+                      <h4 className="font-medium text-secondary-foreground mb-2">📤 Seller Information</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.sellerNTNCNIC || 'Not provided'}</div>
-                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.sellerBusinessName || 'Not provided'}</div>
-                        <div><span className="font-medium">Province:</span> {fbrPreviewData.sellerProvince || 'Not provided'}</div>
-                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.sellerAddress || 'Not provided'}</div>
+                        <div><span className="font-medium text-muted-foreground">NTN/CNIC:</span> <span className="text-foreground">{fbrPreviewData.sellerNTNCNIC || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">Business Name:</span> <span className="text-foreground">{fbrPreviewData.sellerBusinessName || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">Province:</span> <span className="text-foreground">{fbrPreviewData.sellerProvince || 'Not provided'}</span></div>
+                        <div className="md:col-span-2"><span className="font-medium text-muted-foreground">Address:</span> <span className="text-foreground">{fbrPreviewData.sellerAddress || 'Not provided'}</span></div>
                       </div>
                     </div>
 
                     {/* Buyer Information */}
-                    <div className="bg-green-50 p-3 rounded">
-                      <h4 className="font-medium text-green-800 mb-2">📥 Buyer Information</h4>
+                    <div className="bg-accent/30 border border-accent p-3 rounded">
+                      <h4 className="font-medium text-accent-foreground mb-2">📥 Buyer Information</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                        <div><span className="font-medium">Buyer Name:</span> {fbrPreviewData.buyerFullName || orderData.buyerFullName || `${customerInfo.billingFirstName} ${customerInfo.billingLastName}`.trim() || 'Not provided'}</div>
-                        <div><span className="font-medium">NTN/CNIC:</span> {fbrPreviewData.buyerNTNCNIC || 'Not provided'}</div>
-                        <div><span className="font-medium">Business Name:</span> {fbrPreviewData.buyerBusinessName || 'Not provided'}</div>
-                        <div><span className="font-medium">Registration Type:</span> {fbrPreviewData.buyerRegistrationType || 'Not provided'}</div>
-                        <div><span className="font-medium">Province:</span> {fbrPreviewData.buyerProvince || 'Not provided'}</div>
-                        <div className="md:col-span-2"><span className="font-medium">Address:</span> {fbrPreviewData.buyerAddress || 'Not provided'}</div>
+                        <div><span className="font-medium text-muted-foreground">Buyer Name:</span> <span className="text-foreground">{fbrPreviewData.buyerFullName || orderData.buyerFullName || `${customerInfo.billingFirstName} ${customerInfo.billingLastName}`.trim() || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">NTN/CNIC:</span> <span className="text-foreground">{fbrPreviewData.buyerNTNCNIC || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">Business Name:</span> <span className="text-foreground">{fbrPreviewData.buyerBusinessName || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">Registration Type:</span> <span className="text-foreground">{fbrPreviewData.buyerRegistrationType || 'Not provided'}</span></div>
+                        <div><span className="font-medium text-muted-foreground">Province:</span> <span className="text-foreground">{fbrPreviewData.buyerProvince || 'Not provided'}</span></div>
+                        <div className="md:col-span-2"><span className="font-medium text-muted-foreground">Address:</span> <span className="text-foreground">{fbrPreviewData.buyerAddress || 'Not provided'}</span></div>
                       </div>
                     </div>
 
                     {/* Items Details */}
                     {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
-                      <div className="bg-gray-50 p-3 rounded">
-                        <h4 className="font-medium mb-3">📦 Invoice Items ({fbrPreviewData.items.length})</h4>
+                      <div className="bg-muted/30 border p-3 rounded">
+                        <h4 className="font-medium mb-3 text-foreground">📦 Invoice Items ({fbrPreviewData.items.length})</h4>
                         <div className="space-y-3">
                           {fbrPreviewData.items.map((item: any, index: number) => (
-                            <div key={index} className="bg-white p-3 rounded border border-gray-200">
-                              <div className="font-medium text-sm mb-2">
+                            <div key={index} className="bg-card p-3 rounded border">
+                              <div className="font-medium text-sm mb-2 text-foreground">
                                 {item.productDescription || item.itemName || `Item ${index + 1}`}
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                <div><span className="font-medium">HS Code:</span> {item.hsCode}</div>
-                                <div><span className="font-medium">Quantity:</span> {item.quantity}</div>
-                                <div><span className="font-medium">UoM:</span> {item.uoM || item.uom || 'N/A'}</div>
-                                <div><span className="font-medium">Rate:</span> {item.rate}</div>
+                                <div><span className="font-medium text-muted-foreground">HS Code:</span> <span className="text-foreground">{item.hsCode}</span></div>
+                                <div><span className="font-medium text-muted-foreground">Quantity:</span> <span className="text-foreground">{item.quantity}</span></div>
+                                <div><span className="font-medium text-muted-foreground">UoM:</span> <span className="text-foreground">{item.uoM || item.uom || 'N/A'}</span></div>
+                                <div><span className="font-medium text-muted-foreground">Rate:</span> <span className="text-foreground">{item.rate}</span></div>
                                 {item.priceIncludingTax !== undefined && item.priceIncludingTax !== null && (
-                                  <div><span className="font-medium">Price Incl. Tax:</span> {item.priceIncludingTax?.toLocaleString()}</div>
+                                  <div><span className="font-medium text-muted-foreground">Price Incl. Tax:</span> <span className="text-foreground">{item.priceIncludingTax?.toLocaleString()}</span></div>
                                 )}
                                 {item.priceExcludingTax !== undefined && item.priceExcludingTax !== null && (
-                                  <div><span className="font-medium">Price Excl. Tax:</span> {item.priceExcludingTax?.toLocaleString()}</div>
+                                  <div><span className="font-medium text-muted-foreground">Price Excl. Tax:</span> <span className="text-foreground">{item.priceExcludingTax?.toLocaleString()}</span></div>
                                 )}
                                 {item.taxPercentage !== undefined && item.taxPercentage !== null && (
-                                  <div><span className="font-medium">Tax %:</span> {item.taxPercentage}%</div>
+                                  <div><span className="font-medium text-muted-foreground">Tax %:</span> <span className="text-foreground">{item.taxPercentage}%</span></div>
                                 )}
-                                <div><span className="font-medium">Value Excl. ST:</span> {item.valueSalesExcludingST?.toLocaleString()}</div>
-                                <div><span className="font-medium">Sales Tax:</span> {item.salesTaxApplicable?.toLocaleString()}</div>
-                                <div><span className="font-medium">FED Payable:</span> {item.fedPayable?.toLocaleString() || 0}</div>
-                                <div><span className="font-medium">Total Value:</span> {item.totalValues?.toLocaleString()}</div>
+                                <div><span className="font-medium text-muted-foreground">Value Excl. ST:</span> <span className="text-foreground">{item.valueSalesExcludingST?.toLocaleString()}</span></div>
+                                <div><span className="font-medium text-muted-foreground">Sales Tax:</span> <span className="text-foreground">{item.salesTaxApplicable?.toLocaleString()}</span></div>
+                                <div><span className="font-medium text-muted-foreground">FED Payable:</span> <span className="text-foreground">{item.fedPayable?.toLocaleString() || 0}</span></div>
+                                <div><span className="font-medium text-muted-foreground">Total Value:</span> <span className="text-foreground">{item.totalValues?.toLocaleString()}</span></div>
                                 {item.saleType && (
-                                  <div className="md:col-span-2"><span className="font-medium">Sale Type:</span> {item.saleType}</div>
+                                  <div className="md:col-span-2"><span className="font-medium text-muted-foreground">Sale Type:</span> <span className="text-foreground">{item.saleType}</span></div>
                                 )}
                                 {item.discount > 0 && (
-                                  <div><span className="font-medium">Discount:</span> {item.discount}</div>
+                                  <div><span className="font-medium text-muted-foreground">Discount:</span> <span className="text-foreground">{item.discount}</span></div>
                                 )}
                                 {item.extraTax && (
-                                  <div><span className="font-medium">Extra Tax:</span> {item.extraTax}</div>
+                                  <div><span className="font-medium text-muted-foreground">Extra Tax:</span> <span className="text-foreground">{item.extraTax}</span></div>
                                 )}
                                 {item.furtherTax > 0 && (
-                                  <div><span className="font-medium">Further Tax:</span> {item.furtherTax}</div>
+                                  <div><span className="font-medium text-muted-foreground">Further Tax:</span> <span className="text-foreground">{item.furtherTax}</span></div>
                                 )}
                                 {item.sroScheduleNo && (
-                                  <div><span className="font-medium">SRO Schedule:</span> {item.sroScheduleNo}</div>
+                                  <div><span className="font-medium text-muted-foreground">SRO Schedule:</span> <span className="text-foreground">{item.sroScheduleNo}</span></div>
                                 )}
                                 {item.sroItemSerialNo && (
-                                  <div><span className="font-medium">SRO Item Serial:</span> {item.sroItemSerialNo}</div>
+                                  <div><span className="font-medium text-muted-foreground">SRO Item Serial:</span> <span className="text-foreground">{item.sroItemSerialNo}</span></div>
                                 )}
                               </div>
                             </div>
@@ -4659,53 +4674,53 @@ export default function AddOrder() {
 
                     {/* Summary Totals */}
                     {fbrPreviewData.items && fbrPreviewData.items.length > 0 && (
-                      <div className="bg-indigo-50 p-3 rounded">
-                        <h4 className="font-medium text-indigo-800 mb-2">💰 Invoice Summary</h4>
+                      <div className="bg-primary/10 border border-primary/30 p-3 rounded">
+                        <h4 className="font-medium text-primary mb-2">💰 Invoice Summary</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                           <div>
-                            <span className="font-medium">Total Items:</span> {fbrPreviewData.items.length}
+                            <span className="font-medium text-muted-foreground">Total Items:</span> <span className="text-foreground">{fbrPreviewData.items.length}</span>
                           </div>
                           <div>
-                            <span className="font-medium">Total Quantity:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}
+                            <span className="font-medium text-muted-foreground">Total Quantity:</span> <span className="text-foreground">{fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)}</span>
                           </div>
                           <div>
-                            <span className="font-medium">Total Excl. ST:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.valueSalesExcludingST || 0), 0).toLocaleString()}
+                            <span className="font-medium text-muted-foreground">Total Excl. ST:</span> <span className="text-foreground">{fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.valueSalesExcludingST || 0), 0).toLocaleString()}</span>
                           </div>
                           <div>
-                            <span className="font-medium">Total Sales Tax:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.salesTaxApplicable || 0), 0).toLocaleString()}
+                            <span className="font-medium text-muted-foreground">Total Sales Tax:</span> <span className="text-foreground">{fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.salesTaxApplicable || 0), 0).toLocaleString()}</span>
                           </div>
                           <div>
-                            <span className="font-medium">Total FED:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.fedPayable || 0), 0).toLocaleString()}
+                            <span className="font-medium text-muted-foreground">Total FED:</span> <span className="text-foreground">{fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.fedPayable || 0), 0).toLocaleString()}</span>
                           </div>
                           <div>
-                            <span className="font-medium">Grand Total:</span> {fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.totalValues || 0), 0).toLocaleString()}
+                            <span className="font-medium text-muted-foreground">Grand Total:</span> <span className="text-foreground font-semibold">{fbrPreviewData.items.reduce((sum: number, item: any) => sum + (item.totalValues || 0), 0).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
                     )}
 
                     {/* FBR JSON Preview - Same as Console Log */}
-                    <details className="border rounded p-2 bg-slate-50">
-                      <summary className="cursor-pointer font-medium text-sm text-blue-800">
+                    <details className="border rounded p-2 bg-muted/20">
+                      <summary className="cursor-pointer font-medium text-sm text-primary hover:text-primary/80">
                         🔍 FBR JSON Preview (Same as Console Log)
                       </summary>
                       <div className="mt-3 space-y-2">
-                        <div className="text-xs text-gray-600 italic">
+                        <div className="text-xs text-muted-foreground italic">
                           This is the exact JSON that will be sent to FBR and logged in the console:
                         </div>
-                        <div className="bg-black text-green-400 p-3 rounded font-mono text-xs max-h-80 overflow-y-auto">
-                          <div className="text-yellow-400">🔍 === FINAL FBR JSON PAYLOAD ===</div>
-                          <div className="text-cyan-400">📋 Generated FBR Invoice JSON:</div>
-                          <pre className="mt-2 whitespace-pre-wrap">
+                        <div className="bg-card border p-3 rounded font-mono text-xs max-h-80 overflow-y-auto">
+                          <div className="text-primary font-semibold">🔍 === FINAL FBR JSON PAYLOAD ===</div>
+                          <div className="text-secondary-foreground font-medium">📋 Generated FBR Invoice JSON:</div>
+                          <pre className="mt-2 whitespace-pre-wrap text-foreground bg-muted/30 p-2 rounded text-[10px] leading-relaxed">
                             {fbrJsonPreview ? JSON.stringify(fbrJsonPreview, null, 2) : 'No JSON data available'}
                           </pre>
-                          <div className="text-yellow-400 mt-2">===============================</div>
+                          <div className="text-primary font-semibold mt-2">===============================</div>
                         </div>
                       </div>
                     </details>
                   </div>
                 ) : (
-                  <div className="text-gray-500 text-sm">
+                  <div className="text-muted-foreground text-sm bg-muted/30 p-3 rounded border">
                     FBR preview could not be generated. The order will be submitted without preview.
                   </div>
                 )}
@@ -4713,8 +4728,8 @@ export default function AddOrder() {
             )}
 
             {skipFbrSubmission && (
-              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
-                <p className="text-yellow-800 text-sm">
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 p-3 rounded">
+                <p className="text-amber-800 dark:text-amber-200 text-sm">
                   ⚠️ FBR submission is disabled for this order.
                 </p>
               </div>

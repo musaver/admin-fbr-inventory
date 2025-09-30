@@ -3,14 +3,16 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import { Header } from '@/components/ui/header';
 import { AppSidebar } from '@/components/ui/app-sidebar';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { useLayout } from '@/app/contexts/LayoutContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { PanelLeft } from 'lucide-react';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const { layout, toggleLayout } = useLayout();
+  const isMobile = useIsMobile();
 
   if (status === 'loading') {
     return (
@@ -22,8 +24,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   
   if (!session) return <div>{children}</div>;
 
-  // Header Layout 
-  if (layout === 'header') {
+  // Auto-switch to header layout on mobile, or use user preference on desktop
+  if (layout === 'header' || isMobile) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -36,9 +38,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  // Sidebar Layout
+  // Sidebar Layout (Desktop only)
   return (
-    <SidebarProvider defaultOpen={true} open={true} onOpenChange={() => {}}>
+    <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background" style={{'--sidebar-width': '16rem'} as React.CSSProperties}>
         <AppSidebar />
         <SidebarInset className="flex-1 min-w-0">
