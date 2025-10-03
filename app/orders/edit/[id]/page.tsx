@@ -651,6 +651,11 @@ export default function EditOrder() {
 
   // Initialize custom field states based on existing values
   useEffect(() => {
+    // Safety check: ensure orderData.items exists and is an array
+    if (!orderData.items || !Array.isArray(orderData.items)) {
+      return;
+    }
+
     const newItemCustomSroScheduleNumber: {[key: number]: boolean} = {};
     const newItemCustomItemSerialNumber: {[key: number]: boolean} = {};
 
