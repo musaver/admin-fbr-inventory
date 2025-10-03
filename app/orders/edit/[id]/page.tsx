@@ -394,6 +394,14 @@ export default function EditOrder() {
   // FBR scenario management
   const [isCustomScenario, setIsCustomScenario] = useState(false);
 
+  // Custom field options management
+  const [isCustomSroScheduleNumber, setIsCustomSroScheduleNumber] = useState(false);
+  const [isCustomItemSerialNumber, setIsCustomItemSerialNumber] = useState(false);
+  
+  // Custom field options for order items (tracks state per item index)
+  const [itemCustomSroScheduleNumber, setItemCustomSroScheduleNumber] = useState<{[key: number]: boolean}>({});
+  const [itemCustomItemSerialNumber, setItemCustomItemSerialNumber] = useState<{[key: number]: boolean}>({});
+
   // FBR preview and confirmation states
   const [fbrPreviewData, setFbrPreviewData] = useState<any>(null);
   const [fbrJsonPreview, setFbrJsonPreview] = useState<any>(null);
@@ -640,6 +648,44 @@ export default function EditOrder() {
     fetchSellerInfo();
     fetchFbrSettings();
   }, [params.id]);
+
+  // Initialize custom field states based on existing values
+  useEffect(() => {
+    const newItemCustomSroScheduleNumber: {[key: number]: boolean} = {};
+    const newItemCustomItemSerialNumber: {[key: number]: boolean} = {};
+
+    orderData.items.forEach((item, index) => {
+      // Check if SRO/Schedule Number is a custom value
+      if (item.sroScheduleNumber && item.sroScheduleNumber !== 'ICTO TABLE I') {
+        newItemCustomSroScheduleNumber[index] = true;
+      }
+      
+      // Check if Item Serial Number is a custom value
+      if (item.itemSerialNumber && item.itemSerialNumber !== '19') {
+        newItemCustomItemSerialNumber[index] = true;
+      }
+    });
+
+    setItemCustomSroScheduleNumber(newItemCustomSroScheduleNumber);
+    setItemCustomItemSerialNumber(newItemCustomItemSerialNumber);
+  }, [orderData.items]);
+
+  // Initialize custom field states for product selection based on existing values
+  useEffect(() => {
+    // Check if SRO/Schedule Number is a custom value
+    if (productSelection.sroScheduleNumber && productSelection.sroScheduleNumber !== 'ICTO TABLE I') {
+      setIsCustomSroScheduleNumber(true);
+    } else {
+      setIsCustomSroScheduleNumber(false);
+    }
+    
+    // Check if Item Serial Number is a custom value
+    if (productSelection.itemSerialNumber && productSelection.itemSerialNumber !== '19') {
+      setIsCustomItemSerialNumber(true);
+    } else {
+      setIsCustomItemSerialNumber(false);
+    }
+  }, [productSelection.sroScheduleNumber, productSelection.itemSerialNumber]);
 
   // Scroll detection for sticky sidebar
   useEffect(() => {
@@ -2686,26 +2732,102 @@ export default function EditOrder() {
                           
                           <div className="space-y-2">
                             <Label htmlFor="item-serial-number-edit" className="text-sm">Item Serial Number</Label>
-                            <Input
-                              id="item-serial-number-edit"
-                              type="text"
-                              value={productSelection.itemSerialNumber}
-                              onChange={(e) => setProductSelection({...productSelection, itemSerialNumber: e.target.value})}
-                              placeholder="Item-specific serial"
-                              className="text-sm"
-                            />
+                            {!isCustomItemSerialNumber ? (
+                              <div className="flex gap-2">
+                                <Select
+                                  value={productSelection.itemSerialNumber}
+                                  onValueChange={(value) => {
+                                    if (value === 'custom') {
+                                      setIsCustomItemSerialNumber(true);
+                                      setProductSelection({...productSelection, itemSerialNumber: ''});
+                                    } else {
+                                      setProductSelection({...productSelection, itemSerialNumber: value});
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="text-sm">
+                                    <SelectValue placeholder="Select Item Serial Number" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="19">19</SelectItem>
+                                    <SelectItem value="custom">Custom (Type your own)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input
+                                  id="item-serial-number-edit"
+                                  type="text"
+                                  value={productSelection.itemSerialNumber}
+                                  onChange={(e) => setProductSelection({...productSelection, itemSerialNumber: e.target.value})}
+                                  placeholder="Enter custom item serial number"
+                                  className="text-sm"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsCustomItemSerialNumber(false);
+                                    setProductSelection({...productSelection, itemSerialNumber: '19'});
+                                  }}
+                                  className="px-3 text-xs"
+                                >
+                                  Back to Select
+                                </Button>
+                              </div>
+                            )}
                           </div>
                           
                           <div className="space-y-2">
                             <Label htmlFor="sro-schedule-number-edit" className="text-sm">SRO/Schedule Number</Label>
-                            <Input
-                              id="sro-schedule-number-edit"
-                              type="text"
-                              value={productSelection.sroScheduleNumber}
-                              onChange={(e) => setProductSelection({...productSelection, sroScheduleNumber: e.target.value})}
-                              placeholder="SRO schedule reference"
-                              className="text-sm"
-                            />
+                            {!isCustomSroScheduleNumber ? (
+                              <div className="flex gap-2">
+                                <Select
+                                  value={productSelection.sroScheduleNumber}
+                                  onValueChange={(value) => {
+                                    if (value === 'custom') {
+                                      setIsCustomSroScheduleNumber(true);
+                                      setProductSelection({...productSelection, sroScheduleNumber: ''});
+                                    } else {
+                                      setProductSelection({...productSelection, sroScheduleNumber: value});
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="text-sm">
+                                    <SelectValue placeholder="Select SRO/Schedule Number" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ICTO TABLE I">ICTO TABLE I</SelectItem>
+                                    <SelectItem value="custom">Custom (Type your own)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input
+                                  id="sro-schedule-number-edit"
+                                  type="text"
+                                  value={productSelection.sroScheduleNumber}
+                                  onChange={(e) => setProductSelection({...productSelection, sroScheduleNumber: e.target.value})}
+                                  placeholder="Enter custom SRO schedule reference"
+                                  className="text-sm"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setIsCustomSroScheduleNumber(false);
+                                    setProductSelection({...productSelection, sroScheduleNumber: 'ICTO TABLE I'});
+                                  }}
+                                  className="px-3 text-xs"
+                                >
+                                  Back to Select
+                                </Button>
+                              </div>
+                            )}
                           </div>
 
                           <div className="space-y-2">
@@ -3090,22 +3212,98 @@ export default function EditOrder() {
 
                             <div>
                               <Label className="text-sm">Item Serial Number</Label>
-                              <Input
-                                value={item.itemSerialNumber || ''}
-                                onChange={(e) => updateOrderItem(index, 'itemSerialNumber', e.target.value)}
-                                placeholder="Item-specific serial"
-                                className="text-sm"
-                              />
+                              {!itemCustomItemSerialNumber[index] ? (
+                                <div className="flex gap-2">
+                                  <Select
+                                    value={item.itemSerialNumber || ''}
+                                    onValueChange={(value) => {
+                                      if (value === 'custom') {
+                                        setItemCustomItemSerialNumber(prev => ({...prev, [index]: true}));
+                                        updateOrderItem(index, 'itemSerialNumber', '');
+                                      } else {
+                                        updateOrderItem(index, 'itemSerialNumber', value);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="text-sm">
+                                      <SelectValue placeholder="Select Item Serial Number" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="19">19</SelectItem>
+                                      <SelectItem value="custom">Custom (Type your own)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={item.itemSerialNumber || ''}
+                                    onChange={(e) => updateOrderItem(index, 'itemSerialNumber', e.target.value)}
+                                    placeholder="Enter custom item serial number"
+                                    className="text-sm"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setItemCustomItemSerialNumber(prev => ({...prev, [index]: false}));
+                                      updateOrderItem(index, 'itemSerialNumber', '19');
+                                    }}
+                                    className="px-3 text-xs"
+                                  >
+                                    Back to Select
+                                  </Button>
+                                </div>
+                              )}
                             </div>
 
                             <div>
                               <Label className="text-sm">SRO/Schedule Number</Label>
-                              <Input
-                                value={item.sroScheduleNumber || ''}
-                                onChange={(e) => updateOrderItem(index, 'sroScheduleNumber', e.target.value)}
-                                placeholder="SRO schedule reference"
-                                className="text-sm"
-                              />
+                              {!itemCustomSroScheduleNumber[index] ? (
+                                <div className="flex gap-2">
+                                  <Select
+                                    value={item.sroScheduleNumber || ''}
+                                    onValueChange={(value) => {
+                                      if (value === 'custom') {
+                                        setItemCustomSroScheduleNumber(prev => ({...prev, [index]: true}));
+                                        updateOrderItem(index, 'sroScheduleNumber', '');
+                                      } else {
+                                        updateOrderItem(index, 'sroScheduleNumber', value);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="text-sm">
+                                      <SelectValue placeholder="Select SRO/Schedule Number" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="ICTO TABLE I">ICTO TABLE I</SelectItem>
+                                      <SelectItem value="custom">Custom (Type your own)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={item.sroScheduleNumber || ''}
+                                    onChange={(e) => updateOrderItem(index, 'sroScheduleNumber', e.target.value)}
+                                    placeholder="Enter custom SRO schedule reference"
+                                    className="text-sm"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setItemCustomSroScheduleNumber(prev => ({...prev, [index]: false}));
+                                      updateOrderItem(index, 'sroScheduleNumber', 'ICTO TABLE I');
+                                    }}
+                                    className="px-3 text-xs"
+                                  >
+                                    Back to Select
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
