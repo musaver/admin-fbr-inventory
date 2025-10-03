@@ -1120,9 +1120,25 @@ async function processOrderChunk(
         ))
         .limit(1);
 
+      // If no user found by phone, try to find by customer name (if provided)
+      if (existingUser.length === 0 && customerOrders[0].customerName?.trim()) {
+        const customerName = customerOrders[0].customerName.trim();
+        existingUser = await db.select({ id: user.id, email: user.email })
+          .from(user)
+          .where(and(
+            eq(user.name, customerName),
+            eq(user.tenantId, tenantId)
+          ))
+          .limit(1);
+        
+        if (existingUser.length > 0) {
+          console.log(`✅ Found existing user by name: ${customerName}`);
+        }
+      }
+
       if (existingUser.length > 0) {
         customerId = existingUser[0].id;
-        console.log(`✅ Found existing user by phone: ${customerPhone}`);
+        console.log(`✅ Found existing user: ${customerPhone}`);
       } else {
         // Create new user from first order's customer data
         const firstOrder = customerOrders[0];
@@ -1227,7 +1243,7 @@ async function processOrderChunk(
           } else {
             // Create new product
             productId = uuidv4();
-            const unitPrice = parseFloat(orderData.unitPrice);
+            const unitPrice = parseFloat(orderData.unitPrice || '0');
             
             const newProduct = {
               id: productId,
