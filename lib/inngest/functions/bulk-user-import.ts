@@ -497,14 +497,20 @@ function validateProduct(productData: ProductImportRow): string | null {
 
 // Validate order data
 function validateOrder(orderData: OrderImportRow): string | null {
-  if (!orderData.customerPhone?.trim()) {
-    return 'Customer Phone is required';
+  // Either Customer Phone OR Customer Name must be provided
+  const hasPhone = orderData.customerPhone?.trim();
+  const hasName = orderData.customerName?.trim();
+  
+  if (!hasPhone && !hasName) {
+    return 'Either Customer Phone or Customer Name is required';
   }
 
-  // Basic phone validation (at least 7 digits)
-  const phoneRegex = /\d{7,}/;
-  if (!phoneRegex.test(orderData.customerPhone.replace(/[^\d]/g, ''))) {
-    return 'Invalid phone format - must contain at least 7 digits';
+  // If phone is provided, validate it
+  if (hasPhone) {
+    const phoneRegex = /\d{7,}/;
+    if (!phoneRegex.test(orderData.customerPhone.replace(/[^\d]/g, ''))) {
+      return 'Invalid phone format - must contain at least 7 digits';
+    }
   }
 
   if (!orderData.productSku?.trim()) {
@@ -1082,21 +1088,27 @@ async function processOrderChunk(
     detailedReport: []
   };
 
-  // Group orders by customer phone + order number to create proper orders
-  // If order number is provided, group by phone+orderNumber, otherwise by phone only
+  // Group orders by customer identifier + order number to create proper orders
+  // Use phone if available, otherwise use customer name as identifier
   const ordersByKey = new Map<string, OrderImportRow[]>();
   orderRows.forEach((orderRow, index) => {
-    const phone = orderRow.customerPhone.trim();
+    const phone = orderRow.customerPhone?.trim() || '';
+    const customerName = orderRow.customerName?.trim() || '';
     const orderNumber = orderRow.orderNumber?.trim();
     
-    // Create unique key: if orderNumber exists, use phone+orderNumber, otherwise use phone+auto-increment
+    // Create customer identifier: prefer phone, fallback to customer name
+    const customerIdentifier = phone || customerName || `unknown-${startIndex + index + 1}`;
+    
+    // Create unique key: if orderNumber exists, use identifier+orderNumber, otherwise use identifier+auto-increment
     let orderKey: string;
     if (orderNumber) {
-      orderKey = `${phone}|${orderNumber}`;
+      orderKey = `${customerIdentifier}|${orderNumber}`;
     } else {
       // If no order number provided, each row becomes a separate order (for backward compatibility)
-      orderKey = `${phone}|auto-${startIndex + index + 1}`;
+      orderKey = `${customerIdentifier}|auto-${startIndex + index + 1}`;
     }
+    
+    console.log(`🔍 Order grouping: phone="${phone}", name="${customerName}", identifier="${customerIdentifier}", key="${orderKey}"`);
     
     if (!ordersByKey.has(orderKey)) {
       ordersByKey.set(orderKey, []);
@@ -1107,23 +1119,37 @@ async function processOrderChunk(
   console.log(`📦 Grouped ${orderRows.length} rows into ${ordersByKey.size} orders`);
 
   for (const [orderKey, customerOrders] of ordersByKey) {
-    const customerPhone = orderKey.split('|')[0]; // Extract phone from key
+    const customerIdentifier = orderKey.split('|')[0]; // Extract customer identifier from key
+    const firstOrder = customerOrders[0];
+    const customerPhone = firstOrder.customerPhone?.trim() || '';
+    const customerName = firstOrder.customerName?.trim() || '';
+    
+    console.log(`🔍 Processing order group: identifier="${customerIdentifier}", phone="${customerPhone}", name="${customerName}"`);
     
     try {
       // Find or create user
       let customerId: string;
-      let existingUser = await db.select({ id: user.id, email: user.email })
-        .from(user)
-        .where(and(
-          eq(user.phone, customerPhone),
-          eq(user.tenantId, tenantId)
-        ))
-        .limit(1);
+      let existingUser: any[] = [];
+      
+      // First try to find by phone if phone is provided
+      if (customerPhone) {
+        console.log(`🔍 Searching for user by phone: "${customerPhone}"`);
+        existingUser = await db.select({ id: user.id, email: user.email })
+          .from(user)
+          .where(and(
+            eq(user.phone, customerPhone),
+            eq(user.tenantId, tenantId)
+          ))
+          .limit(1);
+          
+        if (existingUser.length > 0) {
+          console.log(`✅ Found existing user by phone: "${customerPhone}"`);
+        }
+      }
 
       // If no user found by phone, try to find by customer name (if provided)
-      if (existingUser.length === 0 && customerOrders[0].customerName?.trim()) {
-        const customerName = customerOrders[0].customerName.trim();
-        console.log(`🔍 Searching for user by name: "${customerName}" (phone search failed for: ${customerPhone})`);
+      if (existingUser.length === 0 && customerName) {
+        console.log(`🔍 Searching for user by name: "${customerName}" (phone search ${customerPhone ? 'failed' : 'skipped - no phone provided'})`);
         
         // First try exact match (case-sensitive)
         existingUser = await db.select({ id: user.id, email: user.email, name: user.name })
@@ -1168,24 +1194,33 @@ async function processOrderChunk(
 
       if (existingUser.length > 0) {
         customerId = existingUser[0].id;
-        console.log(`✅ Found existing user: ${customerPhone}`);
+        console.log(`✅ Found existing user: identifier="${customerIdentifier}"`);
       } else {
         // Create new user from first order's customer data
         const firstOrder = customerOrders[0];
         customerId = uuidv4();
         
-        // Use email if provided, otherwise generate one from phone
-        const userEmail = firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`;
+        // Use email if provided, otherwise generate one from phone or name
+        let userEmail = firstOrder.customerEmail?.trim();
+        if (!userEmail) {
+          if (customerPhone) {
+            userEmail = `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`;
+          } else if (customerName) {
+            userEmail = `user+${customerName.toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`;
+          } else {
+            userEmail = `user+${Date.now()}@unknown.local`;
+          }
+        }
         
-        const userName = firstOrder.customerName?.trim() || `Customer ${customerPhone}`;
-        console.log(`🆕 Creating new user: name="${userName}", email="${userEmail}", phone="${customerPhone}"`);
+        const userName = customerName || `Customer ${customerPhone || 'Unknown'}`;
+        console.log(`🆕 Creating new user: name="${userName}", email="${userEmail}", phone="${customerPhone || 'N/A'}"`);
         
         const newUser = {
           id: customerId,
           tenantId,
           name: userName,
           email: userEmail,
-          phone: customerPhone,
+          phone: customerPhone || null,
           userType: 'customer',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -1207,7 +1242,7 @@ async function processOrderChunk(
           updatedAt: new Date(),
         });
 
-        console.log(`✅ Created new user by phone: ${customerPhone}`);
+        console.log(`✅ Created new user: ${customerName || customerPhone || 'Unknown'}`);
       }
 
       // Create order
@@ -1238,7 +1273,7 @@ async function processOrderChunk(
             const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
             result.errors.push({
               row: globalRowIndex,
-              identifier: `${customerPhone}${orderRef} - ${orderData.productSku}`,
+              identifier: `${customerIdentifier}${orderRef} - ${orderData.productSku}`,
               message: `${validationError}${orderRef}`
             });
             
@@ -1248,7 +1283,7 @@ async function processOrderChunk(
               status: 'failed',
               action: 'validation_error',
               data: {
-                customerEmail: orderData.customerEmail || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`,
+                customerEmail: orderData.customerEmail || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`),
                 customOrderNumber: orderData.orderNumber,
                 productSku: orderData.productSku,
                 productName: orderData.productName,
@@ -1354,7 +1389,7 @@ async function processOrderChunk(
             status: 'success',
             action: i === 0 ? 'created_order' : 'added_to_order',
             data: {
-              customerEmail: existingUser.length > 0 ? existingUser[0].email : (orderData.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
+              customerEmail: existingUser.length > 0 ? existingUser[0].email : (orderData.customerEmail?.trim() || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`)),
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
@@ -1373,7 +1408,7 @@ async function processOrderChunk(
           const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
           result.errors.push({
             row: globalRowIndex,
-            identifier: `${customerPhone}${orderRef} - ${orderData.productSku}`,
+            identifier: `${customerIdentifier}${orderRef} - ${orderData.productSku}`,
             message: `${error.message || 'Unknown error occurred'}${orderRef}`
           });
           
@@ -1383,7 +1418,7 @@ async function processOrderChunk(
             status: 'failed',
             action: 'processing_error',
             data: {
-              customerEmail: orderData.customerEmail || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`,
+              customerEmail: orderData.customerEmail || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`),
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
@@ -1428,8 +1463,8 @@ async function processOrderChunk(
           orderNumber: finalOrderNumber, // Auto-generated unique order number
           customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
           userId: customerId,
-          email: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
-          phone: customerPhone,
+          email: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`)),
+          phone: customerPhone || null,
           status: 'pending', // Default status since removed from CSV
           paymentStatus: 'pending', // Default payment status since removed from CSV
           fulfillmentStatus: 'pending',
@@ -1460,15 +1495,15 @@ async function processOrderChunk(
           id: orderId,
           orderNumber: finalOrderNumber,
           customOrderNumberImport: customOrderNumberImport,
-          customerEmail: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`),
+          customerEmail: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`)),
           itemCount: orderItemsToCreate.length,
           rowNumbers: rowNumbers
         });
 
         const customOrderRef = customOrderNumberImport ? ` (Original: ${customOrderNumberImport})` : '';
-        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for phone ${customerPhone} (Rows: ${rowNumbers.join(', ')})`);
+        console.log(`✅ Created order ${finalOrderNumber}${customOrderRef} with ${orderItemsToCreate.length} items for customer ${customerIdentifier} (Rows: ${rowNumbers.join(', ')})`);
       } else {
-        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for phone ${customerPhone}`);
+        console.log(`⚠️ No valid items found for order ${finalOrderNumber || 'auto-generated'} for customer ${customerIdentifier}`);
       }
 
     } catch (error: any) {
@@ -1478,7 +1513,7 @@ async function processOrderChunk(
         const orderRef = orderData.orderNumber ? ` (Order: ${orderData.orderNumber})` : '';
         result.errors.push({
           row: globalRowIndex,
-          identifier: `${customerPhone}${orderRef} - Order Creation`,
+          identifier: `${customerIdentifier}${orderRef} - Order Creation`,
           message: `Order creation failed: ${error.message || 'Unknown error occurred'}${orderRef}`
         });
         result.failed++;
