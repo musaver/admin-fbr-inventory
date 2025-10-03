@@ -1,7 +1,7 @@
 import { inngest } from '@/lib/inngest';
 import { db } from '@/lib/db';
 import { importJobs, user, userLoyaltyPoints, products, stockMovements, orders, orderItems } from '@/lib/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 interface UserImportRow {
@@ -1123,7 +1123,10 @@ async function processOrderChunk(
       // If no user found by phone, try to find by customer name (if provided)
       if (existingUser.length === 0 && customerOrders[0].customerName?.trim()) {
         const customerName = customerOrders[0].customerName.trim();
-        existingUser = await db.select({ id: user.id, email: user.email })
+        console.log(`🔍 Searching for user by name: "${customerName}" (phone search failed for: ${customerPhone})`);
+        
+        // First try exact match (case-sensitive)
+        existingUser = await db.select({ id: user.id, email: user.email, name: user.name })
           .from(user)
           .where(and(
             eq(user.name, customerName),
@@ -1132,7 +1135,34 @@ async function processOrderChunk(
           .limit(1);
         
         if (existingUser.length > 0) {
-          console.log(`✅ Found existing user by name: ${customerName}`);
+          console.log(`✅ Found existing user by exact name match: "${customerName}" -> User: ${existingUser[0].name}`);
+        } else {
+          // Try case-insensitive search using SQL LOWER function
+          console.log(`🔍 Exact name match failed, trying case-insensitive search for: "${customerName}"`);
+          existingUser = await db.select({ id: user.id, email: user.email, name: user.name })
+            .from(user)
+            .where(and(
+              sql`LOWER(${user.name}) = LOWER(${customerName})`,
+              eq(user.tenantId, tenantId)
+            ))
+            .limit(1);
+          
+          if (existingUser.length > 0) {
+            console.log(`✅ Found existing user by case-insensitive name match: "${customerName}" -> User: ${existingUser[0].name}`);
+          } else {
+            console.log(`❌ No user found by name: "${customerName}" in tenant: ${tenantId}`);
+            
+            // Debug: Show what users actually exist in this tenant
+            const allUsers = await db.select({ id: user.id, name: user.name, phone: user.phone })
+              .from(user)
+              .where(eq(user.tenantId, tenantId))
+              .limit(10);
+            
+            console.log(`🔍 Debug: First 10 users in tenant ${tenantId}:`, allUsers.map(u => ({ 
+              name: u.name, 
+              phone: u.phone 
+            })));
+          }
         }
       }
 
@@ -1147,10 +1177,13 @@ async function processOrderChunk(
         // Use email if provided, otherwise generate one from phone
         const userEmail = firstOrder.customerEmail?.trim() || `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local`;
         
+        const userName = firstOrder.customerName?.trim() || `Customer ${customerPhone}`;
+        console.log(`🆕 Creating new user: name="${userName}", email="${userEmail}", phone="${customerPhone}"`);
+        
         const newUser = {
           id: customerId,
           tenantId,
-          name: firstOrder.customerName?.trim() || `Customer ${customerPhone}`,
+          name: userName,
           email: userEmail,
           phone: customerPhone,
           userType: 'customer',
@@ -1159,6 +1192,7 @@ async function processOrderChunk(
         };
 
         await db.insert(user).values(newUser);
+        console.log(`✅ Successfully created new user with name: "${userName}"`);
         
         // Initialize loyalty points
         await db.insert(userLoyaltyPoints).values({
