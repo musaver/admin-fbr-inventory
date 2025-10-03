@@ -3828,7 +3828,7 @@ export default function EditOrder() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className='hidden'>
                     <Label htmlFor="invoice-number">Invoice Number</Label>
                     <Input
                       id="invoice-number"
@@ -3848,7 +3848,7 @@ export default function EditOrder() {
                     />
                   </div>
                 </div>
-                <div>
+                <div className='hidden'>
                   <Label htmlFor="validation-response">Validation Response</Label>
                   <Textarea
                     id="validation-response"
