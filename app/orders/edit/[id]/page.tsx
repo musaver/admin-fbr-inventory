@@ -638,6 +638,7 @@ export default function EditOrder() {
     fetchCustomers();
     fetchLoyaltySettings();
     fetchSellerInfo();
+    fetchFbrSettings();
   }, [params.id]);
 
   // Scroll detection for sticky sidebar
@@ -725,9 +726,7 @@ export default function EditOrder() {
       if (orderData.isProductionSubmission !== undefined) {
         setIsProductionSubmission(orderData.isProductionSubmission);
       }
-      if (orderData.productionToken) {
-        setProductionToken(orderData.productionToken);
-      }
+      // Production token is now fetched from tenant settings in fetchFbrSettings()
       
       // Initialize province dropdown states
       const predefinedProvinces = ["Punjab", "Sindh", "Khyber Pakhtunkhwa (KPK)", "Balochistan", "Capital Territory", "Azad Jammu & Kashmir (AJK)", "Gilgit-Baltistan (GB)", "N/A"];
@@ -1122,6 +1121,37 @@ export default function EditOrder() {
       }
     } catch (err) {
       console.error('Error fetching seller info:', err);
+    }
+  };
+
+  const fetchFbrSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/fbr');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('FBR settings fetched:', data);
+        if (data.success && data.settings) {
+          // Update seller info with FBR settings (only if values exist in settings)
+          setSellerInfo(prev => ({
+            ...prev,
+            fbrSandboxToken: data.settings.fbrSandboxToken || prev.fbrSandboxToken,
+            fbrBaseUrl: data.settings.fbrBaseUrl || prev.fbrBaseUrl,
+            // Update seller details from FBR settings if available (but preserve existing if not)
+            sellerNTNCNIC: data.settings.fbrSellerNTNCNIC || prev.sellerNTNCNIC,
+            sellerBusinessName: data.settings.fbrSellerBusinessName || prev.sellerBusinessName,
+            sellerProvince: data.settings.fbrSellerProvince || prev.sellerProvince,
+            sellerAddress: data.settings.fbrSellerAddress || prev.sellerAddress
+          }));
+          
+          // Set production token
+          setProductionToken(data.settings.fbrProductionToken || '');
+          console.log('FBR Production token loaded:', data.settings.fbrProductionToken ? '✅ Token found (***' + data.settings.fbrProductionToken.slice(-4) + ')' : '❌ No production token found');
+        }
+      } else {
+        console.error('Failed to fetch FBR settings, status:', response.status);
+      }
+    } catch (err) {
+      console.error('Error fetching FBR settings:', err);
     }
   };
 
