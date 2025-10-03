@@ -247,6 +247,7 @@ export default function EditOrder() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fbrValidationLoading, setFbrValidationLoading] = useState(false);
   
   // Error scroll reference
   const errorRef = useRef<HTMLDivElement>(null);
@@ -648,6 +649,21 @@ export default function EditOrder() {
     fetchSellerInfo();
     fetchFbrSettings();
   }, [params.id]);
+
+  // Auto-run FBR validation 2 seconds after page load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (orderItems.length > 0 && !loading) {
+        setFbrValidationLoading(true);
+        handleFbrValidation();
+        setTimeout(() => {
+          setFbrValidationLoading(false);
+        }, 500); // Brief delay to show loading state
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [loading, orderItems.length]); // Run when loading is complete and items are available
 
   // Initialize custom field states based on existing values
   useEffect(() => {
@@ -1734,9 +1750,9 @@ export default function EditOrder() {
     ).length;
     
     if (updatedCount > 0) {
-      alert(`✅ FBR Validation Complete! Updated ${updatedCount} HS code${updatedCount > 1 ? 's' : ''} for FBR compliance.`);
+      //alert(`✅ FBR Validation Complete! Updated ${updatedCount} HS code${updatedCount > 1 ? 's' : ''} for FBR compliance.`);
     } else {
-      alert('ℹ️ All HS codes are already in correct FBR format.');
+      //alert('ℹ️ All HS codes are already in correct FBR format.');
     }
   };
 
@@ -1980,6 +1996,13 @@ export default function EditOrder() {
       {error && (
         <div ref={errorRef} className="mb-4 p-3 bg-red-100 text-red-700 rounded">
           {error}
+        </div>
+      )}
+
+      {fbrValidationLoading && (
+        <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded flex items-center">
+          <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></span>
+          Auto-validating FBR data...
         </div>
       )}
 
@@ -4008,9 +4031,16 @@ export default function EditOrder() {
                       variant="outline"
                       className="w-full mb-3 border-blue-200 text-blue-700 hover:bg-blue-50"
                       onClick={handleFbrValidation}
-                      disabled={orderItems.length === 0}
+                      disabled={orderItems.length === 0 || fbrValidationLoading}
                     >
-                      🛡️ Validate data for FBR
+                      {fbrValidationLoading ? (
+                        <>
+                          <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></span>
+                          Validating...
+                        </>
+                      ) : (
+                        <>🛡️ Validate data for FBR</>
+                      )}
                     </Button>
                     
                     <Button
