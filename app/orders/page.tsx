@@ -30,7 +30,8 @@ import {
   ShoppingCartIcon,
   DollarSignIcon,
   TrendingUpIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  DownloadIcon
 } from 'lucide-react';
 
 interface OrderItem {
@@ -325,6 +326,137 @@ export default function OrdersList() {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const exportOrders = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all orders (get more records for export)
+      const res = await fetch('/api/orders?limit=999999');
+      const response = await res.json();
+      const allOrders = response.data || response;
+      
+      if (!allOrders || allOrders.length === 0) {
+        alert('No orders found to export');
+        return;
+      }
+
+      // Create CSV header matching the import template format
+      const csvHeaders = [
+        'Order Number',
+        'Customer Phone', 
+        'Customer Name',
+        'Customer Email',
+        'Product SKU',
+        'Product Name',
+        'Quantity',
+        'Unit Price',
+        'Tax Amount',
+        'Tax Percentage', 
+        'Price Including Tax',
+        'HS Code',
+        'UOM',
+        'Serial Number',
+        'List Number',
+        'BC Number',
+        'Lot Number',
+        'Expiry Date'
+      ];
+
+      const csvRows = [csvHeaders.join(',')];
+
+      // Fetch items for each order and build CSV rows
+      for (const order of allOrders) {
+        try {
+          // Fetch full order details including items
+          const orderRes = await fetch(`/api/orders/${order.id}`);
+          const orderData = await orderRes.json();
+          const items = orderData.items || [];
+
+          if (items.length > 0) {
+            items.forEach((item: any) => {
+              const row = [
+                order.orderNumber || '',
+                order.phone || '',
+                order.user?.name || 'Guest',
+                order.email || order.user?.email || '',
+                item.sku || '',
+                item.productName || '',
+                item.quantity || '',
+                item.priceExcludingTax || item.price || '',
+                item.taxAmount || '',
+                item.taxPercentage || '',
+                item.priceIncludingTax || item.totalPrice || '',
+                item.hsCode || '',
+                item.uom || '',
+                item.serialNumber || '',
+                item.listNumber || '',
+                item.bcNumber || '',
+                item.lotNumber || '',
+                item.expiryDate || ''
+              ].map(field => `"${String(field).replace(/"/g, '""')}"`);
+              
+              csvRows.push(row.join(','));
+            });
+          } else {
+            // If no items, still export the order with empty product fields
+            const row = [
+              order.orderNumber || '',
+              order.phone || '',
+              order.user?.name || 'Guest',
+              order.email || order.user?.email || '',
+              '', // Product SKU
+              '', // Product Name
+              '', // Quantity
+              '', // Unit Price
+              '', // Tax Amount
+              '', // Tax Percentage
+              '', // Price Including Tax
+              '', // HS Code
+              '', // UOM
+              '', // Serial Number
+              '', // List Number
+              '', // BC Number
+              '', // Lot Number
+              '' // Expiry Date
+            ].map(field => `"${String(field).replace(/"/g, '""')}"`);
+            
+            csvRows.push(row.join(','));
+          }
+        } catch (itemError) {
+          console.warn(`Failed to fetch items for order ${order.orderNumber}:`, itemError);
+          // Add row with order data but no items
+          const row = [
+            order.orderNumber || '',
+            order.phone || '',
+            order.user?.name || 'Guest',
+            order.email || order.user?.email || '',
+            '', '', '', '', '', '', '', '', '', '', '', '', '', ''
+          ].map(field => `"${String(field).replace(/"/g, '""')}"`);
+          csvRows.push(row.join(','));
+        }
+      }
+
+      // Create and download the CSV file
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `orders_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error('Error exporting orders:', error);
+      alert('Error exporting orders. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -646,43 +778,59 @@ export default function OrdersList() {
             Manage customer orders and track sales performance
           </p>
         </div>
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <Button onClick={() => {
-            fetchOrders(currentPage, pagination.limit);
-            fetchStats();
-          }} disabled={loading || statsLoading} variant="outline" size="sm">
-            <RefreshCwIcon className={`h-4 w-4 mr-2 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button 
-            onClick={handleDeleteSelected} 
-            disabled={loading || selectedOrders.size === 0} 
-            variant="destructive" 
-            size="sm"
-          >
-            <TrashIcon className="h-4 w-4 mr-2" />
-            Delete Selected ({selectedOrders.size})
-          </Button>
-          <Button 
-            onClick={handleDeleteAll} 
-            disabled={loading || orders.length === 0} 
-            variant="destructive" 
-            size="sm"
-          >
-            <TrashIcon className="h-4 w-4 mr-2" />
-            Delete All
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/users/bulk-upload?tab=orders">
-              📤 Bulk Import
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/orders/add">
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add Order
-            </Link>
-          </Button>
+        <div className="flex flex-col space-y-2 flex-shrink-0">
+          {/* First Row - Action Buttons */}
+          <div className="flex items-center space-x-2">
+            <Button onClick={() => {
+              fetchOrders(currentPage, pagination.limit);
+              fetchStats();
+            }} disabled={loading || statsLoading} variant="outline" size="sm">
+              <RefreshCwIcon className={`h-4 w-4 mr-2 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button 
+              onClick={handleDeleteSelected} 
+              disabled={loading || selectedOrders.size === 0} 
+              variant="destructive" 
+              size="sm"
+            >
+              <TrashIcon className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedOrders.size})
+            </Button>
+            <Button 
+              onClick={handleDeleteAll} 
+              disabled={loading || orders.length === 0} 
+              variant="destructive" 
+              size="sm"
+            >
+              <TrashIcon className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
+          </div>
+          
+          {/* Second Row - Import/Export/Add Buttons */}
+          <div className="flex items-center space-x-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/users/bulk-upload?tab=orders">
+                📤 Bulk Import
+              </Link>
+            </Button>
+            <Button 
+              onClick={exportOrders} 
+              disabled={loading || orders.length === 0} 
+              variant="outline" 
+              size="sm"
+            >
+              <DownloadIcon className="h-4 w-4 mr-2" />
+              📥 Export Orders
+            </Button>
+            <Button asChild>
+              <Link href="/orders/add">
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add Order
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
