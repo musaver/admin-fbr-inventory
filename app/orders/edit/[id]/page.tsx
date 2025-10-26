@@ -124,6 +124,7 @@ interface OrderItem {
   discount?: number | string;
   fixedNotifiedValueOrRetailPrice?: number | string;
   saleType?: string;
+  disableAutoTaxCalculations?: boolean;
 }
 
 interface Customer {
@@ -385,7 +386,8 @@ export default function EditOrder() {
     listNumber: '',
     bcNumber: '',
     lotNumber: '',
-    expiryDate: ''
+    expiryDate: '',
+    disableAutoTaxCalculations: false
   });
 
   // Loading states
@@ -892,7 +894,8 @@ export default function EditOrder() {
           fedPayableTax: Number(item.fedPayableTax) || 0,
           discount: Number(item.discount) || 0,
           fixedNotifiedValueOrRetailPrice: Number(item.fixedNotifiedValueOrRetailPrice) || 0,
-          saleType: item.saleType
+          saleType: item.saleType,
+          disableAutoTaxCalculations: item.disableAutoTaxCalculations || false
         }));
         
         // Sort items by SRO Item Serial No. (FBR) - empty values go to the end
@@ -1329,7 +1332,8 @@ export default function EditOrder() {
       listNumber: product.listNumber || '',
       bcNumber: product.bcNumber || '',
       lotNumber: product.lotNumber || '',
-      expiryDate: product.expiryDate || ''
+      expiryDate: product.expiryDate || '',
+      disableAutoTaxCalculations: false
     });
     setProductSearchOpen(false);
   };
@@ -1449,7 +1453,8 @@ export default function EditOrder() {
         fedPayableTax: productSelection.fedPayableTax || 0,
         discount: productSelection.discountAmount || 0,
         fixedNotifiedValueOrRetailPrice: productSelection.fixedNotifiedValueOrRetailPrice || 0,
-        saleType: productSelection.saleType || 'Goods at standard rate'
+        saleType: productSelection.saleType || 'Goods at standard rate',
+        disableAutoTaxCalculations: productSelection.disableAutoTaxCalculations || false
       };
 
       // Add new item and sort by SRO Item Serial No. (FBR)
@@ -1485,7 +1490,8 @@ export default function EditOrder() {
         listNumber: '',
         bcNumber: '',
         lotNumber: '',
-        expiryDate: ''
+        expiryDate: '',
+        disableAutoTaxCalculations: false
       });
       
     } catch (error) {
@@ -1541,37 +1547,39 @@ export default function EditOrder() {
         const priceIncludingTax = Number(updatedItem.priceIncludingTax) || 0;
         const taxPercentage = Number(updatedItem.taxPercentage) || 0;
         
-        // Auto-calculate missing per-unit values based on what was changed
-        if (field === 'taxPercentage' && priceExcludingTax > 0) {
-          // Calculate tax amount and price including tax from percentage
-          const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
-          const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
-          updatedItems[index].taxAmount = calculatedTaxAmount;
-          updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
-        } else if (field === 'priceExcludingTax' && taxPercentage > 0) {
-          // Calculate tax amount and price including tax from excluding price
-          const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
-          const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
-          updatedItems[index].taxAmount = calculatedTaxAmount;
-          updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
-        } else if (field === 'priceIncludingTax' && taxPercentage > 0) {
-          // Calculate price excluding tax and tax amount from including price
-          const calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
-          const calculatedTaxAmount = priceIncludingTax - calculatedPriceExcludingTax;
-          updatedItems[index].priceExcludingTax = calculatedPriceExcludingTax;
-          updatedItems[index].taxAmount = calculatedTaxAmount;
-        } else if (field === 'priceIncludingTax' && priceExcludingTax > 0) {
-          // If no tax percentage, calculate it from the price difference
-          const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
-          const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
-          updatedItems[index].taxAmount = calculatedTaxAmount;
-          updatedItems[index].taxPercentage = calculatedTaxPercentage;
-        } else if (field === 'priceExcludingTax' && priceIncludingTax > 0) {
-          // If no tax percentage, calculate it from the price difference
-          const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
-          const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
-          updatedItems[index].taxAmount = calculatedTaxAmount;
-          updatedItems[index].taxPercentage = calculatedTaxPercentage;
+        // Auto-calculate missing per-unit values based on what was changed (only if auto calculations are enabled for this item)
+        if (!Boolean(updatedItem.disableAutoTaxCalculations)) {
+          if (field === 'taxPercentage' && priceExcludingTax > 0) {
+            // Calculate tax amount and price including tax from percentage
+            const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
+            const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+            updatedItems[index].taxAmount = calculatedTaxAmount;
+            updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
+          } else if (field === 'priceExcludingTax' && taxPercentage > 0) {
+            // Calculate tax amount and price including tax from excluding price
+            const calculatedTaxAmount = (priceExcludingTax * taxPercentage) / 100;
+            const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
+            updatedItems[index].taxAmount = calculatedTaxAmount;
+            updatedItems[index].priceIncludingTax = calculatedPriceIncludingTax;
+          } else if (field === 'priceIncludingTax' && taxPercentage > 0) {
+            // Calculate price excluding tax and tax amount from including price
+            const calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentage / 100);
+            const calculatedTaxAmount = priceIncludingTax - calculatedPriceExcludingTax;
+            updatedItems[index].priceExcludingTax = calculatedPriceExcludingTax;
+            updatedItems[index].taxAmount = calculatedTaxAmount;
+          } else if (field === 'priceIncludingTax' && priceExcludingTax > 0) {
+            // If no tax percentage, calculate it from the price difference
+            const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
+            const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
+            updatedItems[index].taxAmount = calculatedTaxAmount;
+            updatedItems[index].taxPercentage = calculatedTaxPercentage;
+          } else if (field === 'priceExcludingTax' && priceIncludingTax > 0) {
+            // If no tax percentage, calculate it from the price difference
+            const calculatedTaxAmount = priceIncludingTax - priceExcludingTax;
+            const calculatedTaxPercentage = priceExcludingTax > 0 ? (calculatedTaxAmount / priceExcludingTax) * 100 : 0;
+            updatedItems[index].taxAmount = calculatedTaxAmount;
+            updatedItems[index].taxPercentage = calculatedTaxPercentage;
+          }
         }
         
         // Recalculate total price with updated per-unit values
@@ -2457,7 +2465,21 @@ export default function EditOrder() {
 
                       {/* Tax Calculation Fields */}
                       <div>
-                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Tax & Pricing Details</h5>
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="text-sm font-medium text-muted-foreground">Tax & Pricing Details</h5>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="disable-auto-tax-product-selection"
+                              checked={Boolean(productSelection.disableAutoTaxCalculations)}
+                              onChange={(e) => setProductSelection({...productSelection, disableAutoTaxCalculations: e.target.checked})}
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                            />
+                            <Label htmlFor="disable-auto-tax-product-selection" className="text-xs text-muted-foreground cursor-pointer">
+                              Disable automatic tax calculations
+                            </Label>
+                          </div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="price-excluding-tax-edit" className="text-sm">Price Excluding Tax</Label>
@@ -2471,7 +2493,7 @@ export default function EditOrder() {
                                   const priceExcludingTax = value === '' ? 0 : parseFloat(value) || 0;
                                   setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
                                   
-                                  if (!value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
+                                  if (!productSelection.disableAutoTaxCalculations && !value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
                                     const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
                                     const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTax, taxPercentageNum);
                                     const calculatedPriceIncludingTax = priceExcludingTax + calculatedTaxAmount;
@@ -2480,7 +2502,7 @@ export default function EditOrder() {
                                       taxAmount: calculatedTaxAmount,
                                       priceIncludingTax: Math.round(calculatedPriceIncludingTax * 100) / 100
                                     }));
-                                  } else if (!value.endsWith('.') && value !== '' && Number(productSelection.priceIncludingTax) > 0) {
+                                  } else if (!productSelection.disableAutoTaxCalculations && !value.endsWith('.') && value !== '' && Number(productSelection.priceIncludingTax) > 0) {
                                     // If no tax percentage but we have price including tax, calculate tax percentage
                                     const priceIncludingTaxNum = Number(productSelection.priceIncludingTax);
                                     const calculatedTaxAmount = priceIncludingTaxNum - priceExcludingTax;
@@ -2512,7 +2534,7 @@ export default function EditOrder() {
                                   const taxPercentage = value === '' ? 0 : parseFloat(value) || 0;
                                   setProductSelection(prev => ({...prev, taxPercentage: value === '' ? 0 : value}));
                                   
-                                  if (taxPercentage > 0 && Number(productSelection.priceExcludingTax) > 0 && !value.endsWith('.')) {
+                                  if (!productSelection.disableAutoTaxCalculations && taxPercentage > 0 && Number(productSelection.priceExcludingTax) > 0 && !value.endsWith('.')) {
                                     const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
                                     const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTaxNum, taxPercentage);
                                     const calculatedPriceIncludingTax = priceExcludingTaxNum + calculatedTaxAmount;
@@ -2541,7 +2563,7 @@ export default function EditOrder() {
                                   const priceIncludingTax = value === '' ? 0 : parseFloat(value) || 0;
                                   setProductSelection(prev => ({...prev, priceIncludingTax: priceIncludingTax}));
                                   
-                                  if (!value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
+                                  if (!productSelection.disableAutoTaxCalculations && !value.endsWith('.') && value !== '' && Number(productSelection.taxPercentage) > 0) {
                                     // Calculate price excluding tax and tax amount from including price
                                     const taxPercentageNum = Number(productSelection.taxPercentage);
                                     const calculatedPriceExcludingTax = priceIncludingTax / (1 + taxPercentageNum / 100);
@@ -2551,7 +2573,7 @@ export default function EditOrder() {
                                       priceExcludingTax: Math.round(calculatedPriceExcludingTax * 100) / 100,
                                       taxAmount: Math.round(calculatedTaxAmount * 100) / 100
                                     }));
-                                  } else if (!value.endsWith('.') && value !== '' && Number(productSelection.priceExcludingTax) > 0) {
+                                  } else if (!productSelection.disableAutoTaxCalculations && !value.endsWith('.') && value !== '' && Number(productSelection.priceExcludingTax) > 0) {
                                     // If no tax percentage but we have price excluding tax, calculate tax percentage
                                     const priceExcludingTaxNum = Number(productSelection.priceExcludingTax);
                                     const calculatedTaxAmount = priceIncludingTax - priceExcludingTaxNum;
@@ -3045,7 +3067,21 @@ export default function EditOrder() {
 
                         {/* Tax & Pricing Details */}
                         <div className="mb-6">
-                          <h6 className="text-sm font-medium mb-3 text-muted-foreground">💰 Tax & Pricing Details</h6>
+                          <div className="flex items-center justify-between mb-3">
+                            <h6 className="text-sm font-medium text-muted-foreground">💰 Tax & Pricing Details</h6>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`disable-auto-tax-${index}`}
+                                checked={Boolean(item.disableAutoTaxCalculations)}
+                                onChange={(e) => updateOrderItem(index, 'disableAutoTaxCalculations', e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                              />
+                              <Label htmlFor={`disable-auto-tax-${index}`} className="text-xs text-muted-foreground cursor-pointer">
+                                Disable automatic tax calculations
+                              </Label>
+                            </div>
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <Label className="text-sm">Price Excluding Tax</Label>

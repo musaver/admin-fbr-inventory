@@ -357,6 +357,9 @@ export default function AddOrder() {
   // Tax calculation loading state
   const [isTaxCalculating, setIsTaxCalculating] = useState(false);
   
+  // State for disabling automatic tax calculations
+  const [disableAutoTaxCalculations, setDisableAutoTaxCalculations] = useState(false);
+  
   // Loading state for adding products
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   
@@ -3422,17 +3425,31 @@ export default function AddOrder() {
                 <div>
                     <div className="flex items-center justify-between mb-3">
                       <h5 className="text-sm font-medium text-muted-foreground">Tax & Pricing Information</h5>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="update-product-data"
-                          checked={updateProductData}
-                          onChange={(e) => setUpdateProductData(e.target.checked)}
-                          className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                        />
-                        <Label htmlFor="update-product-data" className="text-xs text-muted-foreground cursor-pointer">
-                          Update data into database of this product
-                        </Label>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="disable-auto-tax"
+                            checked={disableAutoTaxCalculations}
+                            onChange={(e) => setDisableAutoTaxCalculations(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                          />
+                          <Label htmlFor="disable-auto-tax" className="text-xs text-muted-foreground cursor-pointer">
+                            Disable automatic tax calculations
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="update-product-data"
+                            checked={updateProductData}
+                            onChange={(e) => setUpdateProductData(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                          />
+                          <Label htmlFor="update-product-data" className="text-xs text-muted-foreground cursor-pointer">
+                            Update data into database of this product
+                          </Label>
+                        </div>
                       </div>
                     </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -3477,8 +3494,8 @@ export default function AddOrder() {
                           // Update tax percentage immediately
                           setProductSelection(prev => ({...prev, taxPercentage: value === '' ? 0 : value}));
                           
-                          // Calculate tax amount and price including tax if we have both values (only if value is a complete number)
-                          if (taxPercentage > 0 && productSelection.priceExcludingTax > 0 && !value.endsWith('.')) {
+                          // Calculate tax amount and price including tax if we have both values (only if value is a complete number and auto calculations are enabled)
+                          if (!disableAutoTaxCalculations && taxPercentage > 0 && productSelection.priceExcludingTax > 0 && !value.endsWith('.')) {
                             const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
                             const calculatedTaxAmount = await calculateTaxAmount(priceExcludingTaxNum, taxPercentage);
                             const calculatedPriceIncludingTax = priceExcludingTaxNum + calculatedTaxAmount;
@@ -3511,8 +3528,8 @@ export default function AddOrder() {
                           // Update price including tax immediately
                           setProductSelection(prev => ({...prev, priceIncludingTax: priceIncludingTax}));
                           
-                          // Only perform calculations if value is a complete number (not ending with decimal point)
-                          if (!value.endsWith('.') && value !== '') {
+                          // Only perform calculations if value is a complete number (not ending with decimal point) and auto calculations are enabled
+                          if (!disableAutoTaxCalculations && !value.endsWith('.') && value !== '') {
                             // If we have tax percentage and price excluding tax, use our calculation method
                             if (productSelection.taxPercentage > 0 && productSelection.priceExcludingTax > 0) {
                               const priceExcludingTaxNum = parseFloat(productSelection.priceExcludingTax.toString());
@@ -3555,8 +3572,8 @@ export default function AddOrder() {
                           // Update price excluding tax immediately
                           setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
                           
-                          // Only perform calculations if value is a complete number (not ending with decimal point)
-                          if (!value.endsWith('.') && value !== '') {
+                          // Only perform calculations if value is a complete number (not ending with decimal point) and auto calculations are enabled
+                          if (!disableAutoTaxCalculations && !value.endsWith('.') && value !== '') {
                             // Calculate tax amount and price including tax if we have tax percentage
                             if (typeof priceExcludingTax === 'number' && priceExcludingTax > 0 && productSelection.taxPercentage > 0) {
                               const taxPercentageNum = parseFloat(productSelection.taxPercentage.toString());
