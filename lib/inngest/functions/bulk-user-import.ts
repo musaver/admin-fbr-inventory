@@ -1261,12 +1261,20 @@ async function processOrderChunk(
       let subtotal = 0;
       const orderItemsToCreate: any[] = [];
 
+      // Sort customer orders by original CSV row number to preserve order
+      customerOrders.sort((a, b) => (a as any).globalRowIndex - (b as any).globalRowIndex);
+
       // Process each order item
       for (let i = 0; i < customerOrders.length; i++) {
         const orderData = customerOrders[i];
         const globalRowIndex = (orderData as any).globalRowIndex;
 
+        // Parse quantity and unit price early for use in validation reporting and error handling
+        const quantityFromCSV = orderData.quantity?.trim();
+        const parsedQuantity = quantityFromCSV && quantityFromCSV !== '' ? parseInt(quantityFromCSV) : null;
+
         try {
+          
           // Validate order data
           const validationError = validateOrder(orderData);
           if (validationError) {
@@ -1287,7 +1295,7 @@ async function processOrderChunk(
                 customOrderNumber: orderData.orderNumber,
                 productSku: orderData.productSku,
                 productName: orderData.productName,
-                quantity: orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1,
+                quantity: parsedQuantity,
                 errorMessage: validationError
               }
             });
@@ -1344,10 +1352,13 @@ async function processOrderChunk(
             console.log(`✅ Created new product: ${orderData.productSku}`);
           }
 
-          // Create order item with default values for optional fields
-          const quantity = orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1; // Default to 1 if not provided
-          const unitPrice = orderData.unitPrice?.trim() ? parseFloat(orderData.unitPrice) : 0.00; // Default to 0 if not provided
-          const totalPrice = quantity * unitPrice;
+          // Create order item with exact values from CSV - preserve empty fields
+          const quantity = parsedQuantity; // Use already parsed quantity
+          
+          const unitPriceFromCSV = orderData.unitPrice?.trim();
+          const unitPrice = unitPriceFromCSV && unitPriceFromCSV !== '' ? parseFloat(unitPriceFromCSV) : null;
+          
+          const totalPrice = (quantity !== null && unitPrice !== null) ? quantity * unitPrice : 0;
           
           // Parse tax fields - unitPrice now contains price excluding tax
           const taxAmount = orderData.taxAmount && orderData.taxAmount.trim() !== '' ? parseFloat(orderData.taxAmount) : 0;
@@ -1371,14 +1382,14 @@ async function processOrderChunk(
             bcNumber: orderData.bcNumber?.trim() || null,
             lotNumber: orderData.lotNumber?.trim() || null,
             expiryDate: orderData.expiryDate?.trim() || null,
-            quantity: quantity,
-            price: unitPrice.toFixed(2),
+            quantity: quantity !== null ? quantity : 0,
+            price: unitPrice !== null ? unitPrice.toFixed(2) : '0.00',
             totalPrice: totalPrice.toFixed(2),
             taxAmount: taxAmount.toFixed(2),
             taxPercentage: taxPercentage.toFixed(2),
             priceIncludingTax: priceIncludingTax.toFixed(2),
             priceExcludingTax: priceExcludingTax.toFixed(2),
-            itemSequence: i + 1, // Item order within the order (1, 2, 3, etc.)
+            itemSequence: i + 1, // Item order within the order (1, 2, 3, etc.) - now properly sorted by CSV row order
           };
 
           orderItemsToCreate.push(orderItem);
@@ -1422,7 +1433,7 @@ async function processOrderChunk(
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
-              quantity: orderData.quantity?.trim() ? parseInt(orderData.quantity) : 1,
+              quantity: parsedQuantity,
               errorMessage: error.message || 'Unknown error occurred'
             }
           });
