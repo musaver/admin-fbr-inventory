@@ -114,6 +114,7 @@ interface OrderItem {
   bcNumber?: string;
   lotNumber?: string;
   expiryDate?: string;
+  itemSequence?: number;
   taxAmount?: number | string;
   taxPercentage?: number | string;
   priceIncludingTax?: number | string;
@@ -1708,9 +1709,26 @@ export default function EditOrder() {
     }
   };
 
-  // Sort items by SRO Item Serial No. (FBR) - serialNumber field
+  // Sort items by import order (itemSequence), then by SKU, then by serial number
   const sortItemsBySerialNumber = (items: OrderItem[]) => {
     return items.sort((a, b) => {
+      // First priority: Sort by itemSequence (CSV import order) if both items have it
+      const aSequence = a.itemSequence || 0;
+      const bSequence = b.itemSequence || 0;
+      
+      if (aSequence && bSequence) {
+        return aSequence - bSequence;
+      }
+      
+      // Second priority: Sort by SKU if itemSequence is not available
+      const aSku = a.sku || '';
+      const bSku = b.sku || '';
+      
+      if (aSku && bSku) {
+        return aSku.localeCompare(bSku, undefined, { numeric: true, sensitivity: 'base' });
+      }
+      
+      // Fallback: Sort by serial number for backward compatibility
       const aSerial = a.serialNumber || '';
       const bSerial = b.serialNumber || '';
       
