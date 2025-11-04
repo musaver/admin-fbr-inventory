@@ -56,8 +56,13 @@ export default function SettingsPage() {
     fbrSellerNTNCNIC: '',
     fbrSellerBusinessName: '',
     fbrSellerProvince: '',
-    fbrSellerAddress: ''
+    fbrSellerAddress: '',
+    fbrStrnNumber: ''
   });
+
+  // Logo settings
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -65,17 +70,19 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const [stockRes, taxRes, loyaltyRes, fbrRes] = await Promise.all([
+      const [stockRes, taxRes, loyaltyRes, fbrRes, logoRes] = await Promise.all([
         fetch('/api/settings/stock-management'),
         fetch('/api/settings/tax-settings'),
         fetch('/api/settings/loyalty'),
-        fetch('/api/settings/fbr')
+        fetch('/api/settings/fbr'),
+        fetch('/api/settings/logo')
       ]);
       
       const stockData = await stockRes.json();
       const taxData = await taxRes.json();
       const loyaltyData = await loyaltyRes.json();
       const fbrData = await fbrRes.json();
+      const logoData = await logoRes.json();
       
       setStockManagementEnabled(stockData.stockManagementEnabled);
       setVatTax(taxData.vatTax);
@@ -87,6 +94,10 @@ export default function SettingsPage() {
       
       if (fbrData.success) {
         setFbrSettings(fbrData.settings);
+      }
+
+      if (logoData.success && logoData.logoUrl) {
+        setLogoUrl(logoData.logoUrl);
       }
     } catch (err) {
       console.error(err);
@@ -255,6 +266,52 @@ export default function SettingsPage() {
     }));
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingLogo(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('directory', 'logos');
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const data = await uploadResponse.json();
+        throw new Error(data.error || 'Failed to upload logo');
+      }
+
+      const { url } = await uploadResponse.json();
+
+      // Save logo URL to settings
+      const saveResponse = await fetch('/api/settings/logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logoUrl: url }),
+      });
+
+      if (!saveResponse.ok) {
+        const data = await saveResponse.json();
+        throw new Error(data.error || 'Failed to save logo');
+      }
+
+      setLogoUrl(url);
+      setSuccess('Logo uploaded successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const handleSaveFbrSettings = async () => {
     try {
       setSaving(true);
@@ -319,6 +376,67 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-8">
+        {/* Logo Upload Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">Tenant Logo</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Upload your business logo to personalize your tenant
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {logoUrl && (
+              <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <img 
+                  src={logoUrl} 
+                  alt="Tenant Logo" 
+                  className="max-h-32 object-contain"
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors">
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleLogoUpload}
+                disabled={uploadingLogo}
+                className="hidden"
+                id="logo-upload"
+              />
+              <label 
+                htmlFor="logo-upload"
+                className={`cursor-pointer flex flex-col items-center ${uploadingLogo ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700 mb-1">
+                  {uploadingLogo ? 'Uploading...' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  PNG, JPG, WEBP up to 5MB
+                </span>
+              </label>
+            </div>
+
+            {logoUrl && (
+              <div className="text-center">
+                <button
+                  onClick={() => {
+                    setLogoUrl('');
+                    // Optionally call API to remove logo
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700"
+                >
+                  Remove Logo
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Stock Management Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-4">
@@ -946,6 +1064,24 @@ export default function SettingsPage() {
                   />
                   <p className="text-xs text-gray-500">
                     Your complete business address for invoicing
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    STRN Number
+                  </label>
+                  <input
+                    type="text"
+                    value={fbrSettings.fbrStrnNumber}
+                    onChange={(e) => handleFbrSettingChange('fbrStrnNumber', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your STRN number"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Sales Tax Registration Number (STRN) issued by FBR
                   </p>
                 </div>
               </div>

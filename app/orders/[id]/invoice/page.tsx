@@ -34,6 +34,7 @@ export default function OrderInvoice() {
   const [order, setOrder] = useState<any>(null);
   const [addons, setAddons] = useState<any[]>([]);
   const [sellerInfo, setSellerInfo] = useState<any>(null);
+  const [logoUrl, setLogoUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [debugJson, setDebugJson] = useState<{
@@ -49,6 +50,7 @@ export default function OrderInvoice() {
     fetchOrderData();
     fetchAddons();
     fetchSellerInfo();
+    fetchLogo();
   }, [orderId]);
 
   const fetchOrderData = async () => {
@@ -110,6 +112,20 @@ export default function OrderInvoice() {
     }
   };
 
+  const fetchLogo = async () => {
+    try {
+      const logoRes = await fetch('/api/settings/logo');
+      if (logoRes.ok) {
+        const logoData = await logoRes.json();
+        if (logoData.success && logoData.logoUrl) {
+          setLogoUrl(logoData.logoUrl);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch logo:', err);
+    }
+  };
+
   // Format amount for print (returns plain string, not React component)
   const formatAmountForPrint = (amount: string | number) => {
     const numAmount = Number(amount);
@@ -129,6 +145,20 @@ export default function OrderInvoice() {
       alert('Please allow popups for printing functionality');
       return;
     }
+
+    // Calculate Amount (sum of all Price Ex. Tax)
+    const totalAmount = orderItems.reduce((sum: number, item: any) => {
+      const priceExTax = Number(item.priceExcludingTax) || 0;
+      const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+      return sum + (priceExTax * quantity);
+    }, 0);
+
+    // Calculate GST (sum of all Tax Amount)
+    const totalGST = orderItems.reduce((sum: number, item: any) => {
+      const taxAmount = Number(item.taxAmount) || 0;
+      const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+      return sum + (taxAmount * quantity);
+    }, 0);
 
     // Build the print content
     const printContent = `
@@ -186,6 +216,16 @@ export default function OrderInvoice() {
             
             .company-info {
               text-align: right;
+              display: flex;
+              flex-direction: column;
+              align-items: flex-end;
+            }
+
+            .company-logo {
+              max-height: 60px;
+              max-width: 200px;
+              margin-bottom: 8px;
+              object-fit: contain;
             }
             
             .company-info h2 {
@@ -499,8 +539,10 @@ export default function OrderInvoice() {
               </div>
             </div>
             <div class="company-info">
+              ${logoUrl ? `<img src="${logoUrl}" alt="Company Logo" class="company-logo" />` : ''}
               ${sellerInfo?.fbrSellerBusinessName ? `<h2>${sellerInfo.fbrSellerBusinessName}</h2>` : '<h2>Business Name</h2>'}
               ${sellerInfo?.fbrSellerNTNCNIC ? `<p>NTN/CNIC: ${sellerInfo.fbrSellerNTNCNIC}</p>` : ''}
+              ${sellerInfo?.fbrStrnNumber ? `<p>STRN: ${sellerInfo.fbrStrnNumber}</p>` : ''}
               ${sellerInfo?.fbrSellerAddress ? `<p>${sellerInfo.fbrSellerAddress}</p>` : ''}
               ${sellerInfo?.fbrSellerProvince ? `<p>${sellerInfo.fbrSellerProvince} Province</p>` : ''}
             </div>
@@ -665,6 +707,18 @@ export default function OrderInvoice() {
             
             <div class="totals-box">
               <h3>Order Summary</h3>
+              ${totalAmount > 0 ? `
+              <div class="total-row">
+                <span>Amount:</span>
+                <span>${formatAmountForPrint(totalAmount)}</span>
+              </div>
+              ` : ''}
+              ${totalGST > 0 ? `
+              <div class="total-row">
+                <span>GST:</span>
+                <span>${formatAmountForPrint(totalGST)}</span>
+              </div>
+              ` : ''}
               <div class="total-row">
                 <span>Subtotal:</span>
                 <span>${formatAmountForPrint(order.subtotal)}</span>
@@ -903,6 +957,20 @@ export default function OrderInvoice() {
 
   const orderItems = order.items || [];
 
+  // Calculate Amount (sum of all Price Ex. Tax)
+  const totalAmount = orderItems.reduce((sum: number, item: any) => {
+    const priceExTax = Number(item.priceExcludingTax) || 0;
+    const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+    return sum + (priceExTax * quantity);
+  }, 0);
+
+  // Calculate GST (sum of all Tax Amount)
+  const totalGST = orderItems.reduce((sum: number, item: any) => {
+    const taxAmount = Number(item.taxAmount) || 0;
+    const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+    return sum + (taxAmount * quantity);
+  }, 0);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8">
           <div className="max-w-4xl mx-auto">
@@ -1006,6 +1074,15 @@ export default function OrderInvoice() {
                   )}
                 </div>
                 <div className="text-right space-y-3">
+                  {logoUrl && (
+                    <div className="flex justify-end mb-3">
+                      <img 
+                        src={logoUrl} 
+                        alt="Company Logo" 
+                        className="max-h-16 max-w-52 object-contain"
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center justify-end gap-3">
                     <Building2 className="h-6 w-6" />
                     <h2 className="text-3xl font-bold">
@@ -1016,6 +1093,11 @@ export default function OrderInvoice() {
                     {sellerInfo?.fbrSellerNTNCNIC && (
                       <div className="flex items-center justify-end gap-2">
                         <span>NTN/CNIC: {sellerInfo.fbrSellerNTNCNIC}</span>
+                      </div>
+                    )}
+                    {sellerInfo?.fbrStrnNumber && (
+                      <div className="flex items-center justify-end gap-2">
+                        <span>STRN: {sellerInfo.fbrStrnNumber}</span>
                       </div>
                     )}
                     {sellerInfo?.fbrSellerAddress && (
@@ -1535,6 +1617,20 @@ export default function OrderInvoice() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {totalAmount > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span>Amount:</span>
+                        <span>{formatAmount(totalAmount)}</span>
+                      </div>
+                    )}
+
+                    {totalGST > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span>GST:</span>
+                        <span>{formatAmount(totalGST)}</span>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between py-2">
                       <span>Subtotal:</span>
                       <span>{formatAmount(order.subtotal)}</span>
@@ -1574,16 +1670,18 @@ export default function OrderInvoice() {
             {/* Footer */}
             <CardContent className="p-8 text-center border-t">
               <div className="space-y-3">
+                
+                <div className="flex items-center justify-center gap-2 text-gray-600">
+                  
+                  <p className="text-sm">
+                    Payments are to be in favor of "{''}
+                    {sellerInfo?.fbrSellerBusinessName || 'us'}
+                  "
+                  </p>
+                </div>
                 <div className="flex items-center justify-center gap-2 text-emerald-700">
                   <CheckCircle className="h-5 w-5" />
-                  <p className="text-lg font-semibold">Thank you for your business!</p>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-gray-600">
-                  <Mail className="h-4 w-4" />
-                  <p className="text-sm">
-                    For questions about this invoice, please contact{' '}
-                    {sellerInfo?.fbrSellerBusinessName || 'us'}
-                  </p>
+                  <p className="text-lg font-semibold">Thank you for doing business with us!</p>
                 </div>
               </div>
             </CardContent>

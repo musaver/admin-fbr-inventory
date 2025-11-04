@@ -14,6 +14,7 @@ const FBR_SETTING_KEYS = {
   FBR_SELLER_BUSINESS_NAME: 'fbr_seller_business_name',
   FBR_SELLER_PROVINCE: 'fbr_seller_province',
   FBR_SELLER_ADDRESS: 'fbr_seller_address',
+  FBR_STRN_NUMBER: 'fbr_strn_number',
 } as const;
 
 interface FbrSettings {
@@ -24,6 +25,7 @@ interface FbrSettings {
   fbrSellerBusinessName: string;
   fbrSellerProvince: string;
   fbrSellerAddress: string;
+  fbrStrnNumber: string;
 }
 
 const DEFAULT_FBR_SETTINGS: FbrSettings = {
@@ -34,6 +36,7 @@ const DEFAULT_FBR_SETTINGS: FbrSettings = {
   fbrSellerBusinessName: '',
   fbrSellerProvince: '',
   fbrSellerAddress: '',
+  fbrStrnNumber: '',
 };
 
 export async function GET(request: NextRequest) {
@@ -83,6 +86,9 @@ export async function GET(request: NextRequest) {
           break;
         case FBR_SETTING_KEYS.FBR_SELLER_ADDRESS:
           fbrSettings.fbrSellerAddress = setting.value || '';
+          break;
+        case FBR_SETTING_KEYS.FBR_STRN_NUMBER:
+          fbrSettings.fbrStrnNumber = setting.value || '';
           break;
       }
     }
@@ -148,6 +154,7 @@ export async function POST(request: NextRequest) {
       { key: FBR_SETTING_KEYS.FBR_SELLER_BUSINESS_NAME, value: newSettings.fbrSellerBusinessName, description: 'Seller business name' },
       { key: FBR_SETTING_KEYS.FBR_SELLER_PROVINCE, value: newSettings.fbrSellerProvince, description: 'Seller province' },
       { key: FBR_SETTING_KEYS.FBR_SELLER_ADDRESS, value: newSettings.fbrSellerAddress, description: 'Seller business address' },
+      { key: FBR_SETTING_KEYS.FBR_STRN_NUMBER, value: newSettings.fbrStrnNumber || '', description: 'FBR STRN number' },
     ];
 
     // Update or create each setting
