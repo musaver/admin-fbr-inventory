@@ -184,34 +184,44 @@ export default function OrderInvoice() {
             .invoice-header {
               background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
               color: white;
-              padding: 16px;
+              padding: 20px 24px;
               margin: -12px -12px 16px -12px;
               border-radius: 0 0 10px 10px;
               box-shadow: 0 2px 8px rgba(0,0,0,0.12);
               display: flex;
               justify-content: space-between;
-              align-items: flex-start;
+              align-items: center;
+              gap: 24px;
+            }
+            
+            .invoice-title {
+              flex: 0 0 auto;
             }
             
             .invoice-title h1 {
-              font-size: 28px;
+              font-size: 32px;
               font-weight: 700;
-              margin-bottom: 6px;
+              margin: 0 0 10px 0;
               letter-spacing: 2px;
               text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+              line-height: 1;
             }
             
             .order-info {
               background: rgba(255,255,255,0.1);
-              padding: 8px;
+              padding: 8px 12px;
               border-radius: 6px;
-              margin-top: 6px;
             }
             
             .order-info p {
-              margin: 3px 0;
+              margin: 0;
               font-size: 12px;
               font-weight: 500;
+              line-height: 1.4;
+            }
+            
+            .order-info p + p {
+              margin-top: 3px;
             }
             
             .company-info {
@@ -219,26 +229,55 @@ export default function OrderInvoice() {
               display: flex;
               flex-direction: column;
               align-items: flex-end;
+              flex: 1 1 auto;
+              min-width: 0;
+            }
+
+            .company-header {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              margin-bottom: 10px;
             }
 
             .company-logo {
-              max-height: 60px;
-              max-width: 200px;
-              margin-bottom: 8px;
+              max-height: 50px;
+              max-width: 120px;
               object-fit: contain;
+              display: block;
             }
             
             .company-info h2 {
-              font-size: 20px;
-              margin-bottom: 8px;
+              font-size: 22px;
+              margin: 0;
               font-weight: 700;
               text-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+              line-height: 1.2;
             }
             
-            .company-info p {
-              margin: 4px 0;
+            .company-details {
+              text-align: right;
+            }
+            
+            .company-details p {
+              margin: 0;
               font-size: 11px;
-              opacity: 0.9;
+              opacity: 0.92;
+              line-height: 1.6;
+            }
+            
+            .company-details p + p {
+              margin-top: 2px;
+            }
+            
+            .tax-numbers {
+              display: flex;
+              gap: 16px;
+              justify-content: flex-end;
+            }
+            
+            .tax-numbers p {
+              margin: 0;
             }
             
             .fbr-notice {
@@ -532,19 +571,27 @@ export default function OrderInvoice() {
           <!-- Invoice Header -->
           <div class="invoice-header">
             <div class="invoice-title">
-              <h1>INVOICE</h1>
+              <h1>GST INVOICE</h1>
               <div class="order-info">
                 <p><strong>Order: ${order.orderNumber}</strong></p>
                 ${order.invoiceRefNo ? `<p>Ref: ${order.invoiceRefNo}</p>` : ''}
               </div>
             </div>
             <div class="company-info">
-              ${logoUrl ? `<img src="${logoUrl}" alt="Company Logo" class="company-logo" />` : ''}
-              ${sellerInfo?.fbrSellerBusinessName ? `<h2>${sellerInfo.fbrSellerBusinessName}</h2>` : '<h2>Business Name</h2>'}
-              ${sellerInfo?.fbrSellerNTNCNIC ? `<p>NTN/CNIC: ${sellerInfo.fbrSellerNTNCNIC}</p>` : ''}
-              ${sellerInfo?.fbrStrnNumber ? `<p>STRN: ${sellerInfo.fbrStrnNumber}</p>` : ''}
-              ${sellerInfo?.fbrSellerAddress ? `<p>${sellerInfo.fbrSellerAddress}</p>` : ''}
-              ${sellerInfo?.fbrSellerProvince ? `<p>${sellerInfo.fbrSellerProvince} Province</p>` : ''}
+              <div class="company-header">
+                ${logoUrl ? `<img src="${logoUrl}" alt="Company Logo" class="company-logo" />` : ''}
+                ${sellerInfo?.fbrSellerBusinessName ? `<h2>${sellerInfo.fbrSellerBusinessName}</h2>` : '<h2>Business Name</h2>'}
+              </div>
+              <div class="company-details">
+                ${(sellerInfo?.fbrSellerNTNCNIC || sellerInfo?.fbrStrnNumber) ? `
+                <div class="tax-numbers d-flex">
+                  ${sellerInfo?.fbrSellerNTNCNIC ? `<p>NTN/CNIC: ${sellerInfo.fbrSellerNTNCNIC}</p>` : ''}
+                  ${sellerInfo?.fbrStrnNumber ? `<p style="margin-top: 0px;">STRN: ${sellerInfo.fbrStrnNumber}</p>` : ''}
+                </div>
+                ` : ''}
+                ${sellerInfo?.fbrSellerAddress ? `<p>${sellerInfo.fbrSellerAddress}</p>` : ''}
+                ${sellerInfo?.fbrSellerProvince ? `<p>${sellerInfo.fbrSellerProvince} Province</p>` : ''}
+              </div>
             </div>
           </div>
           
