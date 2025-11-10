@@ -107,34 +107,36 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
   // Base amount should be the price excluding tax (not totalPrice which includes tax)
   // Try priceExcludingTax first, then calculate from priceIncludingTax, then fall back to price
   let baseAmount;
+  const quantity = parseFloat(item.quantity.toString()) || 1;
+  
   // Check priceExcludingTax properly, handling both string and number types
   const priceExcludingTaxValue = typeof item.priceExcludingTax === 'string' ? parseFloat(item.priceExcludingTax) : item.priceExcludingTax;
   if (priceExcludingTaxValue && priceExcludingTaxValue > 0 && !isNaN(priceExcludingTaxValue)) {
-    // item.priceExcludingTax is already the total amount excluding tax, not per-unit
-    baseAmount = priceExcludingTaxValue;
+    // item.priceExcludingTax is per-unit, so multiply by quantity to get total
+    baseAmount = priceExcludingTaxValue * quantity;
   } else if (item.priceIncludingTax && item.priceIncludingTax > 0) {
     // Calculate excluding tax from including tax if we have tax percentage
     const priceIncludingTax = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax) : item.priceIncludingTax;
     
     if (item.taxPercentage && item.taxPercentage > 0) {
       const taxPercentage = typeof item.taxPercentage === 'string' ? parseFloat(item.taxPercentage) : item.taxPercentage;
-      // priceIncludingTax is already the total, so calculate total priceExcludingTax directly
-      baseAmount = priceIncludingTax / (1 + taxPercentage / 100);
+      // priceIncludingTax is per-unit, so calculate per-unit priceExcludingTax and multiply by quantity
+      baseAmount = (priceIncludingTax / (1 + taxPercentage / 100)) * quantity;
     } else {
       // If we only have priceIncludingTax but no tax percentage, we need to determine if there's tax
       // For scenarios that are exempt or zero-rated, use priceIncludingTax directly
       // For scenarios with tax, we need to calculate backwards using default rate
       if (isExemptOrZeroRated(scenarioId)) {
-        baseAmount = priceIncludingTax;
+        baseAmount = priceIncludingTax * quantity;
       } else {
         // Use the default tax rate for this scenario to calculate backwards
         const defaultRate = parseRate(getDefaultRateForScenario(scenarioId));
         if (defaultRate > 0) {
-          // priceIncludingTax is already the total, so calculate total priceExcludingTax directly
-          baseAmount = priceIncludingTax / (1 + defaultRate);
+          // priceIncludingTax is per-unit, so calculate per-unit priceExcludingTax and multiply by quantity
+          baseAmount = (priceIncludingTax / (1 + defaultRate)) * quantity;
         } else {
           // If default rate is 0, then including tax = excluding tax
-          baseAmount = priceIncludingTax;
+          baseAmount = priceIncludingTax * quantity;
         }
       }
     }
@@ -212,31 +214,33 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   // Check priceExcludingTax properly, handling both string and number types
   const priceExcludingTaxValue = typeof item.priceExcludingTax === 'string' ? parseFloat(item.priceExcludingTax) : item.priceExcludingTax;
   if (priceExcludingTaxValue && priceExcludingTaxValue > 0 && !isNaN(priceExcludingTaxValue)) {
-    // item.priceExcludingTax is already the total amount excluding tax, not per-unit
-    baseAmount = priceExcludingTaxValue;
+    // item.priceExcludingTax is per-unit, so multiply by quantity to get total
+    const quantity = parseFloat(item.quantity.toString()) || 1;
+    baseAmount = priceExcludingTaxValue * quantity;
   } else if (item.priceIncludingTax && item.priceIncludingTax > 0) {
     // Calculate excluding tax from including tax if we have tax percentage
     const priceIncludingTax = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax) : item.priceIncludingTax;
+    const quantity = parseFloat(item.quantity.toString()) || 1;
     
     if (item.taxPercentage && item.taxPercentage > 0) {
       const taxPercentage = typeof item.taxPercentage === 'string' ? parseFloat(item.taxPercentage) : item.taxPercentage;
-      // priceIncludingTax is already the total, so calculate total priceExcludingTax directly
-      baseAmount = priceIncludingTax / (1 + taxPercentage / 100);
+      // priceIncludingTax is per-unit, so calculate per-unit priceExcludingTax and multiply by quantity
+      baseAmount = (priceIncludingTax / (1 + taxPercentage / 100)) * quantity;
     } else {
       // If we only have priceIncludingTax but no tax percentage, we need to determine if there's tax
       // For scenarios that are exempt or zero-rated, use priceIncludingTax directly
       // For scenarios with tax, we need to calculate backwards using default rate
       if (isExemptOrZeroRated(scenarioId)) {
-        baseAmount = priceIncludingTax;
+        baseAmount = priceIncludingTax * quantity;
       } else {
         // Use the default tax rate for this scenario to calculate backwards
         const defaultRate = parseRate(getDefaultRateForScenario(scenarioId));
         if (defaultRate > 0) {
-          // priceIncludingTax is already the total, so calculate total priceExcludingTax directly
-          baseAmount = priceIncludingTax / (1 + defaultRate);
+          // priceIncludingTax is per-unit, so calculate per-unit priceExcludingTax and multiply by quantity
+          baseAmount = (priceIncludingTax / (1 + defaultRate)) * quantity;
         } else {
           // If default rate is 0, then including tax = excluding tax
-          baseAmount = priceIncludingTax;
+          baseAmount = priceIncludingTax * quantity;
         }
       }
     }
@@ -333,13 +337,16 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   fbrItem.sroItemSerialNo = item.itemSerialNumber || "";
   
   // Add display fields for preview purposes (not sent to FBR API)
+  // These are per-unit prices, so multiply by quantity to get totals
   if (item.priceIncludingTax !== undefined && item.priceIncludingTax !== null) {
-    const totalInc = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax as any) : Number(item.priceIncludingTax);
-    fbrItem.priceIncludingTax = totalInc; // Use total value directly (already includes quantity)
+    const perUnitInc = typeof item.priceIncludingTax === 'string' ? parseFloat(item.priceIncludingTax as any) : Number(item.priceIncludingTax);
+    const quantity = parseFloat(item.quantity.toString()) || 1;
+    fbrItem.priceIncludingTax = perUnitInc * quantity; // Multiply by quantity to get total
   }
   if (item.priceExcludingTax !== undefined && item.priceExcludingTax !== null) {
-    const totalEx = typeof item.priceExcludingTax === 'string' ? parseFloat(item.priceExcludingTax as any) : Number(item.priceExcludingTax);
-    fbrItem.priceExcludingTax = totalEx; // Use total value directly (already includes quantity)
+    const perUnitEx = typeof item.priceExcludingTax === 'string' ? parseFloat(item.priceExcludingTax as any) : Number(item.priceExcludingTax);
+    const quantity = parseFloat(item.quantity.toString()) || 1;
+    fbrItem.priceExcludingTax = perUnitEx * quantity; // Multiply by quantity to get total
   }
   if (item.taxPercentage !== undefined && item.taxPercentage !== null) {
     fbrItem.taxPercentage = item.taxPercentage;
