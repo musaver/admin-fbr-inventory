@@ -96,6 +96,7 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       itemCount: Number(orderData.itemCount) || 0,
       // Invoice and FBR fields
       invoiceNumber: orderData.order.invoiceNumber,
+      invoiceDate: orderData.order.invoiceDate,
       invoiceType: orderData.order.invoiceType,
       invoiceRefNo: orderData.order.invoiceRefNo,
       fbrEnvironment: orderData.order.fbrEnvironment,

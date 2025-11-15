@@ -631,9 +631,6 @@ export default function OrderInvoice() {
               <h3>Invoice Information</h3>
               ${order.invoiceDate ? `<p>Invoice Date: ${formatDateTime(order.invoiceDate)}</p>` : ''}
               <p>Created Date: ${formatDateTime(order.createdAt)}</p>
-              <p>Order Status: ${order.status}</p>
-              ${order.invoiceType ? `<p>Invoice Type: ${order.invoiceType}</p>` : ''}
-              ${order.scenarioId ? `<p>Scenario ID: ${order.scenarioId}</p>` : ''}
               ${order.trackingNumber ? `<p>Tracking: ${order.trackingNumber}</p>` : ''}
             </div>
           </div>
@@ -1314,26 +1311,6 @@ export default function OrderInvoice() {
                       <span className="text-sm text-gray-500">Created Date:</span>
                       <span className='text-sm text-gray-500'>{formatDateTime(order.createdAt)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className='text-sm text-gray-500'>Order Status:</span>
-                      <span className="text-sm text-gray-500 capitalize">{order.status}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className='text-sm text-gray-500'>Payment Status:</span>
-                      <span className="capitalize text-sm text-gray-500">{order.paymentStatus}</span>
-                    </div>
-                    {order.invoiceType && (
-                      <div className="flex justify-between">
-                        <span className='text-sm text-gray-500'>Invoice Type:</span>
-                        <span className="text-sm text-gray-500">{order.invoiceType}</span>
-                      </div>
-                    )}
-                    {order.scenarioId && (
-                      <div className="flex justify-between">
-                        <span className='text-sm text-gray-500'>Scenario ID:</span>
-                        <span className="text-sm text-gray-500 font-mono">{order.scenarioId}</span>
-                      </div>
-                    )}
                     {order.trackingNumber && (
                       <div className="flex justify-between">
                         <span className='text-sm text-gray-500'>Tracking:</span>
