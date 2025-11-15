@@ -629,7 +629,8 @@ export default function OrderInvoice() {
             <!-- Invoice Information -->
             <div class="info-box">
               <h3>Invoice Information</h3>
-              <p>Invoice Date: ${formatDateTime(order.createdAt)}</p>
+              ${order.invoiceDate ? `<p>Invoice Date: ${formatDateTime(order.invoiceDate)}</p>` : ''}
+              <p>Created Date: ${formatDateTime(order.createdAt)}</p>
               <p>Order Status: ${order.status}</p>
               ${order.invoiceType ? `<p>Invoice Type: ${order.invoiceType}</p>` : ''}
               ${order.scenarioId ? `<p>Scenario ID: ${order.scenarioId}</p>` : ''}
@@ -1303,8 +1304,14 @@ export default function OrderInvoice() {
                   </CardHeader>
                   <CardContent>
                   <div className="text-gray-600 space-y-1">
+                    {order.invoiceDate && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500">Invoice Date:</span>
+                        <span className='text-sm text-gray-500'>{formatDateTime(order.invoiceDate)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Invoice Date:</span>
+                      <span className="text-sm text-gray-500">Created Date:</span>
                       <span className='text-sm text-gray-500'>{formatDateTime(order.createdAt)}</span>
                     </div>
                     <div className="flex justify-between">

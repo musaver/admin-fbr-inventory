@@ -74,6 +74,7 @@ interface Order {
   };
   // Invoice and FBR fields
   invoiceNumber?: string;
+  invoiceDate?: string;
   invoiceType?: string;
   invoiceRefNo?: string;
   fbrEnvironment?: string;
@@ -708,11 +709,21 @@ export default function OrdersList() {
     },*/
     {
       key: 'createdAt',
-      title: 'Date',
+      title: 'Created Date',
       width: '140px',
       render: (_: any, order: Order) => (
         <div className="text-sm">
           {formatDateTime(order.createdAt)}
+        </div>
+      )
+    },
+    {
+      key: 'invoiceDate',
+      title: 'Invoice Date',
+      width: '140px',
+      render: (_: any, order: Order) => (
+        <div className="text-sm">
+          {order.invoiceDate ? formatDateTime(order.invoiceDate) : <span className="text-xs text-gray-400">-</span>}
         </div>
       )
     },
@@ -724,8 +735,8 @@ export default function OrdersList() {
         if (!order.fbrEnvironment) return <span className="text-xs text-gray-400">-</span>;
         return (
           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-            order.fbrEnvironment === 'production' 
-              ? 'bg-orange-100 text-orange-800' 
+            order.fbrEnvironment === 'production'
+              ? 'bg-orange-100 text-orange-800'
               : 'bg-blue-100 text-blue-800'
           }`}>
             {order.fbrEnvironment === 'production' ? '🚨 Prod' : '🧪 Sand'}
