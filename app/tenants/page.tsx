@@ -80,6 +80,7 @@ export default function TenantsPage() {
               <th className="border p-3 text-left">Email</th>
               <th className="border p-3 text-left">Status</th>
               <th className="border p-3 text-left">Plan</th>
+              <th className="border p-3 text-left">Prod Orders</th>
               <th className="border p-3 text-left">Created</th>
               <th className="border p-3 text-left">Actions</th>
             </tr>
@@ -109,6 +110,11 @@ export default function TenantsPage() {
                   <td className="border p-3">
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                       {tenant.plan || 'basic'}
+                    </span>
+                  </td>
+                  <td className="border p-3 text-center">
+                    <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                      {tenant.productionOrdersCount || 0}
                     </span>
                   </td>
                   <td className="border p-3 text-sm text-gray-600">
@@ -145,7 +151,7 @@ export default function TenantsPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="border p-4 text-center text-gray-500">
+                <td colSpan={8} className="border p-4 text-center text-gray-500">
                   No tenants found. Click "Add New Tenant" to create the first tenant.
                 </td>
               </tr>
