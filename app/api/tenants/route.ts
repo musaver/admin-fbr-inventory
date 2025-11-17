@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { tenants, orders } from '@/lib/schema';
+import { tenants, orders, settings } from '@/lib/schema';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -35,9 +35,11 @@ export async function GET() {
         createdAt: tenants.createdAt,
         updatedAt: tenants.updatedAt,
         productionOrdersCount: sql<number>`COUNT(CASE WHEN ${orders.fbrEnvironment} = 'production' THEN 1 END)`,
+        hasFbrProductionToken: sql<boolean>`MAX(CASE WHEN ${settings.key} = 'fbr_production_token' AND ${settings.value} IS NOT NULL AND ${settings.value} != '' THEN 1 ELSE 0 END) = 1`,
       })
       .from(tenants)
       .leftJoin(orders, eq(orders.tenantId, tenants.id))
+      .leftJoin(settings, eq(settings.tenantId, tenants.id))
       .groupBy(tenants.id, tenants.name, tenants.slug, tenants.email, tenants.status, tenants.plan, tenants.createdAt, tenants.updatedAt)
       .orderBy(tenants.createdAt);
 
