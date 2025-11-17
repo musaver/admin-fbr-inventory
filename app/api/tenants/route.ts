@@ -36,9 +36,9 @@ export async function GET() {
         updatedAt: tenants.updatedAt,
         productionOrdersCount: sql<number>`(
           SELECT COUNT(*)
-          FROM ${orders}
-          WHERE ${orders.tenantId} = ${tenants.id}
-          AND ${orders.fbrEnvironment} = 'production'
+          FROM orders
+          WHERE orders.tenant_id = ${tenants.id}
+          AND orders.fbr_environment = 'production'
         )`.as('production_orders_count'),
       })
       .from(tenants)
