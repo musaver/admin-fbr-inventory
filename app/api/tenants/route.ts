@@ -34,14 +34,11 @@ export async function GET() {
         plan: tenants.plan,
         createdAt: tenants.createdAt,
         updatedAt: tenants.updatedAt,
-        productionOrdersCount: sql<number>`(
-          SELECT COUNT(*)
-          FROM orders
-          WHERE orders.tenant_id = ${tenants.id}
-          AND orders.fbr_environment = 'production'
-        )`.as('production_orders_count'),
+        productionOrdersCount: sql<number>`COUNT(CASE WHEN ${orders.fbrEnvironment} = 'production' THEN 1 END)`,
       })
       .from(tenants)
+      .leftJoin(orders, eq(orders.tenantId, tenants.id))
+      .groupBy(tenants.id, tenants.name, tenants.slug, tenants.email, tenants.status, tenants.plan, tenants.createdAt, tenants.updatedAt)
       .orderBy(tenants.createdAt);
 
     return NextResponse.json(allTenants);
