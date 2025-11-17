@@ -81,6 +81,7 @@ export default function TenantsPage() {
               <th className="border p-3 text-left">Status</th>
               <th className="border p-3 text-left">Plan</th>
               <th className="border p-3 text-left">Prod Orders</th>
+              <th className="border p-3 text-left">FBR Prod Token</th>
               <th className="border p-3 text-left">Created</th>
               <th className="border p-3 text-left">Actions</th>
             </tr>
@@ -117,6 +118,17 @@ export default function TenantsPage() {
                       {tenant.productionOrdersCount || 0}
                     </span>
                   </td>
+                  <td className="border p-3 text-center">
+                    {tenant.hasFbrProductionToken ? (
+                      <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                        Added
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                        Not Added
+                      </span>
+                    )}
+                  </td>
                   <td className="border p-3 text-sm text-gray-600">
                     {new Date(tenant.createdAt).toLocaleDateString()}
                   </td>
@@ -151,7 +163,7 @@ export default function TenantsPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={8} className="border p-4 text-center text-gray-500">
+                <td colSpan={9} className="border p-4 text-center text-gray-500">
                   No tenants found. Click "Add New Tenant" to create the first tenant.
                 </td>
               </tr>
