@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { tenants } from '@/lib/schema';
+import { tenants, orders } from '@/lib/schema';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
-import { eq } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 
 export async function GET() {
   try {
@@ -23,7 +23,7 @@ export async function GET() {
     }
 
     console.log('Super admin fetching all tenants');
-    
+
     const allTenants = await db
       .select({
         id: tenants.id,
@@ -34,6 +34,12 @@ export async function GET() {
         plan: tenants.plan,
         createdAt: tenants.createdAt,
         updatedAt: tenants.updatedAt,
+        productionOrdersCount: sql<number>`(
+          SELECT COUNT(*)
+          FROM ${orders}
+          WHERE ${orders.tenantId} = ${tenants.id}
+          AND ${orders.fbrEnvironment} = 'production'
+        )`.as('production_orders_count'),
       })
       .from(tenants)
       .orderBy(tenants.createdAt);
