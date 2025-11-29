@@ -3,26 +3,26 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import CurrencySymbol from '../components/CurrencySymbol';
 import { calculateItemProfit, calculateOrderProfitSummary, getProfitStatus, OrderItemData } from '@/utils/profitUtils';
-import { 
-  formatWeightAuto, 
-  isWeightBasedProduct 
+import {
+  formatWeightAuto,
+  isWeightBasedProduct
 } from '@/utils/weightUtils';
 import ResponsiveTable from '../components/ResponsiveTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { 
-  PlusIcon, 
-  MoreVerticalIcon, 
-  EditIcon, 
-  EyeIcon, 
+import {
+  PlusIcon,
+  MoreVerticalIcon,
+  EditIcon,
+  EyeIcon,
   TrashIcon,
   RefreshCwIcon,
   FilterIcon,
@@ -118,16 +118,16 @@ export default function OrdersList() {
     setLoading(true);
     try {
       // Handle "view all" case
-      const apiUrl = limit === -1 
+      const apiUrl = limit === -1
         ? '/api/orders?limit=999999' // Very large number for "view all"
         : `/api/orders?page=${page}&limit=${limit}`;
       const res = await fetch(apiUrl);
       const response = await res.json();
       const data = response.data || response; // Handle both paginated and non-paginated responses
-      
+
       setOrders(data);
       setFilteredOrders(data);
-      
+
       // Update pagination if response includes pagination data
       if (response.pagination) {
         setPagination(response.pagination);
@@ -146,11 +146,11 @@ export default function OrdersList() {
       const params = new URLSearchParams();
       if (dateRange.startDate) params.append('startDate', dateRange.startDate);
       if (dateRange.endDate) params.append('endDate', dateRange.endDate);
-      
+
       const apiUrl = `/api/orders/stats${params.toString() ? '?' + params.toString() : ''}`;
       const res = await fetch(apiUrl);
       const statsData = await res.json();
-      
+
       setStats(statsData);
     } catch (err) {
       console.error('Error fetching order stats:', err);
@@ -163,12 +163,12 @@ export default function OrdersList() {
     fetchOrders(1, pageSize);
     fetchStats(); // Fetch stats on initial load
   }, []);
-  
+
   // Effect for page changes
   useEffect(() => {
     fetchOrders(currentPage, pageSize);
   }, [currentPage]);
-  
+
   // Effect for page size changes
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when changing page size
@@ -277,17 +277,17 @@ export default function OrdersList() {
 
   const handleDeleteSelected = async () => {
     if (selectedOrders.size === 0) return;
-    
+
     if (confirm(`Are you sure you want to delete ${selectedOrders.size} selected order(s)? This action cannot be undone.`)) {
       try {
         setLoading(true);
         const deletePromises = Array.from(selectedOrders).map(orderId =>
           fetch(`/api/orders/${orderId}`, { method: 'DELETE' })
         );
-        
+
         const results = await Promise.all(deletePromises);
         const failedDeletes = results.filter(res => !res.ok);
-        
+
         if (failedDeletes.length === 0) {
           // Remove deleted orders from state
           const remainingOrders = orders.filter(order => !selectedOrders.has(order.id));
@@ -333,12 +333,12 @@ export default function OrdersList() {
   const exportOrders = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch all orders (get more records for export)
       const res = await fetch('/api/orders?limit=999999');
       const response = await res.json();
       const allOrders = response.data || response;
-      
+
       if (!allOrders || allOrders.length === 0) {
         alert('No orders found to export');
         return;
@@ -347,7 +347,7 @@ export default function OrdersList() {
       // Create CSV header matching the import template format
       const csvHeaders = [
         'Order Number',
-        'Customer Phone', 
+        'Customer Phone',
         'Customer Name',
         'Customer Email',
         'Product SKU',
@@ -355,7 +355,7 @@ export default function OrdersList() {
         'Quantity',
         'Unit Price',
         'Tax Amount',
-        'Tax Percentage', 
+        'Tax Percentage',
         'Price Including Tax',
         'HS Code',
         'UOM',
@@ -398,7 +398,7 @@ export default function OrdersList() {
                 item.lotNumber || '',
                 item.expiryDate || ''
               ].map(field => `"${String(field).replace(/"/g, '""')}"`);
-              
+
               csvRows.push(row.join(','));
             });
           } else {
@@ -423,7 +423,7 @@ export default function OrdersList() {
               '', // Lot Number
               '' // Expiry Date
             ].map(field => `"${String(field).replace(/"/g, '""')}"`);
-            
+
             csvRows.push(row.join(','));
           }
         } catch (itemError) {
@@ -452,7 +452,7 @@ export default function OrdersList() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
     } catch (error) {
       console.error('Error exporting orders:', error);
       alert('Error exporting orders. Please try again.');
@@ -501,7 +501,7 @@ export default function OrdersList() {
         </span>
       );
     }
-    
+
     return (
       <span className="flex items-center gap-1">
         <CurrencySymbol />{numAmount.toFixed(2)}
@@ -520,7 +520,7 @@ export default function OrdersList() {
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    
+
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.class}`}>
         {config.label}
@@ -575,7 +575,7 @@ export default function OrdersList() {
 
   const parseAddons = (addonsData: any) => {
     if (!addonsData) return [];
-    
+
     try {
       if (Array.isArray(addonsData)) return addonsData;
       if (typeof addonsData === 'string') {
@@ -734,11 +734,10 @@ export default function OrdersList() {
       render: (_: any, order: Order) => {
         if (!order.fbrEnvironment) return <span className="text-xs text-gray-400">-</span>;
         return (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-            order.fbrEnvironment === 'production'
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${order.fbrEnvironment === 'production'
               ? 'bg-orange-100 text-orange-800'
               : 'bg-blue-100 text-blue-800'
-          }`}>
+            }`}>
             {order.fbrEnvironment === 'production' ? '🚨 Prod' : '🧪 Sand'}
           </span>
         );
@@ -747,37 +746,44 @@ export default function OrdersList() {
     }
   ];
 
-  const renderActions = (order: Order) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <MoreVerticalIcon className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link href={`/orders/${order.id}/invoice`} className="flex items-center">
-            <EyeIcon className="h-4 w-4 mr-2" />
-            View Invoice
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+  const renderActions = (order: Order) => {
+    const isProductionInvoice = order.fbrEnvironment === 'production';
 
-          <Link href={`/orders/edit/${order.id}`} className="flex items-center">
-            <EditIcon className="h-4 w-4 mr-2" />
-            Edit
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => handleDelete(order.id)}
-          className="text-red-600 focus:text-red-600"
-        >
-          <TrashIcon className="h-4 w-4 mr-2" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm">
+            <MoreVerticalIcon className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/orders/${order.id}/invoice`} className="flex items-center">
+              <EyeIcon className="h-4 w-4 mr-2" />
+              View Invoice
+            </Link>
+          </DropdownMenuItem>
+          {!isProductionInvoice && (
+            <>
+              <DropdownMenuItem asChild>
+                <Link href={`/orders/edit/${order.id}`} className="flex items-center">
+                  <EditIcon className="h-4 w-4 mr-2" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleDelete(order.id)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <TrashIcon className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   return (
     <div className="space-y-6 w-full max-w-full min-w-0">
@@ -799,26 +805,26 @@ export default function OrdersList() {
               <RefreshCwIcon className={`h-4 w-4 mr-2 ${(loading || statsLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            <Button 
-              onClick={handleDeleteSelected} 
-              disabled={loading || selectedOrders.size === 0} 
-              variant="destructive" 
+            <Button
+              onClick={handleDeleteSelected}
+              disabled={loading || selectedOrders.size === 0}
+              variant="destructive"
               size="sm"
             >
               <TrashIcon className="h-4 w-4 mr-2" />
               Delete Selected ({selectedOrders.size})
             </Button>
-            <Button 
-              onClick={handleDeleteAll} 
-              disabled={loading || orders.length === 0} 
-              variant="destructive" 
+            <Button
+              onClick={handleDeleteAll}
+              disabled={loading || orders.length === 0}
+              variant="destructive"
               size="sm"
             >
               <TrashIcon className="h-4 w-4 mr-2" />
               Delete All
             </Button>
           </div>
-          
+
           {/* Second Row - Import/Export/Add Buttons */}
           <div className="flex items-center space-x-2">
             <Button asChild variant="outline" size="sm">
@@ -826,10 +832,10 @@ export default function OrdersList() {
                 📤 Bulk Import
               </Link>
             </Button>
-            <Button 
-              onClick={exportOrders} 
-              disabled={loading || orders.length === 0} 
-              variant="outline" 
+            <Button
+              onClick={exportOrders}
+              disabled={loading || orders.length === 0}
+              variant="outline"
               size="sm"
             >
               <DownloadIcon className="h-4 w-4 mr-2" />
@@ -863,7 +869,7 @@ export default function OrdersList() {
             <p className="text-xs text-muted-foreground">All time orders</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -948,24 +954,24 @@ export default function OrdersList() {
                 className="w-full"
               />
             </div>
-            
-            
+
+
             <div className="space-y-2 min-w-0">
               <label className="text-sm font-medium">Start Date</label>
               <Input
                 type="date"
                 value={dateRange.startDate}
-                onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
                 className="w-full"
               />
             </div>
-            
+
             <div className="space-y-2 min-w-0">
               <label className="text-sm font-medium">End Date</label>
               <Input
                 type="date"
                 value={dateRange.endDate}
-                onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
                 className="w-full"
               />
             </div>
@@ -1001,13 +1007,13 @@ export default function OrdersList() {
                     </>
                   )}
                 </span>
-                
+
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Show:</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
-                        {pageSize === -1 ? 'View All' : pageSize} 
+                        {pageSize === -1 ? 'View All' : pageSize}
                         <span className="ml-1">▼</span>
                       </Button>
                     </DropdownMenuTrigger>
@@ -1031,7 +1037,7 @@ export default function OrdersList() {
                   </DropdownMenu>
                 </div>
               </div>
-              
+
               {pageSize !== -1 && (
                 <div className="flex items-center gap-2">
                   <Button
@@ -1042,7 +1048,7 @@ export default function OrdersList() {
                   >
                     Previous
                   </Button>
-                  
+
                   <div className="flex items-center gap-1">
                     {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                       const page = i + 1;
@@ -1059,7 +1065,7 @@ export default function OrdersList() {
                         </Button>
                       );
                     })}
-                    
+
                     {pagination.totalPages > 5 && (
                       <>
                         <span className="px-2">...</span>
@@ -1074,7 +1080,7 @@ export default function OrdersList() {
                       </>
                     )}
                   </div>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
