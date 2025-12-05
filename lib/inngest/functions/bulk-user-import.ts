@@ -501,6 +501,17 @@ function validateProduct(productData: ProductImportRow): string | null {
   return null;
 }
 
+// Helper function to parse numeric values by removing commas
+function parseNumericValue(value: string | undefined | null): number | null {
+  if (!value || value.trim() === '') {
+    return null;
+  }
+  // Remove commas from the value before parsing
+  const cleanedValue = value.replace(/,/g, '');
+  const parsed = parseFloat(cleanedValue);
+  return isNaN(parsed) ? null : parsed;
+}
+
 // Validate order data
 function validateOrder(orderData: OrderImportRow): string | null {
   // Either Customer Phone OR Customer Name must be provided
@@ -1301,7 +1312,7 @@ async function processOrderChunk(
                 customOrderNumber: orderData.orderNumber,
                 productSku: orderData.productSku,
                 productName: orderData.productName,
-                quantity: parsedQuantity,
+                quantity: parsedQuantity ?? undefined,
                 errorMessage: validationError
               }
             });
@@ -1326,7 +1337,7 @@ async function processOrderChunk(
           } else {
             // Create new product
             productId = uuidv4();
-            const unitPrice = parseFloat(orderData.unitPrice || '0');
+            const unitPrice = parseNumericValue(orderData.unitPrice) ?? 0;
 
             const newProduct = {
               id: productId,
@@ -1362,15 +1373,15 @@ async function processOrderChunk(
           const quantity = parsedQuantity; // Use already parsed quantity
 
           const unitPriceFromCSV = orderData.unitPrice?.trim();
-          const unitPrice = unitPriceFromCSV && unitPriceFromCSV !== '' ? parseFloat(unitPriceFromCSV) : null;
+          const unitPrice = parseNumericValue(unitPriceFromCSV);
 
           const totalPrice = (quantity !== null && unitPrice !== null) ? quantity * unitPrice : 0;
 
           // Parse tax fields - unitPrice now contains price excluding tax
-          const taxAmount = orderData.taxAmount && orderData.taxAmount.trim() !== '' ? parseFloat(orderData.taxAmount) : 0;
-          const taxPercentage = orderData.taxPercentage && orderData.taxPercentage.trim() !== '' ? parseFloat(orderData.taxPercentage) : 0;
-          const priceIncludingTax = orderData.priceIncludingTax && orderData.priceIncludingTax.trim() !== '' ? parseFloat(orderData.priceIncludingTax) : unitPrice;
-          const priceExcludingTax = unitPrice; // Unit price now contains price excluding tax
+          const taxAmount = parseNumericValue(orderData.taxAmount) ?? 0;
+          const taxPercentage = parseNumericValue(orderData.taxPercentage) ?? 0;
+          const priceIncludingTax = parseNumericValue(orderData.priceIncludingTax) ?? unitPrice ?? 0;
+          const priceExcludingTax = unitPrice ?? 0; // Unit price now contains price excluding tax
 
           subtotal += totalPrice;
 
@@ -1412,8 +1423,8 @@ async function processOrderChunk(
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
-              quantity: quantity,
-              unitPrice: unitPrice,
+              quantity: quantity ?? undefined,
+              unitPrice: unitPrice ?? undefined,
               taxAmount: taxAmount,
               taxPercentage: taxPercentage,
               priceIncludingTax: priceIncludingTax,
@@ -1441,7 +1452,7 @@ async function processOrderChunk(
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
               productName: orderData.productName,
-              quantity: parsedQuantity,
+              quantity: parsedQuantity ?? undefined,
               errorMessage: error.message || 'Unknown error occurred'
             }
           });
