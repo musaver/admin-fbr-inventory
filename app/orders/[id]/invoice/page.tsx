@@ -137,6 +137,9 @@ export default function OrderInvoice() {
     return `${currencySettings?.symbol || '₨'}${numAmount.toFixed(2)}`;
   };
 
+  // Avoid floating-point drift when summing currency values
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
   const handlePrint = () => {
     // Create a new window for printing
     const printWindow = window.open('', '_blank', 'width=800,height=600');
@@ -159,6 +162,8 @@ export default function OrderInvoice() {
       const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
       return sum + (taxAmount * quantity);
     }, 0);
+
+    const computedSubtotal = round2(totalAmount + totalGST);
 
     // Build the print content
     const printContent = `
@@ -766,7 +771,7 @@ export default function OrderInvoice() {
               ` : ''}
               <div class="total-row">
                 <span>Subtotal:</span>
-                <span>${formatAmountForPrint(order.subtotal)}</span>
+                <span>${formatAmountForPrint(computedSubtotal)}</span>
               </div>
               ${parseFloat(order.taxAmount) > 0 ? `
               <div class="total-row">
@@ -788,7 +793,7 @@ export default function OrderInvoice() {
               ` : ''}
               <div class="total-row final">
                 <span>Total:</span>
-                <span>${formatAmountForPrint(order.totalAmount)}</span>
+                <span>${formatAmountForPrint(computedSubtotal)}</span>
               </div>
             </div>
           </div>
@@ -1015,6 +1020,8 @@ export default function OrderInvoice() {
     const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
     return sum + (taxAmount * quantity);
   }, 0);
+
+  const computedSubtotal = round2(totalAmount + totalGST);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8">
@@ -1664,7 +1671,7 @@ export default function OrderInvoice() {
                     
                     <div className="flex justify-between py-2">
                       <span>Subtotal:</span>
-                      <span>{formatAmount(order.subtotal)}</span>
+                      <span>{formatAmount(computedSubtotal)}</span>
                     </div>
                     
                     {parseFloat(order.taxAmount) > 0 && (
@@ -1691,7 +1698,7 @@ export default function OrderInvoice() {
                     <Separator className="my-3" />
                     <div className="flex justify-between py-2 text-xl font-bold text-emerald-700">
                       <span>Total:</span>
-                      <span>{formatAmount(order.totalAmount)}</span>
+                      <span>{formatAmount(computedSubtotal)}</span>
                     </div>
                   </CardContent>
                 </Card>
