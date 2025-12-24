@@ -635,7 +635,6 @@ export default function OrderInvoice() {
             <div class="info-box">
               <h3>Invoice Information</h3>
               ${order.invoiceDate ? `<p>Invoice Date: ${formatDateTime(order.invoiceDate)}</p>` : ''}
-              <p>Created Date: ${formatDateTime(order.createdAt)}</p>
               ${order.trackingNumber ? `<p>Tracking: ${order.trackingNumber}</p>` : ''}
             </div>
           </div>
@@ -1314,10 +1313,6 @@ export default function OrderInvoice() {
                         <span className='text-sm text-gray-500'>{formatDateTime(order.invoiceDate)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Created Date:</span>
-                      <span className='text-sm text-gray-500'>{formatDateTime(order.createdAt)}</span>
-                    </div>
                     {order.trackingNumber && (
                       <div className="flex justify-between">
                         <span className='text-sm text-gray-500'>Tracking:</span>
