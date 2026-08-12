@@ -30,17 +30,6 @@ NEXT_PUBLIC_APP_NAME="Your Inventory App"
 BLOB_READ_WRITE_TOKEN=your-vercel-blob-token
 ```
 
-### **NEW: Inngest Configuration (Required for Background Processing)**
-```bash
-# For Inngest Cloud (Production)
-INNGEST_EVENT_KEY=your-inngest-event-key
-INNGEST_SIGNING_KEY=your-inngest-signing-key
-
-# Optional: For custom Inngest setup
-INNGEST_ENV=production
-INNGEST_BASE_URL=https://api.inngest.com
-```
-
 ### Email Configuration
 ```bash
 EMAIL_FROM=noreply@yourdomain.com
@@ -55,12 +44,6 @@ SENDINBLUE_API_KEY=your-sendinblue-api-key
 3. Create a new Blob store (if not already created)
 4. Copy the `BLOB_READ_WRITE_TOKEN` from the connection string
 5. Add it to your Vercel environment variables
-
-### 2. Inngest Cloud Setup
-1. Sign up at [inngest.com](https://inngest.com)
-2. Create a new project
-3. Get your `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`
-4. Add them to your Vercel environment variables
 
 ### 3. Database Setup
 Ensure your production database has the `import_jobs` table:
@@ -101,35 +84,26 @@ npm run build
 vercel deploy --prod
 ```
 
-### 5. Inngest Function Registration
-After deployment, register your functions with Inngest:
-
-1. Go to your Inngest dashboard
-2. Add your production webhook URL: `https://yourdomain.com/api/inngest`
-3. Inngest will automatically discover your functions
-
 ## Testing Production Import
 
 1. **Access your live domain**: `https://yourdomain.com/users/bulk-upload?tab=products`
 2. **Upload a test CSV** with columns: `name,price,description,sku`
 3. **Monitor progress** in real-time
-4. **Check Inngest dashboard** for function execution logs
+4. **Check Vercel function logs** for function execution logs
 
 ## Production Benefits
 
-✅ **Zero Server Load**: All processing happens in Inngest background
+✅ **Non-blocking uploads**: Processing runs after the response (Next.js `after()`)
 ✅ **No Timeouts**: Handle files up to 100MB
 ✅ **Concurrent Imports**: Multiple users can import simultaneously
 ✅ **Real-time Progress**: Users see live progress updates
 ✅ **Error Handling**: Detailed error reporting per row
 ✅ **Multi-tenant**: Complete tenant isolation
 
-## Troubleshooting x
+## Troubleshooting
 
 ### Import Jobs Stuck in "Pending"
-- Check Inngest webhook is registered correctly
-- Verify `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` are set
-- Check Inngest dashboard for function execution logs
+- Check Vercel function logs for execution details
 
 ### Blob Upload Errors
 - Verify `BLOB_READ_WRITE_TOKEN` is correct
@@ -145,5 +119,4 @@ After deployment, register your functions with Inngest:
 
 For issues specific to:
 - **Vercel Blob**: [Vercel Blob Documentation](https://vercel.com/docs/storage/vercel-blob)
-- **Inngest**: [Inngest Documentation](https://www.inngest.com/docs)
 - **Database**: Check your database provider's documentation
