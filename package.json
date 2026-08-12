@@ -67,7 +67,6 @@
     "form-data": "^4.0.4",
     "framer-motion": "^12.23.12",
     "html2canvas": "^1.4.1",
-    "inngest": "^3.54.2",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.525.0",
     "mysql2": "^3.14.1",

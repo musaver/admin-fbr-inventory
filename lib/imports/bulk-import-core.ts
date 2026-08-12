@@ -1,10 +1,9 @@
-import { inngest } from '@/lib/inngest';
 import { db } from '@/lib/db';
 import { importJobs, user, userLoyaltyPoints, products, stockMovements, orders, orderItems } from '@/lib/schema';
 import { eq, and, sql, or, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
-interface UserImportRow {
+export interface UserImportRow {
   name: string;
   email: string;
   phone: string;
@@ -15,7 +14,7 @@ interface UserImportRow {
   buyerRegistrationType: string;
 }
 
-interface ProductImportRow {
+export interface ProductImportRow {
   sku: string;
   unitPrice: string;
   priceIncludingTax?: string;
@@ -32,7 +31,7 @@ interface ProductImportRow {
   uom?: string;
 }
 
-interface OrderImportRow {
+export interface OrderImportRow {
   customerPhone: string;
   customerName?: string;
   customerEmail?: string;
@@ -55,7 +54,7 @@ interface OrderImportRow {
   sroScheduleNumber?: string;
 }
 
-interface ProcessingResult {
+export interface ProcessingResult {
   successful: number;
   failed: number;
   errors: Array<{
@@ -105,28 +104,9 @@ interface ProcessingResult {
   }>;
 }
 
-// Test function to verify CSV parsing
-function testCSVParsing() {
-  const testCSV = `Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
-"John Doe","john@test.com","+92300-1234567","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Registered"
-"Jane Smith","jane@test.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
-"Bob Wilson","bob@test.com","+92333-1122334","1122334455667","Wilson Corp","KPK","789 Market Road, Peshawar","Unregistered"`;
-
-  console.log('🧪 Testing CSV parsing...');
-  console.log('Raw CSV:', testCSV);
-
-  try {
-    const users = parseUserCSV(testCSV);
-    console.log('✅ Parsed users:', users);
-    return users;
-  } catch (error) {
-    console.error('❌ CSV parsing failed:', error);
-    return [];
-  }
-}
 
 // Utility function to parse CSV for users
-function parseUserCSV(csvText: string): UserImportRow[] {
+export function parseUserCSV(csvText: string): UserImportRow[] {
   const lines = csvText.split('\n').filter(line => line.trim());
 
   if (lines.length < 2) {
@@ -216,7 +196,7 @@ function parseUserCSV(csvText: string): UserImportRow[] {
 }
 
 // Utility function to parse CSV for products
-function parseProductCSV(csvText: string): ProductImportRow[] {
+export function parseProductCSV(csvText: string): ProductImportRow[] {
   const lines = csvText.split('\n').filter(line => line.trim());
 
   if (lines.length < 2) {
@@ -348,7 +328,7 @@ function parseProductCSV(csvText: string): ProductImportRow[] {
 }
 
 // Utility function to parse CSV for orders
-function parseOrderCSV(csvText: string): OrderImportRow[] {
+export function parseOrderCSV(csvText: string): OrderImportRow[] {
   const lines = csvText.split('\n').filter(line => line.trim());
 
   if (lines.length < 2) {
@@ -554,7 +534,7 @@ function validateOrder(orderData: OrderImportRow): string | null {
 }
 
 // Process users in chunks
-async function processUserChunk(
+export async function processUserChunk(
   users: UserImportRow[],
   tenantId: string,
   startIndex: number
@@ -723,7 +703,7 @@ async function processUserChunk(
 }
 
 // Process products in chunks
-async function processProductChunk(
+export async function processProductChunk(
   productRows: ProductImportRow[],
   tenantId: string,
   startIndex: number
@@ -1090,7 +1070,7 @@ async function processProductChunk(
 }
 
 // Process orders in chunks - creates orders with user/product matching logic
-async function processOrderChunk(
+export async function processOrderChunk(
   orderRows: OrderImportRow[],
   tenantId: string,
   startIndex: number
@@ -1566,248 +1546,3 @@ async function processOrderChunk(
 
   return result;
 }
-
-// Main Inngest function
-export const bulkUserImport = inngest.createFunction(
-  {
-    id: 'user-bulk-import',
-    name: 'User Bulk Import (Production)',
-    concurrency: {
-      limit: 10, // Allow up to 10 concurrent import jobs
-    }
-  },
-  { event: 'user/bulk-import' },
-  async ({ event, step }) => {
-    const { jobId, blobUrl, tenantId, fileName, importType = 'users', removeExistingData = false } = event.data;
-
-    // SUPER AGGRESSIVE DEBUG: Log function entry
-    console.log('🚨 BULK IMPORT FUNCTION CALLED!', { jobId, importType, fileName, removeExistingData });
-
-    console.log('🎯 INNGEST FUNCTION TRIGGERED!');
-    console.log(`🚀 Starting ${importType} import job:`, {
-      jobId,
-      tenantId,
-      fileName,
-      importType,
-      removeExistingData,
-      blobUrl: blobUrl.substring(0, 50) + '...'
-    });
-
-    // Step 1: Update job status to processing
-    await step.run('update-job-status-processing', async () => {
-      console.log(`📝 Updating job ${jobId} status to processing...`);
-      await db.update(importJobs)
-        .set({
-          status: 'processing',
-          startedAt: new Date()
-        })
-        .where(eq(importJobs.id, jobId));
-      console.log(`✅ Job ${jobId} status updated to processing`);
-    });
-
-    // Step 1.5: Remove existing data if requested
-    if (removeExistingData) {
-      await step.run('remove-existing-data', async () => {
-        console.log(`🗑️ Removing existing ${importType} for tenant: ${tenantId}`);
-
-        if (importType === 'users') {
-          // Delete users (this will cascade to related data due to foreign key constraints)
-          const deletedUsers = await db.delete(user)
-            .where(and(
-              eq(user.tenantId, tenantId),
-              // Don't delete admin users
-              or(
-                eq(user.userType, 'customer'),
-                isNull(user.userType)
-              )
-            ));
-          console.log(`✅ Removed existing users for tenant: ${tenantId}`);
-        } else if (importType === 'products') {
-          // Delete products (this will cascade to related data)
-          const deletedProducts = await db.delete(products)
-            .where(eq(products.tenantId, tenantId));
-          console.log(`✅ Removed existing products for tenant: ${tenantId}`);
-        }
-      });
-    }
-
-    try {
-      // Step 2: Download and parse file
-      const parsedData = await step.run('parse-file', async () => {
-        console.log(`📥 Downloading file for ${importType} import...`);
-        const response = await fetch(blobUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to download file: ${response.statusText}`);
-        }
-        const csvText = await response.text();
-        console.log(`📄 CSV file downloaded, size: ${csvText.length} characters`);
-
-        if (importType === 'products') {
-          console.log('🔍 Parsing as product CSV...');
-          const data = parseProductCSV(csvText);
-          console.log(`✅ Parsed ${data.length} products from CSV`);
-          return { type: 'products', data };
-        } else if (importType === 'orders') {
-          console.log('🔍 Parsing as order CSV...');
-          const data = parseOrderCSV(csvText);
-          console.log(`✅ Parsed ${data.length} order rows from CSV`);
-          return { type: 'orders', data };
-        } else {
-          console.log('🔍 Parsing as user CSV...');
-
-          // Run test to debug CSV parsing
-          console.log('🧪 Running CSV parsing test first...');
-          testCSVParsing();
-
-          console.log('🔍 Now parsing actual CSV...');
-          console.log('CSV Content (first 500 chars):', csvText.substring(0, 500));
-
-          const data = parseUserCSV(csvText);
-          console.log(`✅ Parsed ${data.length} users from CSV`);
-          console.log('First user data sample:', data[0]);
-          return { type: 'users', data };
-        }
-      });
-
-      // Step 3: Update total records count
-      await step.run('update-total-records', async () => {
-        await db.update(importJobs)
-          .set({ totalRecords: parsedData.data.length })
-          .where(eq(importJobs.id, jobId));
-      });
-
-      // Step 4: Process data in chunks of 50
-      const CHUNK_SIZE = 50;
-      const chunks: (UserImportRow[] | ProductImportRow[] | OrderImportRow[])[] = [];
-      for (let i = 0; i < parsedData.data.length; i += CHUNK_SIZE) {
-        chunks.push(parsedData.data.slice(i, i + CHUNK_SIZE));
-      }
-
-      let totalResults: ProcessingResult = {
-        successful: 0,
-        failed: 0,
-        errors: [],
-        successfulUsers: importType === 'users' ? [] : undefined,
-        successfulProducts: importType === 'products' ? [] : undefined,
-        successfulOrders: importType === 'orders' ? [] : undefined,
-        detailedReport: importType === 'orders' ? [] : undefined
-      };
-
-      // Process each chunk
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
-        const startIndex = chunkIndex * CHUNK_SIZE;
-
-        const chunkResult = await step.run(`process-chunk-${chunkIndex}`, async () => {
-          console.log(`🔄 Processing chunk ${chunkIndex + 1}/${chunks.length} for ${importType} (${chunk.length} items)`);
-          console.log(`📊 Chunk data sample:`, chunk.slice(0, 2)); // Show first 2 items
-
-          if (importType === 'products') {
-            return processProductChunk(chunk as ProductImportRow[], tenantId, startIndex);
-          } else if (importType === 'orders') {
-            return processOrderChunk(chunk as OrderImportRow[], tenantId, startIndex);
-          } else {
-            const result = processUserChunk(chunk as UserImportRow[], tenantId, startIndex);
-            console.log(`🏁 Chunk ${chunkIndex + 1} processing completed`);
-            return result;
-          }
-        });
-
-        // Merge results
-        totalResults.successful += chunkResult.successful;
-        totalResults.failed += chunkResult.failed;
-        totalResults.errors.push(...chunkResult.errors);
-
-        console.log(`📈 Chunk ${chunkIndex + 1} results:`, {
-          successful: chunkResult.successful,
-          failed: chunkResult.failed,
-          errors: chunkResult.errors.length
-        });
-
-        if (importType === 'users' && chunkResult.successfulUsers) {
-          totalResults.successfulUsers!.push(...chunkResult.successfulUsers);
-          console.log(`👥 Added ${chunkResult.successfulUsers.length} successful users to total`);
-        } else if (importType === 'products' && chunkResult.successfulProducts) {
-          totalResults.successfulProducts!.push(...chunkResult.successfulProducts);
-        } else if (importType === 'orders' && chunkResult.successfulOrders) {
-          totalResults.successfulOrders!.push(...chunkResult.successfulOrders);
-          console.log(`📦 Added ${chunkResult.successfulOrders.length} successful orders to total`);
-
-          // Merge detailed reports
-          if (chunkResult.detailedReport) {
-            totalResults.detailedReport!.push(...chunkResult.detailedReport);
-          }
-        }
-
-        console.log(`📊 Running totals: ${totalResults.successful} successful, ${totalResults.failed} failed`);
-
-        // Update progress
-        await step.run(`update-progress-${chunkIndex}`, async () => {
-          await db.update(importJobs)
-            .set({
-              processedRecords: totalResults.successful + totalResults.failed,
-              successfulRecords: totalResults.successful,
-              failedRecords: totalResults.failed
-            })
-            .where(eq(importJobs.id, jobId));
-        });
-      }
-
-      // Step 5: Mark job as completed
-      await step.run('mark-job-completed', async () => {
-        await db.update(importJobs)
-          .set({
-            status: 'completed',
-            completedAt: new Date(),
-            errors: totalResults.errors,
-            results: {
-              successful: totalResults.successful,
-              failed: totalResults.failed,
-              successfulUsers: totalResults.successfulUsers?.slice(0, 100), // Limit stored results
-              successfulProducts: totalResults.successfulProducts?.slice(0, 100), // Limit stored results
-              successfulOrders: totalResults.successfulOrders?.slice(0, 100), // Limit stored results
-              detailedReport: totalResults.detailedReport // Include full detailed report
-            }
-          })
-          .where(eq(importJobs.id, jobId));
-      });
-
-      return {
-        success: true,
-        totalProcessed: totalResults.successful + totalResults.failed,
-        successful: totalResults.successful,
-        failed: totalResults.failed
-      };
-
-    } catch (error: any) {
-      console.log('💥 INNGEST FUNCTION CAUGHT ERROR!');
-      console.error('Full error details:', error);
-
-      // Mark job as failed
-      await step.run('mark-job-failed', async () => {
-        const errorMessage = error.message || 'Unknown error occurred';
-        console.error('❌ Import job failed:', {
-          jobId,
-          tenantId,
-          importType,
-          error: errorMessage,
-          stack: error.stack
-        });
-
-        await db.update(importJobs)
-          .set({
-            status: 'failed',
-            completedAt: new Date(),
-            errors: [{
-              row: 0,
-              identifier: 'SYSTEM_ERROR',
-              message: `Import failed: ${errorMessage}`
-            }]
-          })
-          .where(eq(importJobs.id, jobId));
-      });
-
-      throw error;
-    }
-  }
-);

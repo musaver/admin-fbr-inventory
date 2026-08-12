@@ -1,11 +1,11 @@
 # Bulk Product Import Feature
 
-This feature allows tenants to import large numbers of products with stock information via CSV files using background processing with Inngest.
+This feature allows tenants to import large numbers of products with stock information via CSV files using in-request background processing (Next.js `after()`).
 
 ## Features
 
 - ✅ CSV file upload with validation
-- ✅ Background processing with Inngest
+- ✅ In-request background processing (Next.js `after()`)
 - ✅ Real-time progress tracking
 - ✅ Error reporting and success tracking
 - ✅ Multi-tenant support with automatic tenant ID injection
@@ -28,10 +28,9 @@ This feature allows tenants to import large numbers of products with stock infor
 2. **API Routes**
    - `/api/users/bulk-upload` - Handles file upload and job creation for both users and products
    - `/api/users/import-status/[jobId]` - Returns job progress for both import types
-   - `/api/inngest` - Inngest webhook endpoint
 
 3. **Background Processing**
-   - Inngest function for CSV parsing and product creation
+   - Server-side processing (`lib/imports/`) for CSV parsing and product creation
    - Chunked processing (25 products per chunk)
    - Progress updates after each chunk
    - Automatic stock movement and inventory creation
@@ -163,7 +162,7 @@ SKU,Unit Price,Stock Quantity,Status
 - Maximum file size: 100MB
 - Supported format: CSV only
 - Processing: 25 products per chunk (optimized for database operations)
-- Storage: Vercel Blob with public access for Inngest processing
+- Storage: Vercel Blob (kept as the uploaded-file audit record)
 
 ### Multi-Tenant Support
 - Automatic tenant ID injection from request headers
@@ -201,10 +200,6 @@ SKU,Unit Price,Stock Quantity,Status
 Required environment variables (should already be configured):
 
 ```env
-# Inngest Configuration
-INNGEST_EVENT_KEY=your-inngest-event-key
-INNGEST_SIGNING_KEY=your-inngest-signing-key
-
 # Vercel Blob (automatically configured on Vercel)
 BLOB_READ_WRITE_TOKEN=your-blob-token
 

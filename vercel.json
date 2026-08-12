@@ -6,7 +6,7 @@
     "app/api/**/*.ts": {
       "maxDuration": 30
     },
-    "app/api/inngest/route.ts": {
+    "app/api/users/bulk-upload/route.ts": {
       "maxDuration": 300
     }
   },

@@ -37,7 +37,40 @@ export async function GET(
       return ErrorResponses.invalidInput('Import job not found');
     }
 
-    const importJob = job[0];
+    let importJob = job[0];
+
+    // Stale-job guard: processing runs inside a single invocation capped at
+    // 300s (maxDuration on the bulk-upload route). If a job is still
+    // pending/processing long past that, the invocation was killed or crashed
+    // — mark it failed so the UI stops polling instead of spinning forever.
+    const STALE_MS = 10 * 60 * 1000; // 10 min, comfortably above the 300s cap
+    const staleAnchor = importJob.startedAt || importJob.createdAt;
+    if (
+      (importJob.status === 'processing' || importJob.status === 'pending') &&
+      staleAnchor &&
+      Date.now() - new Date(staleAnchor).getTime() > STALE_MS
+    ) {
+      await db.update(importJobs)
+        .set({
+          status: 'failed',
+          completedAt: new Date(),
+          errors: [{
+            row: 0,
+            identifier: 'SYSTEM_ERROR',
+            message: 'Import timed out or was interrupted (no completion within 10 minutes). Partial data may have been imported; please review and re-upload if needed.'
+          }]
+        })
+        .where(eq(importJobs.id, importJob.id));
+
+      const refreshed = await db
+        .select()
+        .from(importJobs)
+        .where(eq(importJobs.id, importJob.id))
+        .limit(1);
+      if (refreshed.length > 0) {
+        importJob = refreshed[0];
+      }
+    }
 
     // Calculate progress percentage
     const progressPercent = importJob.totalRecords > 0 
