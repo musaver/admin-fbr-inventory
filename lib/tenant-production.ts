@@ -62,12 +62,17 @@ export function extractSubdomain(hostname: string): string | null {
 /**
  * Get tenant by slug - Production version that uses database
  * This works in both Edge Runtime and regular Node.js runtime
+ *
+ * @param requestOrigin Origin of the incoming request (e.g. request.nextUrl.origin).
+ * When provided, the lookup targets the same deployment that received the
+ * request — no env var required, so it can never point at a stale domain.
  */
-export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
+export async function getTenantBySlug(slug: string, requestOrigin?: string): Promise<Tenant | null> {
   try {
     // In production, we need to use the database API endpoint
     // because Edge Runtime can't directly connect to MySQL
-    const baseUrl = process.env.NEXTAUTH_URL
+    const baseUrl = requestOrigin
+      || process.env.NEXTAUTH_URL
       || (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'https://hisaab360invoicing.com');
     
     const response = await fetch(`${baseUrl}/api/tenants/lookup?slug=${slug}`, {

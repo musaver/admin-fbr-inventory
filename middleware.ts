@@ -45,8 +45,11 @@ export async function middleware(request: NextRequest) {
     
     let tenant = null;
     try {
-      // Get tenant information (with caching)
-      tenant = await getCachedTenant(subdomain);
+      // Get tenant information (with caching).
+      // The lookup targets the request's own origin — the /api/tenants/lookup
+      // path is excluded from middleware above, so this cannot recurse and it
+      // never depends on NEXTAUTH_URL pointing at the right domain.
+      tenant = await getCachedTenant(subdomain, request.nextUrl.origin);
       console.log('Tenant lookup result:', tenant ? `Found: ${tenant.name} (${tenant.status})` : 'Not found');
       
       if (!tenant) {
