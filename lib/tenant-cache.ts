@@ -26,7 +26,7 @@ const tenantCache = new Map<string, CachedTenant>();
  * @param slug Tenant slug to lookup
  * @returns Tenant object or null
  */
-export async function getCachedTenant(slug: string): Promise<Tenant | null> {
+export async function getCachedTenant(slug: string, requestOrigin?: string): Promise<Tenant | null> {
   const now = Date.now();
   const cached = tenantCache.get(slug);
 
@@ -40,7 +40,7 @@ export async function getCachedTenant(slug: string): Promise<Tenant | null> {
   
   // Cache miss or expired - fetch from database
   console.log('🔄 Cache miss for tenant:', slug, cached ? '(expired)' : '(not found)');
-  const tenant = await getTenantBySlug(slug);
+  const tenant = await getTenantBySlug(slug, requestOrigin);
   
   // Store in cache
   tenantCache.set(slug, {
