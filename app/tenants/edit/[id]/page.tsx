@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, ArrowLeft, Save, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { getTenantUrl, getSubdomainSuffix } from '@/lib/subdomain-utils';
 
 export default function EditTenantPage() {
   const router = useRouter();
@@ -269,7 +270,7 @@ export default function EditTenantPage() {
                         disabled // Subdomain shouldn't be changed after creation
                         className="bg-gray-50"
                       />
-                      <span className="text-sm text-gray-500">.localhost:3000</span>
+                      <span className="text-sm text-gray-500">{getSubdomainSuffix()}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
                       Subdomain cannot be changed after creation
@@ -477,13 +478,13 @@ export default function EditTenantPage() {
               <div>
                 <Label className="text-gray-600">Access URL</Label>
                 <p>
-                  <a 
-                    href={`http://${originalData.slug}.localhost:3000`}
+                  <a
+                    href={getTenantUrl(originalData.slug)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    {originalData.slug}.localhost:3000
+                    {originalData.slug}{getSubdomainSuffix()}
                   </a>
                 </p>
               </div>

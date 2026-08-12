@@ -20,7 +20,7 @@ git commit -m "Fix: Exclude /api/inngest from tenant subdomain authentication
 - Prevents 500 errors when Inngest webhooks are called from tenant subdomains
 - Ensures bulk import works correctly for all tenants
 
-Fixes: 500 Internal Server Error on https://swd.taxmahir.pk/users/bulk-upload"
+Fixes: 500 Internal Server Error on https://demo.hisaab360invoicing.com/users/bulk-upload"
 
 echo "🚀 Deploying to Vercel..."
 git push
@@ -29,15 +29,15 @@ echo "⏳ Waiting for deployment (30 seconds)..."
 sleep 30
 
 echo "🧪 Testing subdomain endpoint..."
-read -p "Enter your tenant subdomain (e.g., swd.taxmahir.pk): " subdomain
+read -p "Enter your tenant subdomain (e.g., demo.hisaab360invoicing.com): " subdomain
 if [ -z "$subdomain" ]; then
     echo "❌ Subdomain is required"
     exit 1
 fi
 
 # Test the main domain endpoint
-echo "📡 Testing main domain: https://taxmahir.pk/api/inngest"
-main_response=$(curl -s -w "HTTP_STATUS:%{http_code}" "https://taxmahir.pk/api/inngest")
+echo "📡 Testing main domain: https://hisaab360invoicing.com/api/inngest"
+main_response=$(curl -s -w "HTTP_STATUS:%{http_code}" "https://hisaab360invoicing.com/api/inngest")
 main_status=$(echo "$main_response" | grep -o "HTTP_STATUS:[0-9]*" | cut -d':' -f2)
 echo "Main domain status: $main_status"
 

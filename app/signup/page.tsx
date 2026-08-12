@@ -351,7 +351,7 @@ export default function SignupPage() {
                       }`}
                     />
                     <span className="text-sm text-gray-500">
-                      .{process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'yourdomain.com'}
+                      .{process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'hisaab360invoicing.com'}
                     </span>
                     {subdomainCheck.checking && (
                       <Loader2 className="w-4 h-4 animate-spin text-gray-400" />

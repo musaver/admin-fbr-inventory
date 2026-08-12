@@ -32,7 +32,7 @@ export function Header() {
           <div className="hidden md:flex items-center space-x-4">
       
             {/*<Button variant="ghost" size="sm" className="rounded-full">Sign In</Button>*/}
-            <a href="https://app.hisaab360.com/" target="_blank" className="bg-primary hover:bg-primary/90 transition-smooth rounded-full text-white px-3 py-2 ">
+            <a href="/login" className="bg-primary hover:bg-primary/90 transition-smooth rounded-full text-white px-3 py-2 ">
               Login
             </a>
           </div>
@@ -55,7 +55,7 @@ export function Header() {
               <a href="#industries" className="hover:text-foreground transition-smooth py-2">Industries</a>
               <a href="#pricing" className="hover:text-foreground transition-smooth py-2">Pricing</a>
               <div className="flex flex-col space-y-3 pt-4 border-t border-border">
-                <a href="https://app.hisaab360.com/" target="_blank" className="rounded-full">Sign In</a>
+                <a href="/login" className="rounded-full">Sign In</a>
               </div>
             </nav>
           </div>

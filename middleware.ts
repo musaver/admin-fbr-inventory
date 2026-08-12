@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`${protocol}://${redirectHost}/tenant-not-found`));
       }
       
-      if (tenant.status !== 'active') {
+      if (tenant.status !== 'active' && tenant.status !== 'trial') {
         console.log('Tenant not active:', tenant.status);
         // For localhost, redirect to localhost, for production use main domain  
         const redirectHost = hostname.includes('localhost') ? 'localhost:3000' : hostname.replace(subdomain + '.', '');

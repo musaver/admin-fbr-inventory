@@ -20,5 +20,25 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "hisaab360.com" }],
+      "destination": "https://hisaab360invoicing.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.hisaab360.com" }],
+      "destination": "https://hisaab360invoicing.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "(?<subdomain>.*)\\.hisaab360\\.com" }],
+      "destination": "https://:subdomain.hisaab360invoicing.com/:path*",
+      "permanent": true
+    }
   ]
 }

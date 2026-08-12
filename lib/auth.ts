@@ -5,8 +5,11 @@ import { db } from "@/lib/db";
 import { adminUsers, tenants, adminRoles } from "@/lib/schema";
 import bcrypt from "bcrypt";
 import { eq, and } from "drizzle-orm";
-import { extractSubdomain } from "@/lib/tenant";
-import { getTenantBySlug } from "@/lib/tenant-production";
+import { extractSubdomain, getTenantBySlug } from "@/lib/tenant";
+
+// Statuses that are allowed to sign in / keep a session.
+// Self-service registration creates tenants with status 'trial'.
+const ALLOWED_TENANT_STATUSES = ['active', 'trial'];
 
 export const authOptions: NextAuthOptions = {
   // Don't use adapter with JWT strategy - causes conflicts
@@ -102,7 +105,7 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
             
-            if (tenant.status !== 'active') {
+            if (!ALLOWED_TENANT_STATUSES.includes(tenant.status)) {
               console.log("Tenant not active:", tenant.status);
               return null;
             }
@@ -282,7 +285,7 @@ export const authOptions: NextAuthOptions = {
               console.log('🔄 Checking tenant status (30min interval):', token.tenantSlug);
               const tenant = await getTenantBySlug(token.tenantSlug as string);
               
-              if (!tenant || tenant.status !== 'active') {
+              if (!tenant || !ALLOWED_TENANT_STATUSES.includes(tenant.status)) {
                 console.log("Tenant suspended or not found during session:", token.tenantSlug);
                 // Return null session to force logout
                 return { ...session, user: null } as any;
@@ -293,7 +296,7 @@ export const authOptions: NextAuthOptions = {
               token.tenantStatus = tenant.status;
             } else {
               // Use cached tenant status from token
-              if (token.tenantStatus !== 'active') {
+              if (!ALLOWED_TENANT_STATUSES.includes(token.tenantStatus as string)) {
                 console.log("Cached tenant status is inactive:", token.tenantSlug);
                 return { ...session, user: null } as any;
               }
@@ -364,9 +367,15 @@ export const authOptions: NextAuthOptions = {
         return `${baseUrl}${url}`;
       }
       
-      // Handle absolute URLs that match the base domain
+      // Handle absolute URLs on the base domain or any of its tenant subdomains
       try {
-        if (new URL(url).origin === baseUrl) {
+        const target = new URL(url);
+        const rootHost = process.env.NEXT_PUBLIC_ROOT_DOMAIN || new URL(baseUrl).hostname;
+        if (
+          target.origin === baseUrl ||
+          (target.protocol === 'https:' &&
+            (target.hostname === rootHost || target.hostname.endsWith(`.${rootHost}`)))
+        ) {
           return url;
         }
       } catch (e) {

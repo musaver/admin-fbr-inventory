@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           plan: plan,
           status: 'trial',
           trialEndsAt: trialEndsAt.toISOString(),
-          url: `https://${subdomain}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'yourdomain.com'}`
+          url: `https://${subdomain}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'hisaab360invoicing.com'}`
         },
         admin: {
           id: adminUserId,

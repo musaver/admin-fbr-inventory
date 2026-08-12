@@ -6,7 +6,7 @@ export default function SetupPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    email: 'admin@yourdomain.com',
+    email: 'admin@hisaab360invoicing.com',
     password: 'SuperAdmin123!',
     name: 'Super Administrator'
   });

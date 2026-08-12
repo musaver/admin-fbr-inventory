@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { getTenantUrl, getSubdomainSuffix } from '@/lib/subdomain-utils';
 
 export default function AddTenantPage() {
   const router = useRouter();
@@ -211,7 +212,7 @@ export default function AddTenantPage() {
       setTenantInfo({
         tenant: tenantResult,
         admin: adminResult,
-        url: `http://${tenantResult.slug}.localhost:3000`
+        url: getTenantUrl(tenantResult.slug)
       });
       setSuccess(true);
     } catch (error: any) {
@@ -367,7 +368,7 @@ export default function AddTenantPage() {
                             : ''
                         }`}
                       />
-                      <span className="text-sm text-gray-500">.localhost:3000</span>
+                      <span className="text-sm text-gray-500">{getSubdomainSuffix()}</span>
                       {subdomainCheck.checking && (
                         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                       )}

@@ -59,7 +59,7 @@ async function setupAdminUsers() {
     // Create super admin user
     console.log('👤 Creating super admin user...');
     
-    const email = process.env.SUPER_ADMIN_EMAIL || 'admin@yourdomain.com';
+    const email = process.env.SUPER_ADMIN_EMAIL || 'admin@hisaab360invoicing.com';
     const password = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin123!';
     const name = 'Super Administrator';
 
