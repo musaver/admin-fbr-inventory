@@ -11,8 +11,12 @@ interface CachedTenant {
   timestamp: number;
 }
 
-// Cache TTL: 30 minutes
+// Cache TTL: 30 minutes for found tenants
 const CACHE_TTL = 30 * 60 * 1000;
+
+// Short TTL for negative results (lookup failed or tenant not found)
+// so transient lookup errors don't pin a tenant as "missing" for 30 minutes
+const NEGATIVE_CACHE_TTL = 30 * 1000;
 
 // In-memory cache using Map
 const tenantCache = new Map<string, CachedTenant>();
@@ -25,10 +29,13 @@ const tenantCache = new Map<string, CachedTenant>();
 export async function getCachedTenant(slug: string): Promise<Tenant | null> {
   const now = Date.now();
   const cached = tenantCache.get(slug);
-  
-  // Return cached result if still valid
-  if (cached && (now - cached.timestamp) < CACHE_TTL) {
-    return cached.tenant;
+
+  // Return cached result if still valid (negative results expire much sooner)
+  if (cached) {
+    const ttl = cached.tenant ? CACHE_TTL : NEGATIVE_CACHE_TTL;
+    if ((now - cached.timestamp) < ttl) {
+      return cached.tenant;
+    }
   }
   
   // Cache miss or expired - fetch from database

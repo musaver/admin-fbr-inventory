@@ -36,7 +36,7 @@ INSERT IGNORE INTO admin_users (
 ) VALUES (
   'super-admin-001',
   'super-admin',
-  'admin@yourdomain.com',
+  'admin@hisaab360invoicing.com',
   '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- SuperAdmin123!
   'Super Administrator',
   'super-admin',

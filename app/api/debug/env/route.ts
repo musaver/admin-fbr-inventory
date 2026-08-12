@@ -1,20 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
-  // Only allow in development or with a secret key for security
-  const isDebugAllowed = process.env.NODE_ENV === 'development' || 
-                        process.env.DEBUG_SECRET === 'your-debug-secret';
-  
+export async function GET(request: NextRequest) {
+  // Only allow in development, or in production when the caller presents
+  // the configured DEBUG_SECRET (via the x-debug-key header)
+  const providedKey = request.headers.get('x-debug-key');
+  const isDebugAllowed =
+    process.env.NODE_ENV === 'development' ||
+    (!!process.env.DEBUG_SECRET && providedKey === process.env.DEBUG_SECRET);
+
   if (!isDebugAllowed) {
     return NextResponse.json({ error: 'Debug endpoint disabled' }, { status: 403 });
   }
-  
+
   return NextResponse.json({
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL ? 'SET' : 'MISSING',
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? 'SET' : 'MISSING',
     DB_HOST: process.env.DB_HOST ? 'SET' : 'MISSING',
-    DB_USER: process.env.DB_USER ? 'SET' : 'MISSING', 
+    DB_USER: process.env.DB_USER ? 'SET' : 'MISSING',
     DB_PASS: process.env.DB_PASS ? 'SET' : 'MISSING',
     DB_NAME: process.env.DB_NAME ? 'SET' : 'MISSING',
     NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,

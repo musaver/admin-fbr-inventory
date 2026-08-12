@@ -48,8 +48,8 @@ export function Footer() {
             <ul className="space-y-3">
             <li><a href="#faq" className="text-background/70 hover:text-background transition-smooth">FAQ</a></li>
             <li><a href="#contact" className="text-background/70 hover:text-background transition-smooth">Contact Us</a></li>
-            <li><a href="mailto:support@hisaab360.com" className="flex items-center space-x-2 text-background/70 hover:text-background transition-smooth"><Mail className="w-5 h-5 text-background/70" />
-            <span className="text-background/70">support@hisaab360.com</span></a></li>
+            <li><a href="mailto:support@hisaab360invoicing.com" className="flex items-center space-x-2 text-background/70 hover:text-background transition-smooth"><Mail className="w-5 h-5 text-background/70" />
+            <span className="text-background/70">support@hisaab360invoicing.com</span></a></li>
             </ul>
           </div>
 

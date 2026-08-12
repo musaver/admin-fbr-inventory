@@ -4,6 +4,7 @@ import "./globals.css";
 import ClientLayoutWrapper from "./components/ClientLayoutWrapper"; // NEW wrapper
 
 export const metadata: Metadata = {
+  metadataBase: new URL(`https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'hisaab360invoicing.com'}`),
   title: "Hisaab360 - Inventory Management",
   description: "Complete inventory management solution for businesses",
   icons: {

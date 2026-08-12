@@ -31,14 +31,14 @@ DB_PORT=3306
 
 # NextAuth Configuration (CRITICAL)
 NEXTAUTH_SECRET=your-super-secure-jwt-secret-key-here
-NEXTAUTH_URL=https://hisaab360.com
+NEXTAUTH_URL=https://hisaab360invoicing.com
 
 # Multi-tenant Configuration
-NEXT_PUBLIC_ROOT_DOMAIN=hisaab360.com
+NEXT_PUBLIC_ROOT_DOMAIN=hisaab360invoicing.com
 NEXT_PUBLIC_APP_NAME="Hisaab360"
 
 # Email Configuration
-EMAIL_FROM=noreply@hisaab360.com
+EMAIL_FROM=noreply@hisaab360invoicing.com
 SENDINBLUE_API_KEY=your-sendinblue-api-key
 
 # Production Environment
@@ -49,7 +49,7 @@ NODE_ENV=production
 
 ### 1. NEXTAUTH_URL
 **Current Issue**: Might be set incorrectly
-**Required Value**: `https://hisaab360.com`
+**Required Value**: `https://hisaab360invoicing.com`
 **Why**: NextAuth needs the correct base URL for callbacks
 
 ### 2. NEXTAUTH_SECRET
@@ -77,21 +77,21 @@ git push origin main
 ```
 
 ### Step 3: Verify Domain Configuration
-1. Ensure `hisaab360.com` is added to Vercel domains
-2. Ensure `*.hisaab360.com` wildcard is added
+1. Ensure `hisaab360invoicing.com` is added to Vercel domains
+2. Ensure `*.hisaab360invoicing.com` wildcard is added
 3. Check SSL certificates are active
 
 ## 🧪 Testing Production
 
 ### Test Main Domain
 ```
-URL: https://hisaab360.com
+URL: https://hisaab360invoicing.com
 Expected: Landing page loads
 ```
 
 ### Test Tenant Login
 ```
-URL: https://acme-electronics.hisaab360.com
+URL: https://acme-electronics.hisaab360invoicing.com
 Login: admin@acme-electronics.com / admin123
 Expected: Successful login to admin panel
 ```
@@ -139,7 +139,7 @@ export async function GET() {
 - [ ] NEXTAUTH_URL matches production domain
 - [ ] NEXTAUTH_SECRET is strong and unique
 - [ ] Database credentials are correct
-- [ ] Wildcard domain `*.hisaab360.com` is configured
+- [ ] Wildcard domain `*.hisaab360invoicing.com` is configured
 - [ ] SSL certificates are active
 - [ ] Tenant data in `lib/tenant-edge.ts` matches production
 - [ ] Test login on production subdomain

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { getTenantUrl } from '@/lib/subdomain-utils';
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState([]);
@@ -135,7 +136,7 @@ export default function TenantsPage() {
                   <td className="border p-3">
                     <div className="flex gap-2">
                       <Link 
-                        href={`http://${tenant.slug}.localhost:3000`}
+                        href={getTenantUrl(tenant.slug)}
                         target="_blank"
                         className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
                       >

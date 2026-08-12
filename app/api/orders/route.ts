@@ -415,7 +415,9 @@ export const POST = withTenant(async (req: NextRequest, context) => {
             })
           };
 
-          const fbrSubmissionResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/fbr/submit`, {
+          const fbrBaseUrl = process.env.NEXTAUTH_URL
+            || (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'http://localhost:3000');
+          const fbrSubmissionResponse = await fetch(`${fbrBaseUrl}/api/fbr/submit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

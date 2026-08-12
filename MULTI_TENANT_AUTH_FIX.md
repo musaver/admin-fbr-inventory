@@ -28,7 +28,7 @@ Make sure these are set in your Vercel dashboard:
 
 ```env
 # NextAuth Configuration (CRITICAL)
-NEXTAUTH_URL=https://hisaab360.com
+NEXTAUTH_URL=https://hisaab360invoicing.com
 NEXTAUTH_SECRET=your-super-secure-jwt-secret-here
 
 # Database Configuration
@@ -38,7 +38,7 @@ DB_PASS=your-production-db-password
 DB_NAME=your-production-db-name
 
 # Multi-tenant Configuration
-NEXT_PUBLIC_ROOT_DOMAIN=hisaab360.com
+NEXT_PUBLIC_ROOT_DOMAIN=hisaab360invoicing.com
 NODE_ENV=production
 ```
 
@@ -48,10 +48,10 @@ For multi-tenant authentication to work properly, you might need to set the NEXT
 
 ```env
 # If the above doesn't work, try setting NEXTAUTH_URL to the main domain
-NEXTAUTH_URL=https://hisaab360.com
+NEXTAUTH_URL=https://hisaab360invoicing.com
 
 # Or alternatively, set it to handle subdomains dynamically
-NEXTAUTH_URL_INTERNAL=https://hisaab360.com
+NEXTAUTH_URL_INTERNAL=https://hisaab360invoicing.com
 ```
 
 ## 🚀 Deployment Steps
@@ -66,14 +66,14 @@ NEXTAUTH_URL_INTERNAL=https://hisaab360.com
 ### Step 1: Clear All Cookies
 - Open browser dev tools
 - Go to Application/Storage tab
-- Clear all cookies for `hisaab360.com` and subdomains
+- Clear all cookies for `hisaab360invoicing.com` and subdomains
 
 ### Step 2: Test Login Flow
 ```
-1. Visit: https://acme-electronics.hisaab360.com
-2. Should redirect to: https://acme-electronics.hisaab360.com/login
+1. Visit: https://acme-electronics.hisaab360invoicing.com
+2. Should redirect to: https://acme-electronics.hisaab360invoicing.com/login
 3. Login with: admin@acme-electronics.com / admin123
-4. Should redirect to: https://acme-electronics.hisaab360.com/dashboard
+4. Should redirect to: https://acme-electronics.hisaab360invoicing.com/dashboard
 ```
 
 ### Step 3: Verify Session Persistence
@@ -86,7 +86,7 @@ NEXTAUTH_URL_INTERNAL=https://hisaab360.com
 ## 🔍 Debug Steps
 
 ### Check Environment Variables
-Visit: `https://hisaab360.com/api/debug/env`
+Visit: `https://hisaab360invoicing.com/api/debug/env`
 Ensure all critical variables show "SET"
 
 ### Check Vercel Function Logs
@@ -120,12 +120,12 @@ Look for:
 
 ## 📋 Production Checklist
 
-- [ ] NEXTAUTH_URL set to `https://hisaab360.com`
+- [ ] NEXTAUTH_URL set to `https://hisaab360invoicing.com`
 - [ ] NEXTAUTH_SECRET is strong and unique
 - [ ] Database credentials are correct and tested
 - [ ] All cookies cleared from browser
 - [ ] Tenant slugs match in hardcoded data
-- [ ] Vercel domains configured: `hisaab360.com` and `*.hisaab360.com`
+- [ ] Vercel domains configured: `hisaab360invoicing.com` and `*.hisaab360invoicing.com`
 - [ ] SSL certificates are active
 
 ## 🎯 Expected Behavior After Fix
@@ -142,7 +142,7 @@ Try this alternative approach - set NEXTAUTH_URL to the specific tenant domain:
 
 ```env
 # In Vercel, you might need to set:
-NEXTAUTH_URL=https://acme-electronics.hisaab360.com
+NEXTAUTH_URL=https://acme-electronics.hisaab360invoicing.com
 ```
 
 Or create a custom NextAuth configuration that handles multiple domains dynamically.

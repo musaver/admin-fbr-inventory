@@ -8,11 +8,11 @@ echo "⏳ Waiting for deployment (30 seconds)..."
 sleep 30
 
 echo "📊 Checking endpoint status:"
-curl -s "https://taxmahir.pk/api/inngest" | jq '{function_count, mode, has_event_key, has_signing_key}'
+curl -s "https://hisaab360invoicing.com/api/inngest" | jq '{function_count, mode, has_event_key, has_signing_key}'
 
 echo ""
 echo "📊 Checking subdomain endpoint:"
-curl -s "https://swd.taxmahir.pk/api/inngest" | jq '{function_count, mode, has_event_key, has_signing_key}'
+curl -s "https://demo.hisaab360invoicing.com/api/inngest" | jq '{function_count, mode, has_event_key, has_signing_key}'
 
 echo ""
 echo "✅ Analysis:"
@@ -27,7 +27,7 @@ echo "❌ Old functions should become inactive/disconnected"
 
 echo ""
 echo "🧪 Test Instructions:"
-echo "1. Go to https://swd.taxmahir.pk/users/bulk-upload"
+echo "1. Go to https://demo.hisaab360invoicing.com/users/bulk-upload"
 echo "2. Upload a small CSV file (2-3 users)"
 echo "3. Monitor Inngest dashboard during import"
 echo "4. You should see ONLY ONE function execution:"

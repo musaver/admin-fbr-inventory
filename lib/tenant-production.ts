@@ -38,7 +38,12 @@ export function extractSubdomain(hostname: string): string | null {
   if (host.includes('127.0.0.1') || host.includes('192.168.')) {
     return null;
   }
-  
+
+  // Vercel deployment/preview URLs are never tenant subdomains
+  if (host.endsWith('.vercel.app')) {
+    return null;
+  }
+
   // Need at least 3 parts for production subdomain (subdomain.domain.tld)
   if (parts.length < 3) {
     return null;
@@ -62,7 +67,8 @@ export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
   try {
     // In production, we need to use the database API endpoint
     // because Edge Runtime can't directly connect to MySQL
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://hisaab360.com';
+    const baseUrl = process.env.NEXTAUTH_URL
+      || (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'https://hisaab360invoicing.com');
     
     const response = await fetch(`${baseUrl}/api/tenants/lookup?slug=${slug}`, {
       headers: {
@@ -90,46 +96,6 @@ export async function getTenantBySlug(slug: string): Promise<Tenant | null> {
     
   } catch (error) {
     console.error('Error fetching tenant from database:', error);
-    
-    // Fallback to hardcoded tenants for existing test tenants
-    // This ensures backward compatibility during development
-    const fallbackTenants = [
-      {
-        id: '1322dcd9-b23c-40b9-a918-b6b8b990e011',
-        name: 'Acme Electronics',
-        slug: 'acme-electronics',
-        email: 'admin@acme-electronics.com',
-        plan: 'premium',
-        status: 'active',
-        primaryColor: '#3b82f6',
-        maxUsers: 5,
-        maxProducts: 1000,
-        maxOrders: 10000,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      {
-        id: 'cb51f4b3-955c-4bfe-84db-a8edfac2a4ec',
-        name: 'Beta Retail Co',
-        slug: 'beta-retail',
-        email: 'admin@beta-retail.com',
-        plan: 'basic',
-        status: 'active',
-        primaryColor: '#3b82f6',
-        maxUsers: 5,
-        maxProducts: 1000,
-        maxOrders: 10000,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    ];
-    
-    const fallbackTenant = fallbackTenants.find(t => t.slug === slug);
-    if (fallbackTenant) {
-      console.log('Using fallback tenant data for:', slug);
-      return fallbackTenant;
-    }
-    
     return null;
   }
 }
