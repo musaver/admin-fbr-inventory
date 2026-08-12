@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { put } from '@vercel/blob';
 import { db } from '@/lib/db';
 import { importJobs } from '@/lib/schema';
-import { inngest } from '@/lib/inngest';
 import { v4 as uuidv4 } from 'uuid';
 import { withTenant, ErrorResponses } from '@/lib/api-helpers';
+import { processImportJob } from '@/lib/imports/process-import-job';
+
+// Import processing runs in this invocation (via after()), so it needs the
+// extended duration — the api-wide default is 30s (see vercel.json)
+export const maxDuration = 300;
 
 export const POST = withTenant(async (request: NextRequest, context) => {
   try {
@@ -49,7 +53,11 @@ export const POST = withTenant(async (request: NextRequest, context) => {
 
     // Generate unique job ID
     const jobId = uuidv4();
-    
+
+    // Read the CSV content now so the background closure captures a plain
+    // string rather than the request-scoped File object
+    const csvText = await file.text();
+
     // Upload file to Vercel Blob with public access
     const timestamp = Date.now();
     const fileName = `${importType}-imports/${context.tenantId}/${timestamp}-${file.name}`;
@@ -73,32 +81,23 @@ export const POST = withTenant(async (request: NextRequest, context) => {
 
     await db.insert(importJobs).values(importJob);
 
-    // Trigger Inngest background job (same function handles both types)
-    console.log('🚨 SENDING INNGEST EVENT:', {
-      eventName: 'user/bulk-import',
-      data: {
-        jobId,
-        importType,
-        fileName: file.name,
-        tenantId: context.tenantId,
-        removeExistingData
+    // Process the import after the response is sent; the client polls
+    // /api/users/import-status/[jobId] for progress, same as before
+    after(async () => {
+      try {
+        await processImportJob({
+          jobId,
+          tenantId: context.tenantId,
+          fileName: file.name,
+          importType: importType as 'users' | 'products' | 'orders',
+          removeExistingData,
+          csvText,
+        });
+      } catch (err) {
+        // processImportJob handles its own errors; this is a last-resort guard
+        console.error('❌ Unhandled bulk import failure:', { jobId }, err);
       }
     });
-    
-    await inngest.send({
-      name: 'user/bulk-import', // Keep same event name for simplicity
-      data: {
-        jobId,
-        blobUrl: blob.url,
-        tenantId: context.tenantId,
-        fileName: file.name,
-        uploadedBy: uploadedBy || 'unknown',
-        importType, // Add type to event data
-        removeExistingData, // Add remove existing data flag
-      },
-    });
-    
-    console.log('✅ INNGEST EVENT SENT SUCCESSFULLY');
 
     const responseMessage = importType === 'users' 
       ? 'User import job started. You will receive progress updates.'

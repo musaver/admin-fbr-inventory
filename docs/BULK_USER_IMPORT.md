@@ -1,11 +1,11 @@
 # Bulk User Import Feature
 
-This feature allows tenants to import large numbers of users via CSV files using background processing with Inngest.
+This feature allows tenants to import large numbers of users via CSV files using in-request background processing (Next.js `after()`).
 
 ## Features
 
 - ✅ CSV file upload with validation
-- ✅ Background processing with Inngest
+- ✅ In-request background processing (Next.js `after()`)
 - ✅ Real-time progress tracking
 - ✅ Error reporting and success tracking
 - ✅ Multi-tenant support
@@ -27,10 +27,9 @@ This feature allows tenants to import large numbers of users via CSV files using
 2. **API Routes**
    - `/api/users/bulk-upload` - Handles file upload and job creation
    - `/api/users/import-status/[jobId]` - Returns job progress
-   - `/api/inngest` - Inngest webhook endpoint
 
 3. **Background Processing**
-   - Inngest function for CSV parsing and user creation
+   - Server-side processing (`lib/imports/`) for CSV parsing and user creation
    - Chunked processing (50 users per chunk)
    - Progress updates after each chunk
 
@@ -112,9 +111,6 @@ Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Addr
 Add these to your `.env.local`:
 
 ```env
-# Inngest (if using Inngest Cloud)
-INNGEST_EVENT_KEY=your-inngest-event-key
-INNGEST_SIGNING_KEY=your-inngest-signing-key
 
 # Vercel Blob (automatically configured on Vercel)
 BLOB_READ_WRITE_TOKEN=your-blob-token
@@ -191,7 +187,7 @@ Get import job status and progress.
 - Foreign key constraints maintain data integrity
 
 ### Scalability
-- Inngest handles concurrency (max 10 concurrent imports)
+- Imports run one per upload request
 - Vercel Blob provides reliable file storage
 - Tenant isolation ensures security
 
@@ -204,8 +200,8 @@ Get import job status and progress.
 - This is configured correctly in the code
 
 **Import stuck in "pending" status**
-- Check Inngest dashboard for function execution
-- Verify Inngest webhook is properly configured
+- Check Vercel function logs for execution details
+- Verify the import_jobs table is reachable from the app
 - Check server logs for errors
 
 **"Tenant not found" errors**
@@ -220,7 +216,7 @@ Get import job status and progress.
 
 ### Monitoring
 
-- Check Inngest dashboard for job execution
+- Check Vercel function logs for job execution
 - Monitor database for import_jobs records
 - Review server logs for detailed errors
 - Use Vercel dashboard for API performance
