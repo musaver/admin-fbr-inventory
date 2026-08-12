@@ -15,7 +15,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/test') ||
     pathname.startsWith('/api/debug') ||
     pathname.startsWith('/api/loyalty') ||
-    pathname.startsWith('/api/inngest') || // Skip Inngest webhook endpoint
     pathname.startsWith('/api/tenants/lookup') || // Skip tenant lookup API to avoid circular calls
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
@@ -98,7 +97,6 @@ async function handleTenantAuthentication(request: NextRequest, response: NextRe
   // Skip authentication for API routes that don't require tenant context
   if (
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/inngest') || // Skip Inngest webhook endpoint
     pathname.startsWith('/api/upload') ||
     pathname.startsWith('/_next') ||
     pathname.endsWith('.svg') ||
