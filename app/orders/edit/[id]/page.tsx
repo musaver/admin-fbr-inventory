@@ -238,6 +238,11 @@ interface Order {
 }
 
 
+// Values offered in the Item Serial Number / SRO Schedule dropdowns. Anything else
+// (e.g. values coming from a bulk CSV import) is shown as "Custom (Type your own)".
+const ITEM_SERIAL_NUMBER_OPTIONS = ['18', '19'];
+const SRO_SCHEDULE_NUMBER_OPTIONS = ['ICTO TABLE I'];
+
 export default function EditOrder() {
   const router = useRouter();
   const params = useParams();
@@ -669,47 +674,23 @@ export default function EditOrder() {
     return () => clearTimeout(timer);
   }, [loading, orderItems.length]); // Run when loading is complete and items are available
 
-  // Initialize custom field states based on existing values
-  useEffect(() => {
-    // Safety check: ensure orderData.items exists and is an array
-    if (!orderData.items || !Array.isArray(orderData.items)) {
-      return;
-    }
-
-    const newItemCustomSroScheduleNumber: { [key: number]: boolean } = {};
-    const newItemCustomItemSerialNumber: { [key: number]: boolean } = {};
-
-    orderData.items.forEach((item, index) => {
-      // Check if SRO/Schedule Number is a custom value
-      if (item.sroScheduleNumber && item.sroScheduleNumber !== 'ICTO TABLE I') {
-        newItemCustomSroScheduleNumber[index] = true;
-      }
-
-      // Check if Item Serial Number is a custom value
-      if (item.itemSerialNumber && item.itemSerialNumber !== '19') {
-        newItemCustomItemSerialNumber[index] = true;
-      }
-    });
-
-    setItemCustomSroScheduleNumber(newItemCustomSroScheduleNumber);
-    setItemCustomItemSerialNumber(newItemCustomItemSerialNumber);
-  }, [orderData.items]);
+  // Per-row custom state for Item Serial Number / SRO Schedule Number.
+  // An explicit toggle (choosing "Custom" or "Back to Select") wins; otherwise the
+  // row is treated as custom whenever its stored value is not one of the dropdown options,
+  // so values coming from a bulk CSV import show up in the custom input.
+  const isItemSerialNumberCustom = (index: number, value?: string | null) =>
+    itemCustomItemSerialNumber[index] ?? !!(value && !ITEM_SERIAL_NUMBER_OPTIONS.includes(value));
+  const isSroScheduleNumberCustom = (index: number, value?: string | null) =>
+    itemCustomSroScheduleNumber[index] ?? !!(value && !SRO_SCHEDULE_NUMBER_OPTIONS.includes(value));
 
   // Initialize custom field states for product selection based on existing values
   useEffect(() => {
-    // Check if SRO/Schedule Number is a custom value
-    if (productSelection.sroScheduleNumber && productSelection.sroScheduleNumber !== 'ICTO TABLE I') {
-      setIsCustomSroScheduleNumber(true);
-    } else {
-      setIsCustomSroScheduleNumber(false);
-    }
-
-    // Check if Item Serial Number is a custom value
-    if (productSelection.itemSerialNumber && productSelection.itemSerialNumber !== '19') {
-      setIsCustomItemSerialNumber(true);
-    } else {
-      setIsCustomItemSerialNumber(false);
-    }
+    setIsCustomSroScheduleNumber(
+      !!(productSelection.sroScheduleNumber && !SRO_SCHEDULE_NUMBER_OPTIONS.includes(productSelection.sroScheduleNumber))
+    );
+    setIsCustomItemSerialNumber(
+      !!(productSelection.itemSerialNumber && !ITEM_SERIAL_NUMBER_OPTIONS.includes(productSelection.itemSerialNumber))
+    );
   }, [productSelection.sroScheduleNumber, productSelection.itemSerialNumber]);
 
   // Scroll detection for sticky sidebar
@@ -1621,6 +1602,19 @@ export default function EditOrder() {
   const removeOrderItem = (index: number) => {
     const updatedItems = orderItems.filter((_, i) => i !== index);
     setOrderItems(updatedItems);
+
+    // Shift the index-keyed custom toggles so they stay with their rows
+    const shiftFlags = (flags: { [key: number]: boolean }) => {
+      const next: { [key: number]: boolean } = {};
+      Object.entries(flags).forEach(([key, value]) => {
+        const i = Number(key);
+        if (i < index) next[i] = value;
+        else if (i > index) next[i - 1] = value;
+      });
+      return next;
+    };
+    setItemCustomItemSerialNumber(shiftFlags);
+    setItemCustomSroScheduleNumber(shiftFlags);
   };
 
   // Calculate totals
@@ -3307,7 +3301,7 @@ export default function EditOrder() {
 
                             <div>
                               <Label className="text-sm">Item Serial Number</Label>
-                              {!itemCustomItemSerialNumber[index] ? (
+                              {!isItemSerialNumberCustom(index, item.itemSerialNumber) ? (
                                 <div className="flex gap-2">
                                   <Select
                                     value={item.itemSerialNumber || ''}
@@ -3356,7 +3350,7 @@ export default function EditOrder() {
 
                             <div>
                               <Label className="text-sm">SRO/Schedule Number</Label>
-                              {!itemCustomSroScheduleNumber[index] ? (
+                              {!isSroScheduleNumberCustom(index, item.sroScheduleNumber) ? (
                                 <div className="flex gap-2">
                                   <Select
                                     value={item.sroScheduleNumber || ''}
