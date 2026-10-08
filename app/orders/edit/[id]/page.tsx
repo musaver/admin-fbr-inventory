@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Check, ChevronsUpDown, Plus, UserPlus, PackagePlus, Loader } from "lucide-react";
+import { Check, ChevronsUpDown, ChevronDown, Plus, UserPlus, PackagePlus, Loader } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import {
@@ -2617,9 +2618,13 @@ export default function EditOrder() {
                         </div>
                       </div>
 
-                      {/* Additional Tax Fields */}
-                      <div>
-                        <h5 className="text-sm font-medium mb-3 text-muted-foreground">Additional Tax Fields</h5>
+                      {/* Additional Tax Fields (collapsed by default) */}
+                      <Collapsible>
+                        <CollapsibleTrigger type="button" className="group flex w-full items-center justify-between rounded-md text-left hover:bg-muted/50 data-[state=open]:mb-3">
+                          <h5 className="text-sm font-medium text-muted-foreground">Additional Tax Fields</h5>
+                          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="extra-tax-edit" className="text-sm">Extra Tax</Label>
@@ -2725,7 +2730,8 @@ export default function EditOrder() {
                             <UsdHint amount={productSelection.discountAmount} />
                           </div>
                         </div>
-                      </div>
+                        </CollapsibleContent>
+                      </Collapsible>
 
                       {/* Product Identification Fields */}
                       <div>
@@ -3150,9 +3156,13 @@ export default function EditOrder() {
                           </div>
                         </div>
 
-                        {/* Additional Tax Fields */}
-                        <div className="mb-6">
-                          <h6 className="text-sm font-medium mb-3 text-muted-foreground">📊 Additional Tax Fields</h6>
+                        {/* Additional Tax Fields (collapsed by default) */}
+                        <Collapsible className="mb-6">
+                          <CollapsibleTrigger type="button" className="group flex w-full items-center justify-between rounded-md text-left hover:bg-muted/50 data-[state=open]:mb-3">
+                            <h6 className="text-sm font-medium text-muted-foreground">📊 Additional Tax Fields</h6>
+                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                               <Label className="text-sm">Extra Tax</Label>
@@ -3232,7 +3242,8 @@ export default function EditOrder() {
                               </div>
                             </div>
                           </div>
-                        </div>
+                          </CollapsibleContent>
+                        </Collapsible>
 
                         {/* Product Identification */}
                         <div className="mb-4">
@@ -3401,8 +3412,12 @@ export default function EditOrder() {
 
                         {/* Tax Summary Display */}
                         {(Number(item.taxAmount) || Number(item.extraTax) || Number(item.furtherTax) || Number(item.fedPayableTax) || Number(item.discount)) > 0 && (
-                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <div className="text-sm font-medium text-green-800 mb-2">💰 Tax & Discount Summary:</div>
+                          <Collapsible className="mt-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
+                            <CollapsibleTrigger type="button" className="group flex w-full items-center justify-between text-left data-[state=open]:mb-2">
+                              <span className="text-sm font-medium text-green-800">💰 Tax & Discount Summary:</span>
+                              <ChevronDown className="h-4 w-4 text-green-800 transition-transform group-data-[state=open]:rotate-180" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               {Number(item.priceExcludingTax) > 0 && (
                                 <div className="flex justify-between">
@@ -3447,7 +3462,8 @@ export default function EditOrder() {
                                 </div>
                               )}
                             </div>
-                          </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         )}
                       </div>
                     ))}
