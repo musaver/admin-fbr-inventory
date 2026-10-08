@@ -1,0 +1,24 @@
+# FBR Digital Invoicing Configuration
+# Copy these variables to your .env.local file and fill in your actual values
+
+# FBR API Base URL (sandbox)
+FBR_BASE_URL=https://sandbox-api.fbr.gov.pk/di_data/v1/di
+
+# FBR Sandbox Token (get this from FBR portal)
+FBR_SANDBOX_TOKEN=your_fbr_sandbox_token_here
+
+# Seller Information (your business details registered with FBR)
+FBR_SELLER_NTNCNIC=1234567890123
+FBR_SELLER_BUSINESS_NAME=Your Business Name
+FBR_SELLER_PROVINCE=Punjab
+FBR_SELLER_ADDRESS=Your Business Address, City, Province
+
+# Optional: For production, use production URLs and tokens
+# FBR_BASE_URL=https://api.fbr.gov.pk/di_data/v1/di
+# FBR_PRODUCTION_TOKEN=your_fbr_production_token_here
+
+# Notes:
+# 1. Never commit actual tokens to version control
+# 2. Keep production and sandbox tokens separate
+# 3. Ensure your seller information matches your FBR registration
+# 4. Test thoroughly in sandbox before switching to production

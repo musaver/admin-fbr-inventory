@@ -1,0 +1,44 @@
+{
+  "buildCommand": "npm run build:no-types",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    },
+    "app/api/users/bulk-upload/route.ts": {
+      "maxDuration": 300
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "hisaab360.com" }],
+      "destination": "https://hisaab360invoicing.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.hisaab360.com" }],
+      "destination": "https://hisaab360invoicing.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "(?<subdomain>.*)\\.hisaab360\\.com" }],
+      "destination": "https://:subdomain.hisaab360invoicing.com/:path*",
+      "permanent": true
+    }
+  ]
+}
