@@ -298,12 +298,14 @@ export const PUT = withTenant(async (req: NextRequest, context: any) => {
           })
         };
 
-        const fbrBaseUrl = process.env.NEXTAUTH_URL
+        const internalApiBaseUrl = process.env.NEXTAUTH_URL
           || (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : 'http://localhost:3000');
-        const fbrSubmissionResponse = await fetch(`${fbrBaseUrl}/api/fbr/submit`, {
+        const fbrSubmissionResponse = await fetch(`${internalApiBaseUrl}/api/fbr/submit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-tenant-id': context.tenantId,
+            'x-tenant-slug': context.tenantSlug,
           },
           body: JSON.stringify(fbrPayload),
         });

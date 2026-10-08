@@ -3987,7 +3987,17 @@ export default function EditOrder() {
                       checked={isProductionSubmission}
                       onChange={(e) => {
                         setIsProductionSubmission(e.target.checked);
-                        if (!e.target.checked) {
+                        // Auto-set the correct base URL for production mode (same as add order page)
+                        if (e.target.checked) {
+                          setSellerInfo(prev => ({
+                            ...prev,
+                            fbrBaseUrl: 'https://gw.fbr.gov.pk/di_data/v1/di'
+                          }));
+                        } else {
+                          setSellerInfo(prev => ({
+                            ...prev,
+                            fbrBaseUrl: 'https://sandbox-api.fbr.gov.pk/di_data/v1/di'
+                          }));
                           setProductionToken('');
                         }
                       }}
