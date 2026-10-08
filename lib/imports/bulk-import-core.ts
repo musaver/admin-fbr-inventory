@@ -1463,7 +1463,8 @@ export async function processOrderChunk(
             sku: orderData.productSku.trim(),
             hsCode: pick(orderData.hsCode, matchedProduct?.hsCode),
             uom: pick(orderData.uom, matchedProduct?.uom),
-            serialNumber: pick(orderData.serialNumber, matchedProduct?.serialNumber),
+            // CSV Serial Number, else the CSV Item Serial Number (shown as "SRO Item Serial No. (FBR)" on the edit page), else the product's
+            serialNumber: orderData.serialNumber?.trim() || orderData.itemSerialNumber?.trim() || matchedProduct?.serialNumber || null,
             listNumber: pick(orderData.listNumber, matchedProduct?.listNumber),
             bcNumber: pick(orderData.bcNumber, matchedProduct?.bcNumber),
             lotNumber: pick(orderData.lotNumber, matchedProduct?.lotNumber),

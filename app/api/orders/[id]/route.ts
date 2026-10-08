@@ -424,6 +424,8 @@ export const PUT = withTenant(async (req: NextRequest, context: any) => {
         if (item.hsCode !== undefined) itemUpdateData.hsCode = item.hsCode;
         if (item.uom !== undefined) itemUpdateData.uom = item.uom;
         if (item.serialNumber !== undefined) itemUpdateData.serialNumber = item.serialNumber;
+        if (item.itemSerialNumber !== undefined) itemUpdateData.itemSerialNumber = item.itemSerialNumber;
+        if (item.sroScheduleNumber !== undefined) itemUpdateData.sroScheduleNumber = item.sroScheduleNumber;
         if (item.listNumber !== undefined) itemUpdateData.listNumber = item.listNumber;
         if (item.bcNumber !== undefined) itemUpdateData.bcNumber = item.bcNumber;
         if (item.lotNumber !== undefined) itemUpdateData.lotNumber = item.lotNumber;

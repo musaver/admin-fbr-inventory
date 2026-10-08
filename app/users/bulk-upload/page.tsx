@@ -889,6 +889,7 @@ export default function BulkUserUpload() {
                     <li><strong>Note:</strong> Unit Price and Quantity are now optional. Product Name can include description.</li>
                     <li><strong>Product Matching:</strong> When Product Name, Unit Price, Tax, HS Code or UOM are left blank, they are filled from the existing product with that SKU</li>
                     <li><strong>Optional order fields:</strong> Reference Invoice (saved as the order's Invoice Ref No) and Buyer NTN Or CNIC (saved on the order and on new customers)</li>
+                    <li><strong>Item Serial Number:</strong> also stored as the item's SRO Item Serial No. when the Serial Number column is blank</li>
                     <li><strong>Order Grouping:</strong> Rows with same Order Number = same order with multiple items</li>
                     <li><strong>Template Structure:</strong> Order Number first for easy sorting and visual grouping</li>
                     <li><strong>Smart Defaults:</strong> Order Status defaults to "pending", Payment Status to "pending"</li>

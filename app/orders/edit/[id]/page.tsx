@@ -862,6 +862,7 @@ export default function EditOrder() {
           isWeightBased: item.isWeightBased || (item.weightQuantity && Number(item.weightQuantity) > 0),
           uom: item.uom,
           itemSerialNumber: item.itemSerialNumber,
+          itemSequence: item.itemSequence,
           sroScheduleNumber: item.sroScheduleNumber,
           serialNumber: item.serialNumber,
           listNumber: item.listNumber,
@@ -2817,7 +2818,7 @@ export default function EditOrder() {
                                 </Select>
                               </div>
                             ) : (
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-1">
                                 <Input
                                   id="item-serial-number-edit"
                                   type="text"
@@ -2828,13 +2829,13 @@ export default function EditOrder() {
                                 />
                                 <Button
                                   type="button"
-                                  variant="outline"
+                                  variant="link"
                                   size="sm"
                                   onClick={() => {
                                     setIsCustomItemSerialNumber(false);
                                     setProductSelection({ ...productSelection, itemSerialNumber: '19' });
                                   }}
-                                  className="px-3 text-xs"
+                                  className="h-auto self-start px-0 text-xs"
                                 >
                                   Back to Select
                                 </Button>
@@ -2867,7 +2868,7 @@ export default function EditOrder() {
                                 </Select>
                               </div>
                             ) : (
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-1">
                                 <Input
                                   id="sro-schedule-number-edit"
                                   type="text"
@@ -2878,13 +2879,13 @@ export default function EditOrder() {
                                 />
                                 <Button
                                   type="button"
-                                  variant="outline"
+                                  variant="link"
                                   size="sm"
                                   onClick={() => {
                                     setIsCustomSroScheduleNumber(false);
                                     setProductSelection({ ...productSelection, sroScheduleNumber: 'ICTO TABLE I' });
                                   }}
-                                  className="px-3 text-xs"
+                                  className="h-auto self-start px-0 text-xs"
                                 >
                                   Back to Select
                                 </Button>
@@ -3325,7 +3326,7 @@ export default function EditOrder() {
                                   </Select>
                                 </div>
                               ) : (
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-1">
                                   <Input
                                     value={item.itemSerialNumber || ''}
                                     onChange={(e) => updateOrderItem(index, 'itemSerialNumber', e.target.value)}
@@ -3334,13 +3335,13 @@ export default function EditOrder() {
                                   />
                                   <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="link"
                                     size="sm"
                                     onClick={() => {
                                       setItemCustomItemSerialNumber(prev => ({ ...prev, [index]: false }));
                                       updateOrderItem(index, 'itemSerialNumber', '19');
                                     }}
-                                    className="px-3 text-xs"
+                                    className="h-auto self-start px-0 text-xs"
                                   >
                                     Back to Select
                                   </Button>
@@ -3373,7 +3374,7 @@ export default function EditOrder() {
                                   </Select>
                                 </div>
                               ) : (
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-1">
                                   <Input
                                     value={item.sroScheduleNumber || ''}
                                     onChange={(e) => updateOrderItem(index, 'sroScheduleNumber', e.target.value)}
@@ -3382,13 +3383,13 @@ export default function EditOrder() {
                                   />
                                   <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="link"
                                     size="sm"
                                     onClick={() => {
                                       setItemCustomSroScheduleNumber(prev => ({ ...prev, [index]: false }));
                                       updateOrderItem(index, 'sroScheduleNumber', 'ICTO TABLE I');
                                     }}
-                                    className="px-3 text-xs"
+                                    className="h-auto self-start px-0 text-xs"
                                   >
                                     Back to Select
                                   </Button>
