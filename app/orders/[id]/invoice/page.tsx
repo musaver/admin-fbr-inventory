@@ -386,7 +386,19 @@ export default function OrderInvoice() {
             }
             
             .items-table tr:hover td {
-              background: #f3f4f6;
+              background: #eff6ff;
+            }
+
+            .items-table .item-number {
+              color: #6b7280;
+              font-weight: 600;
+            }
+
+            .items-count {
+              font-size: 12px;
+              font-weight: 600;
+              color: #374151;
+              margin-bottom: 6px;
             }
             
             .items-table .text-right {
@@ -652,22 +664,26 @@ export default function OrderInvoice() {
               <h3>Invoice Information</h3>
               ${order.invoiceDate ? `<p>Invoice Date: ${formatDateTime(order.invoiceDate)}</p>` : ''}
               ${order.trackingNumber ? `<p>Tracking: ${order.trackingNumber}</p>` : ''}
+              <p>Total Items: ${orderItems.length}</p>
             </div>
           </div>
           
           <!-- Items Table -->
+          <div class="items-count">Order Items (${orderItems.length})</div>
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width: 50%;">Product Name</th>
+                <th style="width: 5%;">#</th>
+                <th style="width: 45%;">Product Name</th>
                 <th style="width: 15%;">Quantity</th>
                 <th style="width: 15%;">Price Inc. Tax</th>
                 <th style="width: 20%;">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${orderItems.map((item: any) => `
-                <tr>
+              ${orderItems.map((item: any, index: number) => `
+                <tr class="item-row">
+                  <td class="text-center item-number">${index + 1}</td>
                   <td>
                     ${item.serialNumber ? `<div class="product-identification" style="color: #2563eb;">🔢 Serial: ${item.serialNumber}</div>` : ''}
                     ${item.listNumber ? `<div class="product-identification" style="color: #059669;">📋 List: ${item.listNumber}</div>` : ''}
@@ -690,7 +706,7 @@ export default function OrderInvoice() {
                 </tr>
                 ${(item.taxAmount || item.taxPercentage || item.discount || item.extraTax || item.furtherTax || item.fedPayableTax || item.priceIncludingTax || item.priceExcludingTax || item.fixedNotifiedValueOrRetailPrice || item.saleType) ? `
                 <tr class="tax-details-row">
-                  <td colspan="4">
+                  <td colspan="5">
                     <div class="tax-details-title">💰 Tax & Discount Details:</div>
                     <div class="tax-details-grid">
                       ${(Number(item.taxAmount) || 0) > 0 ? `
@@ -1333,11 +1349,15 @@ export default function OrderInvoice() {
               <CardTitle className="flex items-center gap-2 text-xl mb-6">
                 <ShoppingCart className="h-6 w-6 text-slate-600" />
                 Order Items
+                <span className="ml-1 inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-medium text-slate-700">
+                  {orderItems.length} {orderItems.length === 1 ? 'item' : 'items'}
+                </span>
               </CardTitle>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12 text-center">#</TableHead>
                       <TableHead className="text-left">Product Name</TableHead>
                       <TableHead className="text-left">HS Code</TableHead>
                       <TableHead className="text-left">Serial No.</TableHead>
@@ -1352,7 +1372,11 @@ export default function OrderInvoice() {
                     {orderItems.length > 0 ? (
                       orderItems.map((item: any, index: number) => (
                         <React.Fragment key={index}>
-                          <TableRow className="hover:bg-slate-50">
+                          <TableRow className="group transition-colors hover:bg-blue-50/70">
+                            {/* Row number */}
+                            <TableCell className="py-4 text-center font-semibold text-slate-500 group-hover:text-slate-800">
+                              {index + 1}
+                            </TableCell>
                             {/* Product Name */}
                             <TableCell className="py-4">
                               <div>
@@ -1480,7 +1504,7 @@ export default function OrderInvoice() {
                             const parsedAddons = parseAddons(item.addons);
                             return parsedAddons.length > 0 && (
                               <TableRow className="bg-slate-25 hover:bg-slate-50">
-                                <TableCell colSpan={8} className="py-3 pl-8">
+                                <TableCell colSpan={9} className="py-3 pl-8">
                                   <div className="text-xs text-gray-600">
                                     <div className="font-medium mb-2 text-gray-700">🧩 Addons:</div>
                                     <div className="space-y-2">
@@ -1541,7 +1565,7 @@ export default function OrderInvoice() {
                           {/* Tax and Discount details row */}
                           {(item.taxAmount || item.taxPercentage || item.discount || item.extraTax || item.furtherTax || item.fedPayableTax || item.priceIncludingTax || item.priceExcludingTax || item.fixedNotifiedValueOrRetailPrice || item.saleType) && (
                             <TableRow className="bg-emerald-25 hover:bg-emerald-50">
-                              <TableCell colSpan={8} className="py-3 pl-8">
+                              <TableCell colSpan={9} className="py-3 pl-8">
                                 <div className="text-xs text-gray-600">
                                   <div className="font-medium mb-2 text-gray-700">💰 Tax & Discount Details:</div>
                                   <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -1614,7 +1638,7 @@ export default function OrderInvoice() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-gray-500">
+                        <TableCell colSpan={9} className="py-8 text-center text-gray-500">
                           No items found for this order
                         </TableCell>
                       </TableRow>

@@ -2259,6 +2259,9 @@ export default function EditOrder() {
                   <CardTitle className="flex items-center gap-2">
                     <PackagePlus className="h-5 w-5" />
                     Order Items
+                    <span className="ml-1 inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-medium text-slate-700">
+                      {orderItems.length} {orderItems.length === 1 ? 'item' : 'items'}
+                    </span>
                   </CardTitle>
                   <Button
                     onClick={fetchProductsDataBySku}
@@ -2937,9 +2940,13 @@ export default function EditOrder() {
                 {orderItems.length > 0 && (
                   <div className="space-y-4">
                     {orderItems.map((item, index) => (
-                      <div key={item.id || index} className="border rounded-lg p-4">
+                      <div key={item.id || index} className="border rounded-lg p-4 transition-colors hover:bg-slate-50 hover:border-slate-300">
                         <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
+                          <div className="flex-1 flex items-start gap-3">
+                            <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-200 px-2 text-xs font-semibold text-slate-700">
+                              {index + 1}
+                            </span>
+                            <div>
                             <div className="font-medium">{item.productName}</div>
                             {item.variantTitle && (
                               <div className="text-sm text-gray-600">{item.variantTitle}</div>
@@ -2947,6 +2954,7 @@ export default function EditOrder() {
                             {item.sku && (
                               <div className="text-sm text-gray-500">SKU: {item.sku}</div>
                             )}
+                            </div>
                           </div>
                           <Button
                             type="button"
