@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { sortOrderItems } from '@/lib/orders/sort-order-items';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -78,6 +79,9 @@ export default function OrderInvoice() {
             weightUnit: item.weightUnit || undefined
           };
         });
+
+        // Same ordering as the edit-order page: import sequence, then SKU, then serial number
+        orderData.items = sortOrderItems(orderData.items);
       }
       
       setOrder(orderData);
@@ -1002,7 +1006,8 @@ export default function OrderInvoice() {
     );
   }
 
-  const orderItems = order.items || [];
+  // Sorted the same way as the edit-order page; used by both the on-screen table and the print view
+  const orderItems = sortOrderItems(order.items || []);
 
   // Calculate Amount (sum of all Price Ex. Tax)
   const totalAmount = orderItems.reduce((sum: number, item: any) => {
