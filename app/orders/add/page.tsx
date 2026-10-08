@@ -195,7 +195,9 @@ export default function AddOrder() {
   });
   
   // Sticky sidebar state
+  const [isSticky, setIsSticky] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarContainerRef = useRef<HTMLDivElement>(null);
   
   // Loyalty points state
   const [loyaltySettings, setLoyaltySettings] = useState({
@@ -496,6 +498,22 @@ export default function AddOrder() {
       }));
     }
   }, [productSelection.selectedProductId, products, isEditingItem]);
+
+  // Scroll detection for sticky sidebar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (sidebarContainerRef.current && sidebarRef.current) {
+        const containerRect = sidebarContainerRef.current.getBoundingClientRect();
+        const shouldStick = containerRect.top <= 24; // 24px offset for top spacing
+        setIsSticky(shouldStick);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const fetchInitialData = async () => {
     try {
@@ -1919,7 +1937,7 @@ export default function AddOrder() {
   const totals = calculateTotals();
 
   if (loading) return (
-    <div className="mx-auto p-4 md:p-6 max-w-screen-2xl">
+    <div className="container mx-auto p-6 max-w-7xl">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -1928,8 +1946,8 @@ export default function AddOrder() {
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
-          <div className="min-w-0 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
                 <Skeleton className="h-6 w-48" />
@@ -1956,7 +1974,7 @@ export default function AddOrder() {
   );
 
   return (
-    <div className="mx-auto p-4 md:p-6 max-w-screen-2xl">
+    <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">🛒 Create New Order</h1>
@@ -2090,9 +2108,9 @@ export default function AddOrder() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 relative">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
         {/* Main Order Form - Left Side */}
-        <div className="min-w-0 space-y-6 min-h-0">
+        <div className="lg:col-span-2 space-y-6 min-h-0">
           {/* Customer Information */}
           <Card>
             <CardHeader>
@@ -3277,18 +3295,18 @@ export default function AddOrder() {
 
             {/* Editable Product and Tax Fields */}
             {selectedProduct && (
-              <Card className="mt-6 border-dashed bg-muted/20">
-                <CardHeader className="px-4">
+              <Card className="mt-6">
+                <CardHeader>
                   <CardTitle className="text-lg">📋 Product & Tax Details (Editable)</CardTitle>
                   <CardDescription>
                     These values are pre-populated from the product but can be modified before adding to the order.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="px-4 space-y-6">
+                <CardContent className="space-y-6">
                 {/* Product Details Section */}
                     <div>
                     <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Information</h5>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="product-name-edit" className="text-sm">Product Name</Label>
                         <Input
@@ -3415,7 +3433,7 @@ export default function AddOrder() {
 
                 {/* Tax and Price Section */}
                 <div>
-                    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 mb-3">
+                    <div className="flex items-center justify-between mb-3">
                       <h5 className="text-sm font-medium text-muted-foreground">Tax & Pricing Information</h5>
                       <div className="flex items-center space-x-4">
                         <div className="flex items-center space-x-2">
@@ -3444,7 +3462,7 @@ export default function AddOrder() {
                         </div>
                       </div>
                     </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="tax-amount-edit" className="text-sm">Tax Amount</Label>
                         <div className="relative">
@@ -3812,8 +3830,8 @@ export default function AddOrder() {
                 </div>
                 <div className="space-y-2">
                   {orderItems.map((item, index) => (
-                    <div key={index} className="p-3 rounded-lg border transition-colors hover:bg-slate-50">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div key={index} className="p-3 rounded">
+                      <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="font-medium">{item.productName}</div>
                           {item.productDescription && (
@@ -3875,7 +3893,7 @@ export default function AddOrder() {
                           </div>
                           <button
                             onClick={() => handleEditItem(index)}
-                            className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                            className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 mr-2"
                           >
                             Edit
                           </button>
@@ -4157,12 +4175,20 @@ export default function AddOrder() {
         </div>
 
         {/* Order Summary - Right Side */}
-        <div className="relative">
+        <div ref={sidebarContainerRef} className="lg:col-span-1 relative">
           <aside 
             ref={sidebarRef}
-            className="lg:sticky lg:top-6 h-fit max-h-[calc(100vh-3rem)] overflow-y-auto"
+            className={`transition-all duration-300 will-change-transform z-30 ${
+              isSticky 
+                ? 'fixed top-6 right-6 w-80 max-w-[calc(100vw-3rem)]' 
+                : 'sticky top-6'
+            } h-fit max-h-[calc(100vh-3rem)] overflow-y-auto`}
           >
-            <Card className="border-2 shadow-lg bg-background border-border">
+            <Card className={`border-2 transition-all duration-300 ${
+              isSticky 
+                ? 'shadow-2xl bg-background/95 backdrop-blur-sm border-primary/20 scale-105' 
+                : 'shadow-lg bg-background border-border'
+            }`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   📊 Order Summary

@@ -260,6 +260,7 @@ export default function EditOrder() {
   // Error scroll reference
   const errorRef = useRef<HTMLDivElement>(null);
 
+  const sidebarContainerRef = useRef<HTMLDivElement>(null);
 
   // Loyalty points state
   const [loyaltySettings, setLoyaltySettings] = useState({
@@ -421,6 +422,7 @@ export default function EditOrder() {
   const [duplicating, setDuplicating] = useState(false);
 
   // Sticky sidebar state
+  const [isSticky, setIsSticky] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
 
   // Helper function to format date for FBR
@@ -690,6 +692,28 @@ export default function EditOrder() {
       !!(productSelection.itemSerialNumber && !ITEM_SERIAL_NUMBER_OPTIONS.includes(productSelection.itemSerialNumber))
     );
   }, [productSelection.sroScheduleNumber, productSelection.itemSerialNumber]);
+
+  // Scroll detection for sticky sidebar
+  useEffect(() => {
+    const handleScroll = () => {
+      if (sidebarContainerRef.current && sidebarRef.current) {
+        const containerRect = sidebarContainerRef.current.getBoundingClientRect();
+        const shouldStick = containerRect.top <= 24; // 24px offset for top spacing
+        setIsSticky(shouldStick);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+
+    // Initial check
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
 
   // Populate product selection form when product is selected
   useEffect(() => {
@@ -1932,7 +1956,7 @@ export default function EditOrder() {
   const totals = calculateTotals();
 
   return (
-    <div className="p-4 md:p-6 max-w-screen-2xl mx-auto">
+    <div className="p-4 max-w-8xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">✏️ Edit Order #{order.orderNumber}</h1>
@@ -1992,9 +2016,9 @@ export default function EditOrder() {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Content */}
-          <div className="min-w-0 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Customer Selection */}
             <Card>
               <CardHeader>
@@ -2323,18 +2347,18 @@ export default function EditOrder() {
 
                 {/* Product & Tax Details Form */}
                 {productSelection.selectedProductId && (
-                  <Card className="mt-6 border-dashed bg-muted/20">
-                    <CardHeader className="px-4">
+                  <Card className="mt-6">
+                    <CardHeader>
                       <CardTitle className="text-lg">📋 Product & Tax Details (Editable)</CardTitle>
                       <CardDescription>
                         These values are pre-populated from the product but can be modified before adding to the order.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="px-4 space-y-6">
+                    <CardContent className="space-y-6">
                       {/* Basic Product Fields */}
                       <div>
                         <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Information</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="product-name-edit" className="text-sm">Product Name</Label>
                             <Input
@@ -2460,7 +2484,7 @@ export default function EditOrder() {
                             </Label>
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="price-excluding-tax-edit" className="text-sm">Price Excluding Tax</Label>
                             <Input
@@ -2596,7 +2620,7 @@ export default function EditOrder() {
                       {/* Additional Tax Fields */}
                       <div>
                         <h5 className="text-sm font-medium mb-3 text-muted-foreground">Additional Tax Fields</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="extra-tax-edit" className="text-sm">Extra Tax</Label>
                             <Input
@@ -2670,7 +2694,7 @@ export default function EditOrder() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                           <div className="space-y-2">
                             <Label htmlFor="sale-type-edit" className="text-sm">Sale Type</Label>
                             <Input
@@ -2706,7 +2730,7 @@ export default function EditOrder() {
                       {/* Product Identification Fields */}
                       <div>
                         <h5 className="text-sm font-medium mb-3 text-muted-foreground">Product Identification</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="serial-number-edit" className="text-sm">SRO Item Serial No. (FBR)</Label>
                             <Input
@@ -2756,7 +2780,7 @@ export default function EditOrder() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                           <div className="space-y-2">
                             <Label htmlFor="expiry-date-edit" className="text-sm">Expiry Date</Label>
                             <Input
@@ -2938,8 +2962,8 @@ export default function EditOrder() {
                         </div>
 
                         {/* Basic Product Info */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mb-6">
-                          <div className="space-y-1.5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div>
                             <Label className="text-sm">Product Name</Label>
                             <Input
                               value={item.productName || ''}
@@ -2949,7 +2973,7 @@ export default function EditOrder() {
                           </div>
 
                           {item.isWeightBased ? (
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Weight ({item.weightUnit})</Label>
                               <Input
                                 type="number"
@@ -2960,7 +2984,7 @@ export default function EditOrder() {
                               />
                             </div>
                           ) : (
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Quantity</Label>
                               <Input
                                 type="number"
@@ -2983,7 +3007,7 @@ export default function EditOrder() {
                             />
                           </div>
 
-                          <div className="space-y-1.5">
+                          <div>
                             <Label className="text-sm">Unit of Measurement (UOM)</Label>
                             <div className="flex gap-2">
                               <Popover
@@ -3076,8 +3100,8 @@ export default function EditOrder() {
                               </Label>
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            <div className="space-y-1.5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
                               <Label className="text-sm">Price Excluding Tax</Label>
                               <Input
                                 type="number"
@@ -3089,7 +3113,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.priceExcludingTax} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Tax Percentage</Label>
                               <Input
                                 type="number"
@@ -3100,7 +3124,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Price Including Tax</Label>
                               <Input
                                 type="number"
@@ -3112,7 +3136,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.priceIncludingTax} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Tax Amount</Label>
                               <Input
                                 type="number"
@@ -3129,8 +3153,8 @@ export default function EditOrder() {
                         {/* Additional Tax Fields */}
                         <div className="mb-6">
                           <h6 className="text-sm font-medium mb-3 text-muted-foreground">📊 Additional Tax Fields</h6>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            <div className="space-y-1.5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
                               <Label className="text-sm">Extra Tax</Label>
                               <Input
                                 type="number"
@@ -3142,7 +3166,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.extraTax} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Further Tax 1</Label>
                               <Input
                                 type="number"
@@ -3154,7 +3178,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.furtherTax} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">FED Payable Tax</Label>
                               <Input
                                 type="number"
@@ -3166,7 +3190,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.fedPayableTax} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Discount Amount</Label>
                               <Input
                                 type="number"
@@ -3179,8 +3203,8 @@ export default function EditOrder() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mt-4">
-                            <div className="space-y-1.5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <div>
                               <Label className="text-sm">Fixed Notified Value/Retail Price</Label>
                               <Input
                                 type="number"
@@ -3192,7 +3216,7 @@ export default function EditOrder() {
                               <UsdHint amount={item.fixedNotifiedValueOrRetailPrice} />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Sale Type</Label>
                               <Input
                                 value={item.saleType || 'Goods at standard rate'}
@@ -3213,8 +3237,8 @@ export default function EditOrder() {
                         {/* Product Identification */}
                         <div className="mb-4">
                           <h6 className="text-sm font-medium mb-3 text-muted-foreground">🔍 Product Identification</h6>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            <div className="space-y-1.5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
                               <Label className="text-sm">HS Code</Label>
                               <Input
                                 value={item.hsCode || ''}
@@ -3234,7 +3258,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">List Number</Label>
                               <Input
                                 value={item.listNumber || ''}
@@ -3244,7 +3268,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">BC Number</Label>
                               <Input
                                 value={item.bcNumber || ''}
@@ -3255,8 +3279,8 @@ export default function EditOrder() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 mt-4">
-                            <div className="space-y-1.5">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <div>
                               <Label className="text-sm">Lot Number</Label>
                               <Input
                                 value={item.lotNumber || ''}
@@ -3266,7 +3290,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Expiry Date</Label>
                               <Input
                                 type="date"
@@ -3276,7 +3300,7 @@ export default function EditOrder() {
                               />
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">Item Serial Number</Label>
                               {!isItemSerialNumberCustom(index, item.itemSerialNumber) ? (
                                 <div className="flex gap-2">
@@ -3325,7 +3349,7 @@ export default function EditOrder() {
                               )}
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div>
                               <Label className="text-sm">SRO/Schedule Number</Label>
                               {!isSroScheduleNumberCustom(index, item.sroScheduleNumber) ? (
                                 <div className="flex gap-2">
@@ -3984,12 +4008,18 @@ export default function EditOrder() {
           </div>
 
           {/* Order Summary - Right Side */}
-          <div className="relative">
+          <div ref={sidebarContainerRef} className="lg:col-span-1 relative">
             <aside
               ref={sidebarRef}
-              className="lg:sticky lg:top-6 h-fit max-h-[calc(100vh-3rem)] overflow-y-auto"
+              className={`transition-all duration-300 will-change-transform z-30 ${isSticky
+                  ? 'fixed top-6 right-6 w-[200px] min-w-56 max-w-[calc(100vw-3rem)]'
+                  : 'sticky top-6'
+                } h-fit max-h-[calc(100vh-3rem)] overflow-y-auto`}
             >
-              <Card className="border-2 shadow-lg bg-background border-border">
+              <Card className={`border-2 transition-all duration-300 ${isSticky
+                  ? 'shadow-2xl bg-background/95 backdrop-blur-sm border-primary/20 scale-105'
+                  : 'shadow-lg bg-background border-border'
+                }`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     📊 Order Summary
