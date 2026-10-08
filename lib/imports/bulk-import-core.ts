@@ -36,6 +36,8 @@ export interface OrderImportRow {
   customerName?: string;
   customerEmail?: string;
   orderNumber?: string; // Custom order ID for grouping items
+  referenceInvoice?: string; // Stored on orders.invoiceRefNo
+  buyerNTNCNIC?: string; // Stored on orders.buyerNTNCNIC (and the customer record when created)
   productSku: string;
   productName?: string;
   quantity?: string; // Made optional
@@ -345,6 +347,8 @@ export function parseOrderCSV(csvText: string): OrderImportRow[] {
     'customerName': ['customer name', 'name', 'customer_name'],
     'customerEmail': ['customer email', 'email', 'customer_email'],
     'orderNumber': ['order number', 'order_number', 'order id', 'order_id'],
+    'referenceInvoice': ['reference invoice', 'reference_invoice', 'invoice ref', 'invoice ref no', 'invoice_ref_no', 'ref invoice', 'invoice reference'],
+    'buyerNTNCNIC': ['buyer ntn or cnic', 'buyer ntn/cnic', 'buyer_ntn_cnic', 'ntn or cnic', 'ntn/cnic', 'ntn', 'cnic'],
     'productSku': ['product sku', 'sku', 'product_sku'],
     'productName': ['product name', 'product_name'],
     'quantity': ['quantity', 'qty'],
@@ -413,6 +417,8 @@ export function parseOrderCSV(csvText: string): OrderImportRow[] {
       customerName: values[headerMap.customerName] || '',
       customerEmail: values[headerMap.customerEmail] || '',
       orderNumber: values[headerMap.orderNumber] || '',
+      referenceInvoice: values[headerMap.referenceInvoice] || '',
+      buyerNTNCNIC: values[headerMap.buyerNTNCNIC] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
       quantity: values[headerMap.quantity] || '',
@@ -1127,11 +1133,22 @@ export async function processOrderChunk(
       // Find or create user
       let customerId: string;
       let existingUser: any[] = [];
+      // Buyer fields carried from the customer record onto the order (same as the add-order form)
+      const buyerColumns = {
+        buyerNTNCNIC: user.buyerNTNCNIC,
+        buyerBusinessName: user.buyerBusinessName,
+        buyerProvince: user.buyerProvince,
+        buyerAddress: user.buyerAddress,
+        buyerRegistrationType: user.buyerRegistrationType,
+      };
+      // (customerOrders[0] is used directly: a block-scoped `firstOrder` is declared further down in this try block)
+      const csvBuyerNTNCNIC = customerOrders[0].buyerNTNCNIC?.trim() || null;
+      const csvReferenceInvoice = customerOrders[0].referenceInvoice?.trim() || null;
 
       // First try to find by phone if phone is provided
       if (customerPhone) {
         console.log(`🔍 Searching for user by phone: "${customerPhone}"`);
-        existingUser = await db.select({ id: user.id, email: user.email })
+        existingUser = await db.select({ id: user.id, email: user.email, name: user.name, ...buyerColumns })
           .from(user)
           .where(and(
             eq(user.phone, customerPhone),
@@ -1149,7 +1166,7 @@ export async function processOrderChunk(
         console.log(`🔍 Searching for user by name: "${customerName}" (phone search ${customerPhone ? 'failed' : 'skipped - no phone provided'})`);
 
         // First try exact match (case-sensitive)
-        existingUser = await db.select({ id: user.id, email: user.email, name: user.name })
+        existingUser = await db.select({ id: user.id, email: user.email, name: user.name, ...buyerColumns })
           .from(user)
           .where(and(
             eq(user.name, customerName),
@@ -1162,7 +1179,7 @@ export async function processOrderChunk(
         } else {
           // Try case-insensitive search using SQL LOWER function
           console.log(`🔍 Exact name match failed, trying case-insensitive search for: "${customerName}"`);
-          existingUser = await db.select({ id: user.id, email: user.email, name: user.name })
+          existingUser = await db.select({ id: user.id, email: user.email, name: user.name, ...buyerColumns })
             .from(user)
             .where(and(
               sql`LOWER(${user.name}) = LOWER(${customerName})`,
@@ -1192,6 +1209,15 @@ export async function processOrderChunk(
       if (existingUser.length > 0) {
         customerId = existingUser[0].id;
         console.log(`✅ Found existing user: identifier="${customerIdentifier}"`);
+
+        // Backfill the customer's NTN/CNIC from the CSV when the record has none
+        if (csvBuyerNTNCNIC && !existingUser[0].buyerNTNCNIC) {
+          await db.update(user)
+            .set({ buyerNTNCNIC: csvBuyerNTNCNIC, updatedAt: new Date() })
+            .where(and(eq(user.id, customerId), eq(user.tenantId, tenantId)));
+          existingUser[0].buyerNTNCNIC = csvBuyerNTNCNIC;
+          console.log(`✅ Set NTN/CNIC on existing user ${customerId} from CSV`);
+        }
       } else {
         // Create new user from first order's customer data
         const firstOrder = customerOrders[0];
@@ -1219,6 +1245,7 @@ export async function processOrderChunk(
           email: userEmail,
           phone: customerPhone || null,
           userType: 'customer',
+          buyerNTNCNIC: csvBuyerNTNCNIC,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1256,6 +1283,7 @@ export async function processOrderChunk(
       const rowNumbers = customerOrders.map(order => (order as any).globalRowIndex);
 
       let subtotal = 0;
+      let orderTaxTotal = 0; // Sum of per-unit tax * quantity across items
       const orderItemsToCreate: any[] = [];
 
       // Sort customer orders by original CSV row number to preserve order
@@ -1301,9 +1329,33 @@ export async function processOrderChunk(
             continue;
           }
 
-          // Find or create product
+          // Find or create product. When the SKU already exists for this tenant,
+          // the matched product is used as a fallback for any CSV columns left blank.
           let productId: string;
-          let existingProduct = await db.select({ id: products.id, price: products.price })
+          let existingProduct = await db.select({
+              id: products.id,
+              name: products.name,
+              description: products.description,
+              price: products.price,
+              priceExcludingTax: products.priceExcludingTax,
+              priceIncludingTax: products.priceIncludingTax,
+              taxAmount: products.taxAmount,
+              taxPercentage: products.taxPercentage,
+              hsCode: products.hsCode,
+              uom: products.uom,
+              serialNumber: products.serialNumber,
+              listNumber: products.listNumber,
+              bcNumber: products.bcNumber,
+              lotNumber: products.lotNumber,
+              expiryDate: products.expiryDate,
+              costPrice: products.costPrice,
+              fixedNotifiedValueOrRetailPrice: products.fixedNotifiedValueOrRetailPrice,
+              saleType: products.saleType,
+              extraTax: products.extraTax,
+              furtherTax: products.furtherTax,
+              fedPayableTax: products.fedPayableTax,
+              discount: products.discount,
+            })
             .from(products)
             .where(and(
               eq(products.sku, orderData.productSku.trim()),
@@ -1311,8 +1363,10 @@ export async function processOrderChunk(
             ))
             .limit(1);
 
-          if (existingProduct.length > 0) {
-            productId = existingProduct[0].id;
+          const matchedProduct = existingProduct.length > 0 ? existingProduct[0] : null;
+
+          if (matchedProduct) {
+            productId = matchedProduct.id;
             console.log(`✅ Found existing product: ${orderData.productSku}`);
           } else {
             // Create new product
@@ -1349,45 +1403,88 @@ export async function processOrderChunk(
             console.log(`✅ Created new product: ${orderData.productSku}`);
           }
 
-          // Create order item with exact values from CSV - preserve empty fields
+          // Create order item: CSV value wins when present, otherwise fall back to the
+          // matched product's stored data (all per-unit values, same as the add-order form).
           const quantity = parsedQuantity; // Use already parsed quantity
 
-          const unitPriceFromCSV = orderData.unitPrice?.trim();
-          const unitPrice = parseNumericValue(unitPriceFromCSV);
+          // Numeric product column (decimal columns come back as strings) -> number | null
+          const prodNum = (v: string | number | null | undefined): number | null =>
+            v === null || v === undefined || v === '' ? null : parseNumericValue(String(v));
+          // Positive-only variant for price fields where 0.00 is the schema default, not real data
+          const prodPos = (v: string | number | null | undefined): number | null => {
+            const n = prodNum(v);
+            return n !== null && n > 0 ? n : null;
+          };
+          // String column: CSV first, then product, else null
+          const pick = (csv: string | undefined, prod: string | null | undefined): string | null =>
+            csv?.trim() || prod || null;
+          const round2 = (n: number) => Math.round(n * 100) / 100;
+
+          // Values supplied by the CSV (null when the column is blank)
+          const csvUnitPrice = parseNumericValue(orderData.unitPrice?.trim());
+          const csvTaxAmount = parseNumericValue(orderData.taxAmount);
+          const csvTaxPercentage = parseNumericValue(orderData.taxPercentage);
+          const csvPriceIncludingTax = parseNumericValue(orderData.priceIncludingTax);
+
+          // Unit price (excluding tax)
+          const unitPrice: number | null = csvUnitPrice
+            ?? prodPos(matchedProduct?.priceExcludingTax)
+            ?? prodPos(matchedProduct?.price);
+          const priceFromProduct = csvUnitPrice === null;
 
           const totalPrice = (quantity !== null && unitPrice !== null) ? quantity * unitPrice : 0;
 
-          // Parse tax fields - unitPrice now contains price excluding tax
-          const taxAmount = parseNumericValue(orderData.taxAmount) ?? 0;
-          const taxPercentage = parseNumericValue(orderData.taxPercentage) ?? 0;
-          const priceIncludingTax = parseNumericValue(orderData.priceIncludingTax) ?? unitPrice ?? 0;
-          const priceExcludingTax = unitPrice ?? 0; // Unit price now contains price excluding tax
+          // Tax fields (per unit). The product's stored tax amount / price-including-tax were
+          // computed for the product's own price, so they are only reused when the unit price
+          // and percentage also come from the product; otherwise tax is derived from the percentage.
+          const taxPercentage = csvTaxPercentage
+            ?? prodNum(matchedProduct?.taxPercentage)
+            ?? 0;
+          const taxAmount = csvTaxAmount
+            ?? (priceFromProduct && csvTaxPercentage === null ? prodPos(matchedProduct?.taxAmount) : null)
+            ?? (taxPercentage > 0 && unitPrice !== null ? round2(unitPrice * taxPercentage / 100) : 0);
+          const priceExcludingTax = unitPrice ?? 0;
+          const priceIncludingTax = csvPriceIncludingTax
+            ?? (priceFromProduct && csvTaxAmount === null && csvTaxPercentage === null ? prodPos(matchedProduct?.priceIncludingTax) : null)
+            ?? round2(priceExcludingTax + taxAmount);
+
+          const costPrice = prodNum(matchedProduct?.costPrice);
+          const resolvedProductName = orderData.productName?.trim() || matchedProduct?.name || orderData.productSku.trim();
 
           subtotal += totalPrice;
+          orderTaxTotal += taxAmount * (quantity ?? 0);
 
           const orderItem = {
             id: uuidv4(),
             orderId: orderId,
             productId: productId,
-            productName: orderData.productName?.trim() || orderData.productSku.trim(),
-            productDescription: null, // Description is now part of product name
+            productName: resolvedProductName,
+            productDescription: matchedProduct?.description || null,
             sku: orderData.productSku.trim(),
-            hsCode: orderData.hsCode?.trim() || null,
-            uom: orderData.uom?.trim() || null,
-            serialNumber: orderData.serialNumber?.trim() || null,
-            listNumber: orderData.listNumber?.trim() || null,
-            bcNumber: orderData.bcNumber?.trim() || null,
-            lotNumber: orderData.lotNumber?.trim() || null,
-            expiryDate: orderData.expiryDate?.trim() || null,
+            hsCode: pick(orderData.hsCode, matchedProduct?.hsCode),
+            uom: pick(orderData.uom, matchedProduct?.uom),
+            serialNumber: pick(orderData.serialNumber, matchedProduct?.serialNumber),
+            listNumber: pick(orderData.listNumber, matchedProduct?.listNumber),
+            bcNumber: pick(orderData.bcNumber, matchedProduct?.bcNumber),
+            lotNumber: pick(orderData.lotNumber, matchedProduct?.lotNumber),
+            expiryDate: pick(orderData.expiryDate, matchedProduct?.expiryDate),
             itemSerialNumber: orderData.itemSerialNumber?.trim() || null,
             sroScheduleNumber: orderData.sroScheduleNumber?.trim() || null,
             quantity: quantity !== null ? quantity : 0,
             price: unitPrice !== null ? unitPrice.toFixed(2) : '0.00',
+            costPrice: costPrice !== null ? costPrice.toFixed(2) : null,
             totalPrice: totalPrice.toFixed(2),
+            totalCost: costPrice !== null && quantity !== null ? (costPrice * quantity).toFixed(2) : null,
             taxAmount: taxAmount.toFixed(2),
             taxPercentage: taxPercentage.toFixed(2),
             priceIncludingTax: priceIncludingTax.toFixed(2),
             priceExcludingTax: priceExcludingTax.toFixed(2),
+            extraTax: (prodNum(matchedProduct?.extraTax) ?? 0).toFixed(2),
+            furtherTax: (prodNum(matchedProduct?.furtherTax) ?? 0).toFixed(2),
+            fedPayableTax: (prodNum(matchedProduct?.fedPayableTax) ?? 0).toFixed(2),
+            discount: (prodNum(matchedProduct?.discount) ?? 0).toFixed(2),
+            fixedNotifiedValueOrRetailPrice: (prodNum(matchedProduct?.fixedNotifiedValueOrRetailPrice) ?? 0).toFixed(2),
+            saleType: matchedProduct?.saleType || 'Goods at standard rate',
             itemSequence: i + 1, // Item order within the order (1, 2, 3, etc.) - now properly sorted by CSV row order
           };
 
@@ -1402,7 +1499,7 @@ export async function processOrderChunk(
               customerEmail: existingUser.length > 0 ? existingUser[0].email : (orderData.customerEmail?.trim() || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`)),
               customOrderNumber: orderData.orderNumber,
               productSku: orderData.productSku,
-              productName: orderData.productName,
+              productName: resolvedProductName,
               quantity: quantity ?? undefined,
               unitPrice: unitPrice ?? undefined,
               taxAmount: taxAmount,
@@ -1472,6 +1569,13 @@ export async function processOrderChunk(
           tenantId,
           orderNumber: finalOrderNumber, // Auto-generated unique order number
           customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
+          invoiceRefNo: csvReferenceInvoice, // "Reference Invoice" column from CSV
+          // Buyer information: CSV NTN/CNIC wins, otherwise carried from the customer record
+          buyerNTNCNIC: csvBuyerNTNCNIC || existingUser[0]?.buyerNTNCNIC || null,
+          buyerBusinessName: existingUser[0]?.buyerBusinessName || null,
+          buyerProvince: existingUser[0]?.buyerProvince || null,
+          buyerAddress: existingUser[0]?.buyerAddress || null,
+          buyerRegistrationType: existingUser[0]?.buyerRegistrationType || null,
           userId: customerId,
           email: existingUser.length > 0 ? existingUser[0].email : (firstOrder.customerEmail?.trim() || (customerPhone ? `user+${customerPhone.replace(/[^0-9]/g, '')}@phone.local` : `user+${(customerName || 'unknown').toLowerCase().replace(/[^a-z0-9]/g, '')}@name.local`)),
           phone: customerPhone || null,
@@ -1479,10 +1583,10 @@ export async function processOrderChunk(
           paymentStatus: 'pending', // Default payment status since removed from CSV
           fulfillmentStatus: 'pending',
           subtotal: subtotal.toFixed(2),
-          taxAmount: '0.00',
+          taxAmount: orderTaxTotal.toFixed(2),
           shippingAmount: '0.00',
           discountAmount: '0.00',
-          totalAmount: subtotal.toFixed(2),
+          totalAmount: (subtotal + orderTaxTotal).toFixed(2),
           currency: 'PKR',
           serviceDate: null, // Service date removed from CSV
           serviceTime: null, // Service time removed from CSV  

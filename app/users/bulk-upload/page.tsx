@@ -436,11 +436,11 @@ export default function BulkUserUpload() {
 "PROD-003","45.00","48.60","High-end product","3.60","8.0","5555666677","25","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","Ltr"`;
       fileName = 'bulk_product_import_template.csv';
     } else {
-      csvContent = `Order Number,Customer Phone,Customer Name,Customer Email,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Item Serial Number,SRO/Schedule Number
-"ORD-001","+92300-1234567","John Doe","john.doe@example.com","PROD-001","Premium Widget - High quality widget for professional use","2","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","18","ICTO TABLE I"
-"ORD-001","+92300-1234567","John Doe","john.doe@example.com","PROD-002","Standard Item - Additional item for same order","","","1.60","8.0","21.59","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","19","ICTO TABLE I"
-"ORD-002","+92321-9876543","Jane Smith","jane.smith@example.com","PROD-003","Premium Product - Premium quality product for special customers","3","45.00","3.60","8.0","48.60","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","18","ICTO TABLE I"
-"ORD-003","+92333-1122334","Ahmed Khan","ahmed.khan@example.com","PROD-001","Premium Widget - Single item order example","","","2.40","8.0","32.39","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31","18","ICTO TABLE I"`;
+      csvContent = `Order Number,Reference Invoice,Customer Phone,Customer Name,Buyer NTN Or CNIC,Customer Email,Product SKU,Product Name,Quantity,Unit Price,Tax Amount,Tax Percentage,Price Including Tax,HS Code,UOM,Serial Number,List Number,BC Number,Lot Number,Expiry Date,Item Serial Number,SRO/Schedule Number
+"ORD-001","INV-001","+92300-1234567","John Doe","1234567890123","john.doe@example.com","PROD-001","Premium Widget - High quality widget for professional use","2","29.99","2.40","8.0","32.39","1234567890","Pcs","SN123456789","LIST-001","BC123456","LOT-2024-001","2024-12-31","18","ICTO TABLE I"
+"ORD-001","INV-001","+92300-1234567","John Doe","1234567890123","john.doe@example.com","PROD-002","Standard Item - Additional item for same order","","","1.60","8.0","21.59","9876543210","Kg","SN987654321","LIST-002","BC654321","LOT-2024-002","2025-06-30","19","ICTO TABLE I"
+"ORD-002","INV-002","+92321-9876543","Jane Smith","9876543210987","jane.smith@example.com","PROD-003","Premium Product - Premium quality product for special customers","3","45.00","3.60","8.0","48.60","5555666677","Ltr","SN555666777","LIST-003","BC777888","LOT-2024-003","2025-12-31","18","ICTO TABLE I"
+"ORD-003","","+92333-1122334","Ahmed Khan","","ahmed.khan@example.com","PROD-001","Premium Widget - Single item order example","","","2.40","8.0","32.39","1234567890","Pcs","SN123456790","LIST-001","BC123457","LOT-2024-004","2024-12-31","18","ICTO TABLE I"`;
       fileName = 'bulk_order_import_template.csv';
     }
 
@@ -887,6 +887,8 @@ export default function BulkUserUpload() {
                     <li><strong>Required fields:</strong> Order Number, Customer Phone, Product SKU</li>
                     <li><strong>Tax fields:</strong> Tax Amount, Tax Percentage, Price Including Tax (optional)</li>
                     <li><strong>Note:</strong> Unit Price and Quantity are now optional. Product Name can include description.</li>
+                    <li><strong>Product Matching:</strong> When Product Name, Unit Price, Tax, HS Code or UOM are left blank, they are filled from the existing product with that SKU</li>
+                    <li><strong>Optional order fields:</strong> Reference Invoice (saved as the order's Invoice Ref No) and Buyer NTN Or CNIC (saved on the order and on new customers)</li>
                     <li><strong>Order Grouping:</strong> Rows with same Order Number = same order with multiple items</li>
                     <li><strong>Template Structure:</strong> Order Number first for easy sorting and visual grouping</li>
                     <li><strong>Smart Defaults:</strong> Order Status defaults to "pending", Payment Status to "pending"</li>

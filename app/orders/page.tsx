@@ -359,8 +359,10 @@ export default function OrdersList() {
       // Create CSV header matching the import template format
       const csvHeaders = [
         'Order Number',
+        'Reference Invoice',
         'Customer Phone',
         'Customer Name',
+        'Buyer NTN Or CNIC',
         'Customer Email',
         'Product SKU',
         'Product Name',
@@ -392,8 +394,10 @@ export default function OrdersList() {
             items.forEach((item: any) => {
               const row = [
                 order.orderNumber || '',
+                order.invoiceRefNo || '',
                 order.phone || '',
                 order.user?.name || 'Guest',
+                order.buyerNTNCNIC || '',
                 order.email || order.user?.email || '',
                 item.sku || '',
                 item.productName || '',
@@ -417,8 +421,10 @@ export default function OrdersList() {
             // If no items, still export the order with empty product fields
             const row = [
               order.orderNumber || '',
+              order.invoiceRefNo || '',
               order.phone || '',
               order.user?.name || 'Guest',
+              order.buyerNTNCNIC || '',
               order.email || order.user?.email || '',
               '', // Product SKU
               '', // Product Name
@@ -443,8 +449,10 @@ export default function OrdersList() {
           // Add row with order data but no items
           const row = [
             order.orderNumber || '',
+            order.invoiceRefNo || '',
             order.phone || '',
             order.user?.name || 'Guest',
+            order.buyerNTNCNIC || '',
             order.email || order.user?.email || '',
             '', '', '', '', '', '', '', '', '', '', '', '', '', ''
           ].map(field => `"${String(field).replace(/"/g, '""')}"`);

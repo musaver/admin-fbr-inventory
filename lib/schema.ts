@@ -394,6 +394,7 @@ export const orders = mysqlTable("orders", {
   id: varchar("id", { length: 255 }).primaryKey(),
   tenantId: varchar("tenant_id", { length: 255 }).notNull(), // Multi-tenant support
   orderNumber: varchar("order_number", { length: 100 }).notNull().unique(),
+  customOrderNumberImport: varchar("custom_order_number_import", { length: 255 }), // Original order number from a bulk CSV import (may repeat)
   userId: varchar("user_id", { length: 255 }),
   email: varchar("email", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }),
@@ -521,6 +522,7 @@ export const orderItems = mysqlTable("order_items", {
   productImage: varchar("product_image", { length: 500 }),
   addons: json("addons"), // Store selected addons as JSON
   groupTitle: varchar("group_title", { length: 255 }), // Add group title for addon groups
+  itemSequence: int("item_sequence"), // Position of the item within the order (bulk import keeps CSV row order)
   createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

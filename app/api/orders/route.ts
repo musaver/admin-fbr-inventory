@@ -82,6 +82,7 @@ export const GET = withTenant(async (req: NextRequest, context) => {
     const simplifiedOrders = ordersWithDetails.map((orderData) => ({
       id: orderData.order.id,
       orderNumber: orderData.order.orderNumber,
+      customOrderNumberImport: orderData.order.customOrderNumberImport,
       email: orderData.order.email,
       phone: orderData.order.phone,
       subtotal: orderData.order.subtotal,
@@ -99,6 +100,7 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       invoiceDate: orderData.order.invoiceDate,
       invoiceType: orderData.order.invoiceType,
       invoiceRefNo: orderData.order.invoiceRefNo,
+      buyerNTNCNIC: orderData.order.buyerNTNCNIC,
       fbrEnvironment: orderData.order.fbrEnvironment,
       scenarioId: orderData.order.scenarioId,
       validationResponse: orderData.order.validationResponse
