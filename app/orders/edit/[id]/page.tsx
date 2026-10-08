@@ -3156,95 +3156,6 @@ export default function EditOrder() {
                           </div>
                         </div>
 
-                        {/* Additional Tax Fields (collapsed by default) */}
-                        <Collapsible className="mb-6">
-                          <CollapsibleTrigger type="button" className="group flex w-full items-center justify-between rounded-md text-left hover:bg-muted/50 data-[state=open]:mb-3">
-                            <h6 className="text-sm font-medium text-muted-foreground">📊 Additional Tax Fields</h6>
-                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                              <Label className="text-sm">Extra Tax</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.extraTax || 0}
-                                onChange={(e) => updateOrderItem(index, 'extraTax', parseFloat(e.target.value) || 0)}
-                                className="text-sm"
-                              />
-                              <UsdHint amount={item.extraTax} />
-                            </div>
-
-                            <div>
-                              <Label className="text-sm">Further Tax 1</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.furtherTax || 0}
-                                onChange={(e) => updateOrderItem(index, 'furtherTax', parseFloat(e.target.value) || 0)}
-                                className="text-sm"
-                              />
-                              <UsdHint amount={item.furtherTax} />
-                            </div>
-
-                            <div>
-                              <Label className="text-sm">FED Payable Tax</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.fedPayableTax || 0}
-                                onChange={(e) => updateOrderItem(index, 'fedPayableTax', parseFloat(e.target.value) || 0)}
-                                className="text-sm"
-                              />
-                              <UsdHint amount={item.fedPayableTax} />
-                            </div>
-
-                            <div>
-                              <Label className="text-sm">Discount Amount</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.discount || 0}
-                                onChange={(e) => updateOrderItem(index, 'discount', parseFloat(e.target.value) || 0)}
-                                className="text-sm"
-                              />
-                              <UsdHint amount={item.discount} />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                            <div>
-                              <Label className="text-sm">Fixed Notified Value/Retail Price</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={item.fixedNotifiedValueOrRetailPrice || 0}
-                                onChange={(e) => updateOrderItem(index, 'fixedNotifiedValueOrRetailPrice', parseFloat(e.target.value) || 0)}
-                                className="text-sm"
-                              />
-                              <UsdHint amount={item.fixedNotifiedValueOrRetailPrice} />
-                            </div>
-
-                            <div>
-                              <Label className="text-sm">Sale Type</Label>
-                              <Input
-                                value={item.saleType || 'Goods at standard rate'}
-                                onChange={(e) => updateOrderItem(index, 'saleType', e.target.value)}
-                                className="text-sm"
-                              />
-                            </div>
-
-                            <div className='hidden'>
-                              <Label className="text-sm">Total Price</Label>
-                              <div className="flex items-center h-9 px-3 py-2 border rounded bg-gray-50 text-sm">
-                                {formatCurrency(item.totalPrice)}
-                              </div>
-                            </div>
-                          </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-
                         {/* Product Identification */}
                         <div className="mb-4">
                           <h6 className="text-sm font-medium mb-3 text-muted-foreground">🔍 Product Identification</h6>
@@ -3409,6 +3320,95 @@ export default function EditOrder() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Additional Tax Fields (collapsed by default) */}
+                        <Collapsible className="mb-6">
+                          <CollapsibleTrigger type="button" className="group flex w-full items-center justify-between rounded-md text-left hover:bg-muted/50 data-[state=open]:mb-3">
+                            <h6 className="text-sm font-medium text-muted-foreground">📊 Additional Tax Fields</h6>
+                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Extra Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.extraTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'extraTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                              <UsdHint amount={item.extraTax} />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Further Tax 1</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.furtherTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'furtherTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                              <UsdHint amount={item.furtherTax} />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">FED Payable Tax</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.fedPayableTax || 0}
+                                onChange={(e) => updateOrderItem(index, 'fedPayableTax', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                              <UsdHint amount={item.fedPayableTax} />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Discount Amount</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.discount || 0}
+                                onChange={(e) => updateOrderItem(index, 'discount', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                              <UsdHint amount={item.discount} />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <div>
+                              <Label className="text-sm">Fixed Notified Value/Retail Price</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.fixedNotifiedValueOrRetailPrice || 0}
+                                onChange={(e) => updateOrderItem(index, 'fixedNotifiedValueOrRetailPrice', parseFloat(e.target.value) || 0)}
+                                className="text-sm"
+                              />
+                              <UsdHint amount={item.fixedNotifiedValueOrRetailPrice} />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm">Sale Type</Label>
+                              <Input
+                                value={item.saleType || 'Goods at standard rate'}
+                                onChange={(e) => updateOrderItem(index, 'saleType', e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+
+                            <div className='hidden'>
+                              <Label className="text-sm">Total Price</Label>
+                              <div className="flex items-center h-9 px-3 py-2 border rounded bg-gray-50 text-sm">
+                                {formatCurrency(item.totalPrice)}
+                              </div>
+                            </div>
+                          </div>
+                          </CollapsibleContent>
+                        </Collapsible>
 
                         {/* Tax Summary Display */}
                         {(Number(item.taxAmount) || Number(item.extraTax) || Number(item.furtherTax) || Number(item.fedPayableTax) || Number(item.discount)) > 0 && (
