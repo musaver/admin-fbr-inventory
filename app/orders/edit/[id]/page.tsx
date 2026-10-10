@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { zeroTaxFields, isTaxFree } from '@/lib/orders/zero-taxes';
 import { useRouter, useParams } from 'next/navigation';
 import CurrencySymbol from '../../../components/CurrencySymbol';
 import DualPrice, { UsdHint } from '../../../components/DualPrice';
@@ -293,6 +294,10 @@ export default function EditOrder() {
   const [skipCustomerEmail, setSkipCustomerEmail] = useState(true);
   const [skipSellerEmail, setSkipSellerEmail] = useState(true);
   const [skipFbrSubmission, setSkipFbrSubmission] = useState(false);
+  // "Make taxes zero" (Customer Information). Not stored in the DB; derived from the items on load.
+  // The ref mirrors the state so async code can read the current value.
+  const [makeTaxesZero, setMakeTaxesZero] = useState(false);
+  const makeTaxesZeroRef = useRef(false);
   const [isProductionSubmission, setIsProductionSubmission] = useState(false);
   const [productionToken, setProductionToken] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -684,6 +689,36 @@ export default function EditOrder() {
   const isSroScheduleNumberCustom = (index: number, value?: string | null) =>
     itemCustomSroScheduleNumber[index] ?? !!(value && !SRO_SCHEDULE_NUMBER_OPTIONS.includes(value));
 
+  // "Make taxes zero": zero an item's tax, lock automatic calculations and recompute its total
+  // (same total formula as updateOrderItem).
+  const applyZeroTaxes = (item: OrderItem): OrderItem => {
+    const zeroed = zeroTaxFields(item);
+    const unitPrice = Number(zeroed.priceIncludingTax) || Number(zeroed.price) || 0;
+    const extraTax = Number(zeroed.extraTax) || 0;
+    const furtherTax = Number(zeroed.furtherTax) || 0;
+    const fedPayableTax = Number(zeroed.fedPayableTax) || 0;
+    const discount = Number(zeroed.discount) || 0;
+    const quantity = Number(zeroed.quantity) || 0;
+    return {
+      ...zeroed,
+      disableAutoTaxCalculations: true,
+      totalPrice: (unitPrice + extraTax + furtherTax + fedPayableTax - discount) * quantity,
+    };
+  };
+
+  const handleMakeTaxesZeroChange = (checked: boolean) => {
+    setMakeTaxesZero(checked);
+    makeTaxesZeroRef.current = checked;
+    if (checked) {
+      setOrderItems(prev => prev.map(applyZeroTaxes));
+      setProductSelection(prev => ({ ...zeroTaxFields(prev), disableAutoTaxCalculations: true }));
+    } else {
+      // Only re-enable automatic calculations; values stay as they are
+      setOrderItems(prev => prev.map(item => ({ ...item, disableAutoTaxCalculations: false })));
+      setProductSelection(prev => ({ ...prev, disableAutoTaxCalculations: false }));
+    }
+  };
+
   // Initialize custom field states for product selection based on existing values
   useEffect(() => {
     setIsCustomSroScheduleNumber(
@@ -721,7 +756,8 @@ export default function EditOrder() {
     if (productSelection.selectedProductId && products.length > 0) {
       const product = products.find(p => p.id === productSelection.selectedProductId);
       if (product) {
-        setProductSelection(prev => ({
+        setProductSelection(prev => {
+          const filled = {
           ...prev,
           hsCode: product.hsCode || '',
           productName: product.name || '',
@@ -742,7 +778,10 @@ export default function EditOrder() {
           lotNumber: product.lotNumber || '',
           expiryDate: product.expiryDate || '',
           uom: product.uom || ''
-        }));
+          };
+          // "Make taxes zero" is on: a newly selected product starts tax-free
+          return makeTaxesZeroRef.current ? { ...zeroTaxFields(filled), disableAutoTaxCalculations: true } : filled;
+        });
       }
     }
   }, [productSelection.selectedProductId, products]);
@@ -883,8 +922,16 @@ export default function EditOrder() {
           disableAutoTaxCalculations: item.disableAutoTaxCalculations || false
         }));
 
+        // "Make taxes zero" is not stored: when every item is already tax-free, start with it checked
+        const allTaxFree = processedItems.length > 0 && processedItems.every((item: any) => isTaxFree(item));
+        setMakeTaxesZero(allTaxFree);
+        makeTaxesZeroRef.current = allTaxFree;
+        const itemsToSort = allTaxFree
+          ? processedItems.map((item: any) => ({ ...item, disableAutoTaxCalculations: true }))
+          : processedItems;
+
         // Sort items by SRO Item Serial No. (FBR) - empty values go to the end
-        const sortedItems = sortItemsBySerialNumber(processedItems);
+        const sortedItems = sortItemsBySerialNumber(itemsToSort);
         setOrderItems(sortedItems);
       }
 
@@ -1103,7 +1150,8 @@ export default function EditOrder() {
               totalPrice: updatedItem.totalPrice
             });
 
-            return updatedItem;
+            // Keep the order tax-free while "Make taxes zero" is on
+            return makeTaxesZeroRef.current ? applyZeroTaxes(updatedItem as OrderItem) : updatedItem;
           } catch (error) {
             console.error(`Error fetching product data for SKU ${item.sku}:`, error);
             return item;
@@ -1742,7 +1790,8 @@ export default function EditOrder() {
 
   // Validate and format HS codes for FBR compliance
   const handleFbrValidation = () => {
-    const updatedItems = orderItems.map(item => {
+    // Functional update so a concurrent change (e.g. "Make taxes zero") is not overwritten
+    setOrderItems(prevItems => prevItems.map(item => {
       if (item.hsCode && item.hsCode.trim()) {
         let hsCode = item.hsCode.trim();
 
@@ -1763,20 +1812,7 @@ export default function EditOrder() {
         return { ...item, hsCode };
       }
       return item;
-    });
-
-    setOrderItems(updatedItems);
-
-    // Show success message
-    const updatedCount = updatedItems.filter((item, index) =>
-      item.hsCode !== orderItems[index].hsCode
-    ).length;
-
-    if (updatedCount > 0) {
-      //alert(`✅ FBR Validation Complete! Updated ${updatedCount} HS code${updatedCount > 1 ? 's' : ''} for FBR compliance.`);
-    } else {
-      //alert('ℹ️ All HS codes are already in correct FBR format.');
-    }
+    }));
   };
 
   // Submit order update
@@ -2243,6 +2279,21 @@ export default function EditOrder() {
                         onChange={(e) => setOrderData({ ...orderData, buyerAddress: e.target.value })}
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Make taxes zero */}
+                <div className="flex items-start space-x-2 border-t pt-4">
+                  <input
+                    type="checkbox"
+                    id="make-taxes-zero"
+                    checked={makeTaxesZero}
+                    onChange={(e) => handleMakeTaxesZeroChange(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300"
+                  />
+                  <div>
+                    <Label htmlFor="make-taxes-zero" className="text-sm">Make taxes zero</Label>
+                    <p className="text-xs text-muted-foreground">Sets Tax Percentage and Tax Amount to 0 on every item and disables automatic tax calculations</p>
                   </div>
                 </div>
               </CardContent>

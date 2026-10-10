@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { zeroTaxFields } from '@/lib/orders/zero-taxes';
 import { useRouter } from 'next/navigation';
 import CurrencySymbol from '../../components/CurrencySymbol';
 import DualPrice, { UsdHint } from '../../components/DualPrice';
@@ -362,6 +363,27 @@ export default function AddOrder() {
   
   // State for disabling automatic tax calculations
   const [disableAutoTaxCalculations, setDisableAutoTaxCalculations] = useState(false);
+
+  // "Make taxes zero" (Customer Information): zero tax on every item and disable auto calculations.
+  // The ref mirrors the state so effects can read the current value without re-running on toggle.
+  const [makeTaxesZero, setMakeTaxesZero] = useState(false);
+  const makeTaxesZeroRef = useRef(false);
+  const handleMakeTaxesZeroChange = (checked: boolean) => {
+    setMakeTaxesZero(checked);
+    makeTaxesZeroRef.current = checked;
+    if (checked) {
+      setDisableAutoTaxCalculations(true);
+      setProductSelection(prev => zeroTaxFields(prev));
+      setOrderItems(prev => prev.map(item => {
+        // totalPrice already includes the old tax (and addons) on this page, so just take the tax out
+        const oldTax = Number(item.taxAmount) || 0;
+        return { ...zeroTaxFields(item), totalPrice: Math.max(0, (Number(item.totalPrice) || 0) - oldTax) };
+      }));
+    } else {
+      // Only re-enable automatic calculations; values stay as they are
+      setDisableAutoTaxCalculations(false);
+    }
+  };
   
   // Loading state for adding products
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -437,7 +459,8 @@ export default function AddOrder() {
       const product = products.find(p => p.id === productSelection.selectedProductId);
       if (product) {
         const normalizedHs = normalizeHsCode(product.hsCode || '');
-        setProductSelection(prev => ({
+        setProductSelection(prev => {
+          const filled = {
           ...prev,
           // Populate additional fields from product
           hsCode: normalizedHs,
@@ -466,7 +489,10 @@ export default function AddOrder() {
           expiryDate: product.expiryDate || '',
           // Populate UOM from product
           uom: product.uom || ''
-        }));
+          };
+          // "Make taxes zero" is on: a newly selected product starts tax-free
+          return makeTaxesZeroRef.current ? zeroTaxFields(filled) : filled;
+        });
       }
     } else {
       // Reset editable fields when no product is selected
@@ -707,6 +733,13 @@ export default function AddOrder() {
         saleType: productSelection.saleType || 'Goods at standard rate',
         uom: productSelection.uom || null
       };
+
+      // "Make taxes zero" is an order-level choice; never write the zeroed tax back onto the product
+      if (makeTaxesZero) {
+        delete (updateData as any).taxAmount;
+        delete (updateData as any).taxPercentage;
+        delete (updateData as any).priceIncludingTax;
+      }
 
       const response = await fetch(`/api/products/${productId}`, {
         method: 'PUT',
@@ -2242,6 +2275,21 @@ export default function AddOrder() {
               <Label htmlFor="skip-customer-email" className="text-sm">
                 Do not send email to customer
               </Label>
+            </div>
+
+            {/* Make taxes zero */}
+            <div className="flex items-start space-x-2 pt-2">
+              <input
+                type="checkbox"
+                id="make-taxes-zero"
+                checked={makeTaxesZero}
+                onChange={(e) => handleMakeTaxesZeroChange(e.target.checked)}
+                className="mt-0.5 rounded border-gray-300"
+              />
+              <div>
+                <Label htmlFor="make-taxes-zero" className="text-sm">Make taxes zero</Label>
+                <p className="text-xs text-muted-foreground">Sets Tax Percentage and Tax Amount to 0 on every item and disables automatic tax calculations</p>
+              </div>
             </div>
             </CardContent>
           </Card>
