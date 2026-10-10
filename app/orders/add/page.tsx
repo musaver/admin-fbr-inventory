@@ -2674,34 +2674,34 @@ export default function AddOrder() {
                         <SelectValue placeholder="Select FBR Scenario" />
                       </SelectTrigger>
                       <SelectContent className="max-h-60 overflow-y-auto">
-                        <SelectItem value="SN001">SN001 - Goods at standard rate (default)</SelectItem>
-                        <SelectItem value="SN002">SN002 - Goods at standard rate (with WHT)</SelectItem>
-                        <SelectItem value="SN003">SN003 - Goods at standard rate (default)</SelectItem>
-                        <SelectItem value="SN004">SN004 - Goods at standard rate (default)</SelectItem>
-                        <SelectItem value="SN005">SN005 - Goods at Reduced Rate</SelectItem>
-                        <SelectItem value="SN006">SN006 - Exempt goods</SelectItem>
-                        <SelectItem value="SN007">SN007 - Goods at zero-rate</SelectItem>
-                        <SelectItem value="SN008">SN008 - 3rd Schedule Goods</SelectItem>
-                        <SelectItem value="SN009">SN009 - Cotton ginners</SelectItem>
-                        <SelectItem value="SN010">SN010 - Ship breaking</SelectItem>
-                        <SelectItem value="SN011">SN011 - Steel Melters / Re-Rollers</SelectItem>
-                        <SelectItem value="SN012">SN012 - Petroleum products</SelectItem>
-                        <SelectItem value="SN013">SN013 - Natural Gas / CNG</SelectItem>
-                        <SelectItem value="SN014">SN014 - Electric power / Electricity</SelectItem>
-                        <SelectItem value="SN015">SN015 - Telecommunication services</SelectItem>
-                        <SelectItem value="SN016">SN016 - Processing / Conversion of Goods</SelectItem>
-                        <SelectItem value="SN017">SN017 - Goods liable to FED in ST mode</SelectItem>
-                        <SelectItem value="SN018">SN018 - Services with FED in ST mode</SelectItem>
+                        <SelectItem value="SN001">SN001 - Goods at standard rate to registered buyers</SelectItem>
+                        <SelectItem value="SN002">SN002 - Goods at standard rate to unregistered buyers</SelectItem>
+                        <SelectItem value="SN003">SN003 - Sale of steel (melted and re-rolled)</SelectItem>
+                        <SelectItem value="SN004">SN004 - Sale by ship breakers</SelectItem>
+                        <SelectItem value="SN005">SN005 - Reduced rate sale (8th Schedule)</SelectItem>
+                        <SelectItem value="SN006">SN006 - Exempt goods sale (6th Schedule)</SelectItem>
+                        <SelectItem value="SN007">SN007 - Zero-rated sale (5th Schedule)</SelectItem>
+                        <SelectItem value="SN008">SN008 - Sale of 3rd Schedule goods</SelectItem>
+                        <SelectItem value="SN009">SN009 - Cotton spinners purchase from cotton ginners</SelectItem>
+                        <SelectItem value="SN010">SN010 - Telecom services rendered or provided</SelectItem>
+                        <SelectItem value="SN011">SN011 - Toll manufacturing sale by steel sector</SelectItem>
+                        <SelectItem value="SN012">SN012 - Sale of petroleum products</SelectItem>
+                        <SelectItem value="SN013">SN013 - Electricity supply to retailers</SelectItem>
+                        <SelectItem value="SN014">SN014 - Sale of gas to CNG stations</SelectItem>
+                        <SelectItem value="SN015">SN015 - Sale of mobile phones</SelectItem>
+                        <SelectItem value="SN016">SN016 - Processing / conversion of goods</SelectItem>
+                        <SelectItem value="SN017">SN017 - Goods where FED is charged in ST mode</SelectItem>
+                        <SelectItem value="SN018">SN018 - Services where FED is charged in ST mode</SelectItem>
                         <SelectItem value="SN019">SN019 - Services rendered or provided</SelectItem>
-                        <SelectItem value="SN020">SN020 - Mobile phones (9th Schedule)</SelectItem>
-                        <SelectItem value="SN021">SN021 - Drugs at fixed rate (Eighth Schedule)</SelectItem>
-                        <SelectItem value="SN022">SN022 - Services (ICT Ordinance)</SelectItem>
-                        <SelectItem value="SN023">SN023 - Services liable to FED in ST mode</SelectItem>
-                        <SelectItem value="SN024">SN024 - Non-Adjustable Supplies</SelectItem>
-                        <SelectItem value="SN025">SN025 - Drugs at fixed ST rate (Eighth Schedule)</SelectItem>
-                        <SelectItem value="SN026">SN026 - Goods at standard rate (Tested ✅)</SelectItem>
-                        <SelectItem value="SN027">SN027 - Retail Supplies (Invoice Level)</SelectItem>
-                        <SelectItem value="SN028">SN028 - Retail Supplies (Item Level)</SelectItem>
+                        <SelectItem value="SN020">SN020 - Sale of electric vehicles</SelectItem>
+                        <SelectItem value="SN021">SN021 - Sale of cement / concrete block</SelectItem>
+                        <SelectItem value="SN022">SN022 - Sale of potassium chlorate</SelectItem>
+                        <SelectItem value="SN023">SN023 - Sale of CNG</SelectItem>
+                        <SelectItem value="SN024">SN024 - Goods listed in SRO 297(I)/2023</SelectItem>
+                        <SelectItem value="SN025">SN025 - Drugs at fixed ST rate (8th Schedule, serial 81)</SelectItem>
+                        <SelectItem value="SN026">SN026 - Sale to end consumer by retailer (standard rate)</SelectItem>
+                        <SelectItem value="SN027">SN027 - Sale to end consumer by retailer (3rd Schedule goods)</SelectItem>
+                        <SelectItem value="SN028">SN028 - Sale to end consumer by retailer (reduced rate)</SelectItem>
                         <SelectItem value="custom">Custom Scenario...</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2719,17 +2719,17 @@ export default function AddOrder() {
                   
                   {orderData.scenarioId && (
                     <div className="text-sm text-muted-foreground">
-                      {orderData.scenarioId === "SN001" && "⚠️ Not valid for unregistered buyers"}
-                      {orderData.scenarioId === "SN002" && "Requires withholding tax at item level"}
-                      {orderData.scenarioId === "SN005" && "Uses 1% tax rate"}
-                      {orderData.scenarioId === "SN006" && "Tax-exempt goods (0% tax)"}
-                      {orderData.scenarioId === "SN007" && "Zero-rate goods (0% tax)"}
-                      {orderData.scenarioId === "SN008" && "Requires fixed retail price"}
-                      {orderData.scenarioId === "SN017" && "Requires FED payable amount"}
-                      {orderData.scenarioId === "SN018" && "Services with FED in ST mode"}
-                      {orderData.scenarioId === "SN026" && "✅ Tested and working for unregistered buyers"}
-                      {orderData.scenarioId === "SN027" && "Retail supplies at invoice level"}
-                      {orderData.scenarioId === "SN028" && "Retail supplies at item level"}
+                      {orderData.scenarioId === "SN001" && "Registered buyers only. Buyer NTN or CNIC required. Items at the standard rate (18%)."}
+                      {orderData.scenarioId === "SN002" && "Unregistered buyers. Items at the standard rate (18%). No withholding tax."}
+                      {orderData.scenarioId === "SN005" && "Reduced rate goods (8th Schedule). Items need the reduced rate plus SRO schedule and item serial number."}
+                      {orderData.scenarioId === "SN006" && "Exempt goods (6th Schedule). Every item must have 0% tax (rate Exempt) plus SRO schedule and item serial number."}
+                      {orderData.scenarioId === "SN007" && "Zero-rated goods (5th Schedule). Every item must have 0% tax plus SRO schedule and item serial number."}
+                      {orderData.scenarioId === "SN008" && "3rd Schedule goods. Fixed or notified retail price required per item."}
+                      {orderData.scenarioId === "SN017" && "Goods with FED charged in sales tax mode. FED payable required per item."}
+                      {orderData.scenarioId === "SN018" && "Services with FED charged in sales tax mode."}
+                      {orderData.scenarioId === "SN026" && "Retailers only (per FBR sales tax profile). Standard rate (18%) to end consumers."}
+                      {orderData.scenarioId === "SN027" && "Retailers only (per FBR sales tax profile). 3rd Schedule goods to end consumers; retail price required."}
+                      {orderData.scenarioId === "SN028" && "Retailers only (per FBR sales tax profile). Reduced rate goods to end consumers."}
                     </div>
                   )}
                 </div>

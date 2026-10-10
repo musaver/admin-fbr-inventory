@@ -174,13 +174,11 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
     salesTaxApplicable = typeof item.taxAmount === 'string' ? parseFloat(item.taxAmount as any) : Number(item.taxAmount);
   }
   
-  // Calculate withholding tax - only use user-provided value or 0
+  // Withholding tax: pass through only a user-entered value, never auto-calculate.
+  // DI spec v1.12 error 0008 requires it to be 0 or equal to the sales tax, and
+  // error 0070 rejects any withholding for unregistered buyers.
   if (item.extraTax !== undefined && item.extraTax !== null && item.extraTax > 0) {
     salesTaxWithheldAtSource = item.extraTax;
-  } else if (requiresWithholdingTax(scenarioId)) {
-    // Only auto-calculate for scenarios that specifically require it (like SN002)
-    // and only if user hasn't explicitly set it to 0
-    salesTaxWithheldAtSource = baseAmount * 0.02;
   } else {
     salesTaxWithheldAtSource = 0;
   }
@@ -650,6 +648,47 @@ export function validateOrderForFbr(order: Order): { isValid: boolean; errors: s
         errors.push(`Item ${index + 1}: Fixed/Notified Value or Retail Price is mandatory for 3rd Schedule Goods`);
       }
     });
+  }
+
+  // Rate / sale-type consistency (DI spec v1.12 section 9; error codes 0046, 0077, 0078).
+  // FBR only accepts a rate that is valid for the item's sale type, and the sale type
+  // comes from the scenario, so the item tax on the order must agree with the scenario.
+  const scenarioSaleType = getSaleTypeForScenario(scenarioId);
+  const scenarioRate = getDefaultRateForScenario(scenarioId);
+  const describeItems = (items: OrderItem[]) => {
+    const names = items.slice(0, 3).map(i => i.productName || 'unnamed item');
+    return names.join(', ') + (items.length > 3 ? ` and ${items.length - 3} more` : '');
+  };
+
+  if (scenarioId === 'SN006' || scenarioId === 'SN007') {
+    const taxedItems = (order.items || []).filter(item =>
+      Number(item.taxPercentage) > 0 || Number(item.taxAmount) > 0
+    );
+    if (taxedItems.length > 0) {
+      errors.push(
+        `Scenario ${scenarioId} (${scenarioSaleType}) requires rate "${scenarioRate}" with zero sales tax on every item, ` +
+        `but ${taxedItems.length} item(s) carry tax (${describeItems(taxedItems)}). ` +
+        `Set the item tax to 0%, or use a standard-rate scenario instead (SN002 for an unregistered buyer, SN001 for a registered buyer).`
+      );
+    }
+    (order.items || []).forEach((item, index) => {
+      if (!item.sroScheduleNumber || !item.itemSerialNumber) {
+        errors.push(`Item ${index + 1}: SRO/Schedule number and item serial number are required for ${scenarioSaleType}`);
+      }
+    });
+  }
+
+  if (scenarioSaleType === 'Goods at standard rate (default)') {
+    const untaxedItems = (order.items || []).filter(item =>
+      item.taxPercentage !== undefined && item.taxPercentage !== null && Number(item.taxPercentage) === 0
+    );
+    if (untaxedItems.length > 0) {
+      errors.push(
+        `Scenario ${scenarioId} (${scenarioSaleType}) requires rate "${scenarioRate}" on every item, ` +
+        `but ${untaxedItems.length} item(s) have 0% tax (${describeItems(untaxedItems)}). ` +
+        `Set the item tax to ${scenarioRate}, or use SN006 (Exempt goods) or SN007 (zero-rated goods) for untaxed items.`
+      );
+    }
   }
   
   return {
