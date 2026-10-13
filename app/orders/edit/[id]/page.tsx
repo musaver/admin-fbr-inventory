@@ -2057,13 +2057,18 @@ export default function EditOrder() {
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
             {/* Customer Selection */}
+            <Collapsible defaultOpen>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CollapsibleTrigger type="button" className="group flex flex-1 items-center justify-between gap-2 text-left">
+                  <CardTitle className="flex items-center gap-2">
                   <UserPlus className="h-5 w-5" />
                   Customer Information
                 </CardTitle>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
               </CardHeader>
+              <CollapsibleContent forceMount className="data-[state=closed]:hidden">
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <label className="flex items-center space-x-2">
@@ -2297,19 +2302,25 @@ export default function EditOrder() {
                   </div>
                 </div>
               </CardContent>
+              </CollapsibleContent>
             </Card>
+            </Collapsible>
 
             {/* Add Products */}
+            <Collapsible defaultOpen>
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
+                  <CollapsibleTrigger type="button" className="group flex flex-1 items-center justify-between gap-2 text-left">
+                    <CardTitle className="flex items-center gap-2">
                     <PackagePlus className="h-5 w-5" />
                     Order Items
                     <span className="ml-1 inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-sm font-medium text-slate-700">
                       {orderItems.length} {orderItems.length === 1 ? 'item' : 'items'}
                     </span>
                   </CardTitle>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
                   <Button
                     onClick={fetchProductsDataBySku}
                     variant="outline"
@@ -2326,6 +2337,7 @@ export default function EditOrder() {
                   </Button>
                 </div>
               </CardHeader>
+              <CollapsibleContent forceMount className="data-[state=closed]:hidden">
               <CardContent className="space-y-4">
                 <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
                   <PopoverTrigger asChild>
@@ -3521,14 +3533,21 @@ export default function EditOrder() {
                   </div>
                 )}
               </CardContent>
+              </CollapsibleContent>
             </Card>
+            </Collapsible>
 
             {/* Loyalty Points */}
             {loyaltySettings.enabled && orderData.customerId && customerPoints.availablePoints > 0 && (
+              <Collapsible defaultOpen>
               <Card>
                 <CardHeader>
-                  <CardTitle>🎁 Loyalty Points</CardTitle>
+                  <CollapsibleTrigger type="button" className="group flex flex-1 items-center justify-between gap-2 text-left">
+                    <CardTitle>🎁 Loyalty Points</CardTitle>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
                 </CardHeader>
+                <CollapsibleContent forceMount className="data-[state=closed]:hidden">
                 <CardContent className="space-y-4">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -3590,7 +3609,9 @@ export default function EditOrder() {
                     )}
                   </div>
                 </CardContent>
+                </CollapsibleContent>
               </Card>
+              </Collapsible>
             )}
 
             {/* Shipping Information */}
@@ -3748,139 +3769,22 @@ export default function EditOrder() {
               </CardContent>
             </Card>
 
-            {/* Seller Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  🏪 Seller Information
-                </CardTitle>
-                <CardDescription>
-                  Your business information for FBR Digital Invoicing. These fields are auto-filled from environment variables but can be modified if needed.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="seller-ntn">Seller NTN/CNIC</Label>
-                    <Input
-                      id="seller-ntn"
-                      type="text"
-                      value={sellerInfo.sellerNTNCNIC}
-                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerNTNCNIC: e.target.value })}
-                      placeholder="Enter your NTN or CNIC"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="seller-business">Business Name</Label>
-                    <Input
-                      id="seller-business"
-                      type="text"
-                      value={sellerInfo.sellerBusinessName}
-                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerBusinessName: e.target.value })}
-                      placeholder="Enter your business name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="seller-province">Province</Label>
-                    <div className="space-y-2">
-                      <Select
-                        value={
-                          isCustomSellerProvince ? "custom" :
-                            ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
-                              ? sellerInfo.sellerProvince
-                              : ""
-                        }
-                        onValueChange={(value) => {
-                          if (value === "custom") {
-                            setIsCustomSellerProvince(true);
-                            setSellerInfo({ ...sellerInfo, sellerProvince: "" });
-                          } else {
-                            setIsCustomSellerProvince(false);
-                            setSellerInfo({ ...sellerInfo, sellerProvince: value });
-                          }
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Province" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Punjab">Punjab</SelectItem>
-                          <SelectItem value="Sindh">Sindh</SelectItem>
-                          <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
-                          <SelectItem value="Balochistan">Balochistan</SelectItem>
-                          <SelectItem value="Capital Territory">Islamabad</SelectItem>
-                          <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
-                          <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
-                          <SelectItem value="N/A">N/A</SelectItem>
-                          <SelectItem value="custom">Custom Province...</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {isCustomSellerProvince && (
-                        <Input
-                          placeholder="Enter custom province"
-                          value={sellerInfo.sellerProvince || ""}
-                          onChange={(e) => setSellerInfo({ ...sellerInfo, sellerProvince: e.target.value })}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="seller-address">Address</Label>
-                    <Input
-                      id="seller-address"
-                      type="text"
-                      value={sellerInfo.sellerAddress}
-                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerAddress: e.target.value })}
-                      placeholder="Enter your business address"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fbr-sandbox-token">FBR Sandbox Token</Label>
-                    <Input
-                      id="fbr-sandbox-token"
-                      type="text"
-                      value={sellerInfo.fbrSandboxToken}
-                      onChange={(e) => setSellerInfo({ ...sellerInfo, fbrSandboxToken: e.target.value })}
-                      placeholder="FBR sandbox token"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fbr-base-url">FBR Base URL</Label>
-                    <Input
-                      id="fbr-base-url"
-                      type="text"
-                      value={sellerInfo.fbrBaseUrl}
-                      onChange={(e) => setSellerInfo({ ...sellerInfo, fbrBaseUrl: e.target.value })}
-                      placeholder="FBR base URL"
-                    />
-                  </div>
-                </div>
-
-                {(!sellerInfo.sellerNTNCNIC || !sellerInfo.sellerBusinessName || !sellerInfo.fbrSandboxToken || !sellerInfo.fbrBaseUrl) && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                      <span>⚠️</span>
-                      <span className="font-medium">Missing Seller Information</span>
-                    </div>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      Please ensure your seller information is complete for FBR Digital Invoicing.
-                      You can set default values in your environment variables (FBR_SELLER_*).
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Invoice & Validation Fields */}
+            <Collapsible defaultOpen>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CollapsibleTrigger type="button" className="group flex flex-1 items-center justify-between gap-2 text-left">
+                  <CardTitle className="flex items-center gap-2">
                   🧾 Invoice & Validation
                 </CardTitle>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
                 <CardDescription>
                   Enter invoice details and validation information
                 </CardDescription>
               </CardHeader>
+              <CollapsibleContent forceMount className="data-[state=closed]:hidden">
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -4081,7 +3985,139 @@ export default function EditOrder() {
                   )}
                 </div>
               </CardContent>
+              </CollapsibleContent>
             </Card>
+            </Collapsible>
+
+            {/* Seller Information */}
+            <Collapsible>
+            <Card>
+              <CardHeader>
+                <CollapsibleTrigger type="button" className="group flex flex-1 items-center justify-between gap-2 text-left">
+                  <CardTitle className="flex items-center gap-2">
+                  🏪 Seller Information
+                </CardTitle>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CardDescription>
+                  Your business information for FBR Digital Invoicing. These fields are auto-filled from environment variables but can be modified if needed.
+                </CardDescription>
+              </CardHeader>
+              <CollapsibleContent forceMount className="data-[state=closed]:hidden">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="seller-ntn">Seller NTN/CNIC</Label>
+                    <Input
+                      id="seller-ntn"
+                      type="text"
+                      value={sellerInfo.sellerNTNCNIC}
+                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerNTNCNIC: e.target.value })}
+                      placeholder="Enter your NTN or CNIC"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-business">Business Name</Label>
+                    <Input
+                      id="seller-business"
+                      type="text"
+                      value={sellerInfo.sellerBusinessName}
+                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerBusinessName: e.target.value })}
+                      placeholder="Enter your business name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-province">Province</Label>
+                    <div className="space-y-2">
+                      <Select
+                        value={
+                          isCustomSellerProvince ? "custom" :
+                            ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Capital Territory", "Azad Jammu and Kashmir", "Gilgit-Baltistan", "N/A"].includes(sellerInfo.sellerProvince || "")
+                              ? sellerInfo.sellerProvince
+                              : ""
+                        }
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            setIsCustomSellerProvince(true);
+                            setSellerInfo({ ...sellerInfo, sellerProvince: "" });
+                          } else {
+                            setIsCustomSellerProvince(false);
+                            setSellerInfo({ ...sellerInfo, sellerProvince: value });
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Punjab">Punjab</SelectItem>
+                          <SelectItem value="Sindh">Sindh</SelectItem>
+                          <SelectItem value="Khyber Pakhtunkhwa">Khyber Pakhtunkhwa</SelectItem>
+                          <SelectItem value="Balochistan">Balochistan</SelectItem>
+                          <SelectItem value="Capital Territory">Islamabad</SelectItem>
+                          <SelectItem value="Azad Jammu and Kashmir">Azad Jammu and Kashmir</SelectItem>
+                          <SelectItem value="Gilgit-Baltistan">Gilgit-Baltistan</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
+                          <SelectItem value="custom">Custom Province...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {isCustomSellerProvince && (
+                        <Input
+                          placeholder="Enter custom province"
+                          value={sellerInfo.sellerProvince || ""}
+                          onChange={(e) => setSellerInfo({ ...sellerInfo, sellerProvince: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="seller-address">Address</Label>
+                    <Input
+                      id="seller-address"
+                      type="text"
+                      value={sellerInfo.sellerAddress}
+                      onChange={(e) => setSellerInfo({ ...sellerInfo, sellerAddress: e.target.value })}
+                      placeholder="Enter your business address"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fbr-sandbox-token">FBR Sandbox Token</Label>
+                    <Input
+                      id="fbr-sandbox-token"
+                      type="text"
+                      value={sellerInfo.fbrSandboxToken}
+                      onChange={(e) => setSellerInfo({ ...sellerInfo, fbrSandboxToken: e.target.value })}
+                      placeholder="FBR sandbox token"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="fbr-base-url">FBR Base URL</Label>
+                    <Input
+                      id="fbr-base-url"
+                      type="text"
+                      value={sellerInfo.fbrBaseUrl}
+                      onChange={(e) => setSellerInfo({ ...sellerInfo, fbrBaseUrl: e.target.value })}
+                      placeholder="FBR base URL"
+                    />
+                  </div>
+                </div>
+
+                {(!sellerInfo.sellerNTNCNIC || !sellerInfo.sellerBusinessName || !sellerInfo.fbrSandboxToken || !sellerInfo.fbrBaseUrl) && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-yellow-800">
+                      <span>⚠️</span>
+                      <span className="font-medium">Missing Seller Information</span>
+                    </div>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Please ensure your seller information is complete for FBR Digital Invoicing.
+                      You can set default values in your environment variables (FBR_SELLER_*).
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+              </CollapsibleContent>
+            </Card>
+            </Collapsible>
           </div>
 
           {/* Order Summary - Right Side */}
