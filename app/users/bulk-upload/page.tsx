@@ -708,77 +708,99 @@ export default function BulkUserUpload() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Upload Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Upload {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
-            </CardTitle>
-            <CardDescription>
-              Select your CSV file to begin the import process
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <XCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        {/* Upload + Template side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upload Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Upload {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
+              </CardTitle>
+              <CardDescription>
+                Select your CSV file to begin the import process
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {error && (
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="csvFile">Select CSV File</Label>
-                <Input
-                  type="file"
-                  id="csvFile"
-                  accept=".csv"
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                  className="file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
-                />
-                {file && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleUpload}
-                  disabled={!file || uploading}
-                  className="gap-2"
-                >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4" />
-                      Start Import
-                    </>
-                  )}
-                </Button>
-
-                {(file || currentJob) && (
-                  <Button
-                    variant="outline"
-                    onClick={resetForm}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="csvFile">Select CSV File</Label>
+                  <Input
+                    type="file"
+                    id="csvFile"
+                    accept=".csv"
+                    onChange={handleFileChange}
                     disabled={uploading}
+                    className="file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
+                  />
+                  {file && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      <span>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleUpload}
+                    disabled={!file || uploading}
                     className="gap-2"
                   >
-                    Reset
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Start Import
+                      </>
+                    )}
                   </Button>
-                )}
+
+                  {(file || currentJob) && (
+                    <Button
+                      variant="outline"
+                      onClick={resetForm}
+                      disabled={uploading}
+                      className="gap-2"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Template Download (shared, adapts to the active tab) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Download Template
+              </CardTitle>
+              <CardDescription>
+                Get the CSV template with correct format and sample data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Download {activeTab === 'users' ? 'User' : activeTab === 'products' ? 'Product' : 'Order'} CSV Template
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Import Options (users / products only) */}
         {activeTab !== 'orders' && (
@@ -1156,25 +1178,6 @@ export default function BulkUserUpload() {
         )}
 
         <TabsContent value="users" className="space-y-6">
-          {/* Template Download */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5" />
-                Download Template
-              </CardTitle>
-              <CardDescription>
-                Get the CSV template with correct format and sample data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Download User CSV Template
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* Instructions Card */}
           <Card>
             <CardHeader>
@@ -1205,25 +1208,6 @@ export default function BulkUserUpload() {
         </TabsContent>
 
         <TabsContent value="products" className="space-y-6">
-          {/* Template Download */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5" />
-                Download Template
-              </CardTitle>
-              <CardDescription>
-                Get the CSV template with correct format and sample data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Download Product CSV Template
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* Instructions Card */}
           <Card>
             <CardHeader>
@@ -1254,25 +1238,6 @@ export default function BulkUserUpload() {
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-6">
-          {/* Template Download */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5" />
-                Download Template
-              </CardTitle>
-              <CardDescription>
-                Get the CSV template with correct format and sample data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Download Order CSV Template
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* Instructions Card */}
           <Card>
             <CardHeader>
