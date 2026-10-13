@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { importJobs, user, userLoyaltyPoints, products, stockMovements, orders, orderItems } from '@/lib/schema';
 import { eq, and, sql, or, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { allScenarios } from '@/lib/fbr/saleTypes';
 
 export interface UserImportRow {
   name: string;
@@ -37,6 +38,7 @@ export interface OrderImportRow {
   customerEmail?: string;
   orderNumber?: string; // Custom order ID for grouping items
   referenceInvoice?: string; // Stored on orders.invoiceRefNo
+  scenarioId?: string; // FBR scenario, stored on orders.scenarioId
   buyerNTNCNIC?: string; // Stored on orders.buyerNTNCNIC (and the customer record when created)
   productSku: string;
   productName?: string;
@@ -330,6 +332,22 @@ export function parseProductCSV(csvText: string): ProductImportRow[] {
 }
 
 // Utility function to parse CSV for orders
+/**
+ * Normalise a CSV scenario value to the "SN001" form used by the FBR scenario dropdowns.
+ * Accepts "sn1", "SN01", "1", " SN018 " etc. Returns null for blank. Unknown IDs are kept
+ * (the edit page shows them as a custom scenario) but logged.
+ */
+export function normalizeScenarioId(raw: string | undefined | null): string | null {
+  const value = (raw || '').trim().toUpperCase();
+  if (!value) return null;
+  const match = value.match(/^(?:SN)?\s*(\d{1,3})$/);
+  const normalized = match ? `SN${match[1].padStart(3, '0')}` : value;
+  if (!(allScenarios as string[]).includes(normalized)) {
+    console.warn(`⚠️ Scenario "${raw}" is not a known FBR scenario (${allScenarios[0]}–${allScenarios[allScenarios.length - 1]}); storing "${normalized}" as a custom scenario`);
+  }
+  return normalized;
+}
+
 export function parseOrderCSV(csvText: string): OrderImportRow[] {
   const lines = csvText.split('\n').filter(line => line.trim());
 
@@ -348,6 +366,7 @@ export function parseOrderCSV(csvText: string): OrderImportRow[] {
     'customerEmail': ['customer email', 'email', 'customer_email'],
     'orderNumber': ['order number', 'order_number', 'order id', 'order_id'],
     'referenceInvoice': ['reference invoice', 'reference_invoice', 'invoice ref', 'invoice ref no', 'invoice_ref_no', 'ref invoice', 'invoice reference'],
+    'scenarioId': ['scenario', 'scenario id', 'scenario_id', 'fbr scenario', 'fbr scenario id'],
     'buyerNTNCNIC': ['buyer ntn or cnic', 'buyer ntn/cnic', 'buyer_ntn_cnic', 'ntn or cnic', 'ntn/cnic', 'ntn', 'cnic'],
     'productSku': ['product sku', 'sku', 'product_sku'],
     'productName': ['product name', 'product_name'],
@@ -418,6 +437,7 @@ export function parseOrderCSV(csvText: string): OrderImportRow[] {
       customerEmail: values[headerMap.customerEmail] || '',
       orderNumber: values[headerMap.orderNumber] || '',
       referenceInvoice: values[headerMap.referenceInvoice] || '',
+      scenarioId: values[headerMap.scenarioId] || '',
       buyerNTNCNIC: values[headerMap.buyerNTNCNIC] || '',
       productSku: values[headerMap.productSku] || '',
       productName: values[headerMap.productName] || '',
@@ -1144,6 +1164,7 @@ export async function processOrderChunk(
       // (customerOrders[0] is used directly: a block-scoped `firstOrder` is declared further down in this try block)
       const csvBuyerNTNCNIC = customerOrders[0].buyerNTNCNIC?.trim() || null;
       const csvReferenceInvoice = customerOrders[0].referenceInvoice?.trim() || null;
+      const csvScenarioId = normalizeScenarioId(customerOrders[0].scenarioId);
 
       // First try to find by phone if phone is provided
       if (customerPhone) {
@@ -1571,6 +1592,7 @@ export async function processOrderChunk(
           orderNumber: finalOrderNumber, // Auto-generated unique order number
           customOrderNumberImport: customOrderNumberImport, // Original order number from CSV
           invoiceRefNo: csvReferenceInvoice, // "Reference Invoice" column from CSV
+          scenarioId: csvScenarioId, // "Scenario" column from CSV (FBR scenario ID)
           // Buyer information: CSV NTN/CNIC wins, otherwise carried from the customer record
           buyerNTNCNIC: csvBuyerNTNCNIC || existingUser[0]?.buyerNTNCNIC || null,
           buyerBusinessName: existingUser[0]?.buyerBusinessName || null,

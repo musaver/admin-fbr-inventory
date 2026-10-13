@@ -360,6 +360,7 @@ export default function OrdersList() {
       const csvHeaders = [
         'Order Number',
         'Reference Invoice',
+        'Scenario',
         'Customer Phone',
         'Customer Name',
         'Buyer NTN Or CNIC',
@@ -395,6 +396,7 @@ export default function OrdersList() {
               const row = [
                 order.orderNumber || '',
                 order.invoiceRefNo || '',
+                order.scenarioId || '',
                 order.phone || '',
                 order.user?.name || 'Guest',
                 order.buyerNTNCNIC || '',
@@ -422,6 +424,7 @@ export default function OrdersList() {
             const row = [
               order.orderNumber || '',
               order.invoiceRefNo || '',
+              order.scenarioId || '',
               order.phone || '',
               order.user?.name || 'Guest',
               order.buyerNTNCNIC || '',
@@ -450,6 +453,7 @@ export default function OrdersList() {
           const row = [
             order.orderNumber || '',
             order.invoiceRefNo || '',
+            order.scenarioId || '',
             order.phone || '',
             order.user?.name || 'Guest',
             order.buyerNTNCNIC || '',
