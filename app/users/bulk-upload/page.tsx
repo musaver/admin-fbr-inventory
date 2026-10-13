@@ -708,7 +708,473 @@ export default function BulkUserUpload() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Upload Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
+            </CardTitle>
+            <CardDescription>
+              Select your CSV file to begin the import process
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="csvFile">Select CSV File</Label>
+                <Input
+                  type="file"
+                  id="csvFile"
+                  accept=".csv"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                  className="file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
+                />
+                {file && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleUpload}
+                  disabled={!file || uploading}
+                  className="gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Start Import
+                    </>
+                  )}
+                </Button>
+
+                {(file || currentJob) && (
+                  <Button
+                    variant="outline"
+                    onClick={resetForm}
+                    disabled={uploading}
+                    className="gap-2"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Import Options (users / products only) */}
+        {activeTab !== 'orders' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                Import Options
+              </CardTitle>
+              <CardDescription>
+                Configure how the import should handle existing data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="removeExistingData"
+                  checked={removeExistingData}
+                  onChange={(e) => setRemoveExistingData(e.target.checked)}
+                  className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                />
+                <label htmlFor="removeExistingData" className="text-sm font-medium text-red-700">
+                  Remove all existing {activeTab} before import
+                </label>
+              </div>
+              <p className="text-xs text-red-600 mt-2">
+                ⚠️ Warning: This will permanently delete all existing {activeTab} and their data before importing new {activeTab}.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Progress & Status */}
+        {currentJob && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Import Progress
+              </CardTitle>
+              <CardDescription>
+                Real-time status of your import job
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Status Badge */}
+              <div className="flex items-center gap-2">
+                {getStatusIcon(currentJob.status)}
+                <Badge variant={getStatusVariant(currentJob.status)}>
+                  {currentJob.status.charAt(0).toUpperCase() + currentJob.status.slice(1)}
+                </Badge>
+                {currentJob.status === 'processing' && currentJob.estimatedTimeRemaining && (
+                  <span className="text-sm text-muted-foreground">
+                    Est. {formatTimeRemaining(currentJob.estimatedTimeRemaining)} remaining
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              {currentJob.totalRecords > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress: {currentJob.processedRecords} / {currentJob.totalRecords}</span>
+                    <span className="font-medium">{currentJob.progressPercent}%</span>
+                  </div>
+                  <Progress value={currentJob.progressPercent} className="h-2" />
+                </div>
+              )}
+
+              {/* Statistics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <div className="text-2xl font-bold text-green-800 dark:text-green-200">
+                          {currentJob.successfulRecords}
+                        </div>
+                        <div className="text-sm text-green-600 dark:text-green-400">Successful</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <XCircle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <div className="text-2xl font-bold text-red-800 dark:text-red-200">
+                          {currentJob.failedRecords}
+                        </div>
+                        <div className="text-sm text-red-600 dark:text-red-400">Failed</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                          {currentJob.processedRecords}
+                        </div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400">Processed</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Success Details */}
+              {currentJob.type === 'users' && currentJob.results?.successfulUsers && Array.isArray(currentJob.results.successfulUsers) && currentJob.results.successfulUsers.length > 0 && (
+                <Card className="border-green-200">
+                  <CardHeader>
+                    <CardTitle className="text-green-800 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Successfully Created Users
+                    </CardTitle>
+                    <CardDescription>Showing first 20 users</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {currentJob.results.successfulUsers.slice(0, 20).map((user, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
+                          <Users className="h-4 w-4 text-green-600" />
+                          <div className="text-sm">
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-muted-foreground"> ({user.email})</span>
+                          </div>
+                        </div>
+                      ))}
+                      {currentJob.results.successfulUsers.length > 20 && (
+                        <div className="text-sm text-muted-foreground italic text-center py-2">
+                          ... and {currentJob.results.successfulUsers.length - 20} more users
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {currentJob.type === 'products' && currentJob.results?.successfulProducts && Array.isArray(currentJob.results.successfulProducts) && currentJob.results.successfulProducts.length > 0 && (
+                <Card className="border-green-200">
+                  <CardHeader>
+                    <CardTitle className="text-green-800 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Successfully Created Products
+                    </CardTitle>
+                    <CardDescription>Showing first 20 products</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {currentJob.results.successfulProducts.slice(0, 20).map((product, index) => (
+                        <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
+                          <Package className="h-4 w-4 text-green-600" />
+                          <div className="text-sm">
+                            <span className="font-medium">{product.name}</span>
+                            <span className="text-muted-foreground"> (SKU: {product.sku})</span>
+                          </div>
+                        </div>
+                      ))}
+                      {currentJob.results.successfulProducts.length > 20 && (
+                        <div className="text-sm text-muted-foreground italic text-center py-2">
+                          ... and {currentJob.results.successfulProducts.length - 20} more products
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {currentJob.type === 'orders' && currentJob.results?.successfulOrders && Array.isArray(currentJob.results.successfulOrders) && currentJob.results.successfulOrders.length > 0 && (
+                <Card className="border-green-200">
+                  <CardHeader>
+                    <CardTitle className="text-green-800 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Successfully Created Orders
+                    </CardTitle>
+                    <CardDescription>
+                      {currentJob.results.successfulOrders.length} orders created from {currentJob.processedRecords} CSV rows
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {currentJob.results.successfulOrders.slice(0, 15).map((order, index) => (
+                        <div key={index} className="p-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <ShoppingCart className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                              {order.orderNumber}
+                            </span>
+                            {order.customOrderNumberImport && (
+                              <span className="text-xs bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
+                                Original: {order.customOrderNumberImport}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-green-700 dark:text-green-300">
+                            <div>Customer: <span className="font-medium">{order.customerEmail}</span></div>
+                            <div>Items: <span className="font-medium">{order.itemCount}</span></div>
+                            <div>CSV Rows: <span className="font-mono text-xs">{order.rowNumbers?.join(', ') || 'N/A'}</span></div>
+                          </div>
+                        </div>
+                      ))}
+                      {currentJob.results.successfulOrders.length > 15 && (
+                        <div className="text-sm text-muted-foreground italic text-center py-2">
+                          ... and {currentJob.results.successfulOrders.length - 15} more orders
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Error Details */}
+              {currentJob.errors && Array.isArray(currentJob.errors) && currentJob.errors.length > 0 && (
+                <Card className="border-red-200">
+                  <CardHeader>
+                    <CardTitle className="text-red-800 flex items-center gap-2">
+                      <XCircle className="h-5 w-5" />
+                      Import Errors
+                    </CardTitle>
+                    <CardDescription>
+                      {currentJob.errors.length} errors found - showing first 15 with detailed reasons
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {currentJob.errors.slice(0, 15).map((error, index) => (
+                        <div key={index} className="p-3 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-red-800 dark:text-red-200">
+                              CSV Row {error.row}
+                            </span>
+                            <span className="text-xs bg-red-100 dark:bg-red-900 px-2 py-1 rounded font-mono">
+                              {error.identifier || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-red-700 dark:text-red-300 mb-1">
+                            <strong>Reason:</strong> {error.message}
+                          </div>
+                          {currentJob.type === 'orders' && (
+                            <div className="text-xs text-red-600 dark:text-red-400">
+                              💡 <strong>Tip:</strong> Check that Customer Phone and Product SKU are provided and valid
+                            </div>
+                          )}
+                          {currentJob.type === 'users' && (
+                            <div className="text-xs text-red-600 dark:text-red-400">
+                              💡 <strong>Tip:</strong> Check that Name and Email are provided and email format is valid
+                            </div>
+                          )}
+                          {currentJob.type === 'products' && (
+                            <div className="text-xs text-red-600 dark:text-red-400">
+                              💡 <strong>Tip:</strong> Check that SKU and Unit Price are provided and price is a valid number
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {currentJob.errors.length > 15 && (
+                        <div className="text-sm text-muted-foreground italic text-center py-2">
+                          ... and {currentJob.errors.length - 15} more errors
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Completion Actions */}
+              {currentJob.status === 'completed' && (
+                <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <span className="font-medium text-green-800 dark:text-green-200">
+                          Import completed successfully!
+                        </span>
+                      </div>
+
+                      {currentJob.type === 'orders' && currentJob.results?.successfulOrders && (
+                        <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                          <div className="text-sm text-green-700 dark:text-green-300">
+                            <strong>Summary:</strong> Created {currentJob.results.successfulOrders.length} orders from {currentJob.processedRecords} CSV rows
+                            {currentJob.results.successfulOrders.length > 0 && (
+                              <div className="mt-1">
+                                Average: {(currentJob.processedRecords / currentJob.results.successfulOrders.length).toFixed(1)} items per order
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => router.push(currentJob.type === 'users' ? '/users' : currentJob.type === 'products' ? '/products' : '/orders')}
+                          className="gap-2"
+                        >
+                          View All {currentJob.type === 'users' ? 'Users' : currentJob.type === 'products' ? 'Products' : 'Orders'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Technical Logs */}
+              {currentJob && (currentJob.status === 'processing' || currentJob.status === 'completed' || currentJob.status === 'failed') && (
+                <Card className="border-blue-200">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-blue-600" />
+                        <CardTitle className="text-blue-800 dark:text-blue-200">
+                          Technical Logs
+                        </CardTitle>
+                      </div>
+                      <Button
+                        onClick={() => setShowTechnicalLogs(!showTechnicalLogs)}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        {showTechnicalLogs ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Hide Logs
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Show Logs
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <CardDescription>
+                      Detailed processing logs for technical debugging
+                    </CardDescription>
+                  </CardHeader>
+                  {showTechnicalLogs && (
+                    <CardContent>
+                      <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                        {getTechnicalLogs().map((log, index) => (
+                          <div key={index} className="mb-1">
+                            {log}
+                          </div>
+                        ))}
+                        {currentJob.status === 'processing' && (
+                          <div className="text-yellow-400 animate-pulse">
+                            ⏳ Processing in progress...
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              )}
+
+              {/* Detailed Import Report */}
+              {currentJob.status === 'completed' && currentJob.results?.detailedReport && Array.isArray(currentJob.results.detailedReport) && currentJob.results.detailedReport.length > 0 && (
+                <DetailedImportReport
+                  report={currentJob.results.detailedReport}
+                  importType={currentJob.type}
+                  fileName={currentJob.fileName}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <TabsContent value="users" className="space-y-6">
+          {/* Template Download */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Download Template
+              </CardTitle>
+              <CardDescription>
+                Get the CSV template with correct format and sample data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Download User CSV Template
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Instructions Card */}
           <Card>
             <CardHeader>
@@ -736,7 +1202,9 @@ export default function BulkUserUpload() {
               </Alert>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="products" className="space-y-6">
           {/* Template Download */}
           <Card>
             <CardHeader>
@@ -751,43 +1219,11 @@ export default function BulkUserUpload() {
             <CardContent>
               <Button onClick={downloadTemplate} variant="outline" className="gap-2">
                 <FileText className="h-4 w-4" />
-                Download User CSV Template
+                Download Product CSV Template
               </Button>
             </CardContent>
           </Card>
 
-          {/* Remove Existing Data Option */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                Import Options
-              </CardTitle>
-              <CardDescription>
-                Configure how the import should handle existing data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="removeExistingUsers"
-                  checked={activeTab === 'users' ? removeExistingData : false}
-                  onChange={(e) => activeTab === 'users' && setRemoveExistingData(e.target.checked)}
-                  className="rounded border-gray-300 text-red-600 focus:ring-red-500"
-                />
-                <label htmlFor="removeExistingUsers" className="text-sm font-medium text-red-700">
-                  Remove all existing users before import
-                </label>
-              </div>
-              <p className="text-xs text-red-600 mt-2">
-                ⚠️ Warning: This will permanently delete all existing users and their data before importing new users.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="products" className="space-y-6">
           {/* Instructions Card */}
           <Card>
             <CardHeader>
@@ -815,7 +1251,9 @@ export default function BulkUserUpload() {
               </Alert>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="orders" className="space-y-6">
           {/* Template Download */}
           <Card>
             <CardHeader>
@@ -830,43 +1268,11 @@ export default function BulkUserUpload() {
             <CardContent>
               <Button onClick={downloadTemplate} variant="outline" className="gap-2">
                 <FileText className="h-4 w-4" />
-                Download Product CSV Template
+                Download Order CSV Template
               </Button>
             </CardContent>
           </Card>
 
-          {/* Remove Existing Data Option */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                Import Options
-              </CardTitle>
-              <CardDescription>
-                Configure how the import should handle existing data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="removeExistingProducts"
-                  checked={activeTab === 'products' ? removeExistingData : false}
-                  onChange={(e) => activeTab === 'products' && setRemoveExistingData(e.target.checked)}
-                  className="rounded border-gray-300 text-red-600 focus:ring-red-500"
-                />
-                <label htmlFor="removeExistingProducts" className="text-sm font-medium text-red-700">
-                  Remove all existing products before import
-                </label>
-              </div>
-              <p className="text-xs text-red-600 mt-2">
-                ⚠️ Warning: This will permanently delete all existing products and their data before importing new products.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="orders" className="space-y-6">
           {/* Instructions Card */}
           <Card>
             <CardHeader>
@@ -902,442 +1308,9 @@ export default function BulkUserUpload() {
               </Alert>
             </CardContent>
           </Card>
-
-          {/* Template Download */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5" />
-                Download Template
-              </CardTitle>
-              <CardDescription>
-                Get the CSV template with correct format and sample data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={downloadTemplate} variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Download Order CSV Template
-              </Button>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Upload {activeTab === 'users' ? 'Users' : activeTab === 'products' ? 'Products' : 'Orders'}
-          </CardTitle>
-          <CardDescription>
-            Select your CSV file to begin the import process
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="csvFile">Select CSV File</Label>
-              <Input
-                type="file"
-                id="csvFile"
-                accept=".csv"
-                onChange={handleFileChange}
-                disabled={uploading}
-                className="file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
-              />
-              {file && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FileText className="h-4 w-4" />
-                  <span>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={handleUpload}
-                disabled={!file || uploading}
-                className="gap-2"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    Start Import
-                  </>
-                )}
-              </Button>
-
-              {(file || currentJob) && (
-                <Button
-                  variant="outline"
-                  onClick={resetForm}
-                  disabled={uploading}
-                  className="gap-2"
-                >
-                  Reset
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Progress & Status */}
-      {currentJob && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Import Progress
-            </CardTitle>
-            <CardDescription>
-              Real-time status of your import job
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Status Badge */}
-            <div className="flex items-center gap-2">
-              {getStatusIcon(currentJob.status)}
-              <Badge variant={getStatusVariant(currentJob.status)}>
-                {currentJob.status.charAt(0).toUpperCase() + currentJob.status.slice(1)}
-              </Badge>
-              {currentJob.status === 'processing' && currentJob.estimatedTimeRemaining && (
-                <span className="text-sm text-muted-foreground">
-                  Est. {formatTimeRemaining(currentJob.estimatedTimeRemaining)} remaining
-                </span>
-              )}
-            </div>
-
-            {/* Progress Bar */}
-            {currentJob.totalRecords > 0 && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress: {currentJob.processedRecords} / {currentJob.totalRecords}</span>
-                  <span className="font-medium">{currentJob.progressPercent}%</span>
-                </div>
-                <Progress value={currentJob.progressPercent} className="h-2" />
-              </div>
-            )}
-
-            {/* Statistics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                        {currentJob.successfulRecords}
-                      </div>
-                      <div className="text-sm text-green-600 dark:text-green-400">Successful</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <XCircle className="h-5 w-5 text-red-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-red-800 dark:text-red-200">
-                        {currentJob.failedRecords}
-                      </div>
-                      <div className="text-sm text-red-600 dark:text-red-400">Failed</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                        {currentJob.processedRecords}
-                      </div>
-                      <div className="text-sm text-blue-600 dark:text-blue-400">Processed</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Success Details */}
-            {currentJob.type === 'users' && currentJob.results?.successfulUsers && Array.isArray(currentJob.results.successfulUsers) && currentJob.results.successfulUsers.length > 0 && (
-              <Card className="border-green-200">
-                <CardHeader>
-                  <CardTitle className="text-green-800 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    Successfully Created Users
-                  </CardTitle>
-                  <CardDescription>Showing first 20 users</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {currentJob.results.successfulUsers.slice(0, 20).map((user, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
-                        <Users className="h-4 w-4 text-green-600" />
-                        <div className="text-sm">
-                          <span className="font-medium">{user.name}</span>
-                          <span className="text-muted-foreground"> ({user.email})</span>
-                        </div>
-                      </div>
-                    ))}
-                    {currentJob.results.successfulUsers.length > 20 && (
-                      <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.results.successfulUsers.length - 20} more users
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {currentJob.type === 'products' && currentJob.results?.successfulProducts && Array.isArray(currentJob.results.successfulProducts) && currentJob.results.successfulProducts.length > 0 && (
-              <Card className="border-green-200">
-                <CardHeader>
-                  <CardTitle className="text-green-800 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    Successfully Created Products
-                  </CardTitle>
-                  <CardDescription>Showing first 20 products</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {currentJob.results.successfulProducts.slice(0, 20).map((product, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded-md bg-green-50 dark:bg-green-950">
-                        <Package className="h-4 w-4 text-green-600" />
-                        <div className="text-sm">
-                          <span className="font-medium">{product.name}</span>
-                          <span className="text-muted-foreground"> (SKU: {product.sku})</span>
-                        </div>
-                      </div>
-                    ))}
-                    {currentJob.results.successfulProducts.length > 20 && (
-                      <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.results.successfulProducts.length - 20} more products
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {currentJob.type === 'orders' && currentJob.results?.successfulOrders && Array.isArray(currentJob.results.successfulOrders) && currentJob.results.successfulOrders.length > 0 && (
-              <Card className="border-green-200">
-                <CardHeader>
-                  <CardTitle className="text-green-800 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    Successfully Created Orders
-                  </CardTitle>
-                  <CardDescription>
-                    {currentJob.results.successfulOrders.length} orders created from {currentJob.processedRecords} CSV rows
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {currentJob.results.successfulOrders.slice(0, 15).map((order, index) => (
-                      <div key={index} className="p-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
-                        <div className="flex items-center gap-2 mb-1">
-                          <ShoppingCart className="h-4 w-4 text-green-600" />
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {order.orderNumber}
-                          </span>
-                          {order.customOrderNumberImport && (
-                            <span className="text-xs bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
-                              Original: {order.customOrderNumberImport}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-green-700 dark:text-green-300">
-                          <div>Customer: <span className="font-medium">{order.customerEmail}</span></div>
-                          <div>Items: <span className="font-medium">{order.itemCount}</span></div>
-                          <div>CSV Rows: <span className="font-mono text-xs">{order.rowNumbers?.join(', ') || 'N/A'}</span></div>
-                        </div>
-                      </div>
-                    ))}
-                    {currentJob.results.successfulOrders.length > 15 && (
-                      <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.results.successfulOrders.length - 15} more orders
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Error Details */}
-            {currentJob.errors && Array.isArray(currentJob.errors) && currentJob.errors.length > 0 && (
-              <Card className="border-red-200">
-                <CardHeader>
-                  <CardTitle className="text-red-800 flex items-center gap-2">
-                    <XCircle className="h-5 w-5" />
-                    Import Errors
-                  </CardTitle>
-                  <CardDescription>
-                    {currentJob.errors.length} errors found - showing first 15 with detailed reasons
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {currentJob.errors.slice(0, 15).map((error, index) => (
-                      <div key={index} className="p-3 rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-red-800 dark:text-red-200">
-                            CSV Row {error.row}
-                          </span>
-                          <span className="text-xs bg-red-100 dark:bg-red-900 px-2 py-1 rounded font-mono">
-                            {error.identifier || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-red-700 dark:text-red-300 mb-1">
-                          <strong>Reason:</strong> {error.message}
-                        </div>
-                        {currentJob.type === 'orders' && (
-                          <div className="text-xs text-red-600 dark:text-red-400">
-                            💡 <strong>Tip:</strong> Check that Customer Phone and Product SKU are provided and valid
-                          </div>
-                        )}
-                        {currentJob.type === 'users' && (
-                          <div className="text-xs text-red-600 dark:text-red-400">
-                            💡 <strong>Tip:</strong> Check that Name and Email are provided and email format is valid
-                          </div>
-                        )}
-                        {currentJob.type === 'products' && (
-                          <div className="text-xs text-red-600 dark:text-red-400">
-                            💡 <strong>Tip:</strong> Check that SKU and Unit Price are provided and price is a valid number
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {currentJob.errors.length > 15 && (
-                      <div className="text-sm text-muted-foreground italic text-center py-2">
-                        ... and {currentJob.errors.length - 15} more errors
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Completion Actions */}
-            {currentJob.status === 'completed' && (
-              <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="font-medium text-green-800 dark:text-green-200">
-                        Import completed successfully!
-                      </span>
-                    </div>
-
-                    {currentJob.type === 'orders' && currentJob.results?.successfulOrders && (
-                      <div className="bg-white dark:bg-gray-800 p-3 rounded border">
-                        <div className="text-sm text-green-700 dark:text-green-300">
-                          <strong>Summary:</strong> Created {currentJob.results.successfulOrders.length} orders from {currentJob.processedRecords} CSV rows
-                          {currentJob.results.successfulOrders.length > 0 && (
-                            <div className="mt-1">
-                              Average: {(currentJob.processedRecords / currentJob.results.successfulOrders.length).toFixed(1)} items per order
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => router.push(currentJob.type === 'users' ? '/users' : currentJob.type === 'products' ? '/products' : '/orders')}
-                        className="gap-2"
-                      >
-                        View All {currentJob.type === 'users' ? 'Users' : currentJob.type === 'products' ? 'Products' : 'Orders'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Technical Logs */}
-            {currentJob && (currentJob.status === 'processing' || currentJob.status === 'completed' || currentJob.status === 'failed') && (
-              <Card className="border-blue-200">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      <CardTitle className="text-blue-800 dark:text-blue-200">
-                        Technical Logs
-                      </CardTitle>
-                    </div>
-                    <Button
-                      onClick={() => setShowTechnicalLogs(!showTechnicalLogs)}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                    >
-                      {showTechnicalLogs ? (
-                        <>
-                          <ChevronUp className="h-4 w-4" />
-                          Hide Logs
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4" />
-                          Show Logs
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <CardDescription>
-                    Detailed processing logs for technical debugging
-                  </CardDescription>
-                </CardHeader>
-                {showTechnicalLogs && (
-                  <CardContent>
-                    <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
-                      {getTechnicalLogs().map((log, index) => (
-                        <div key={index} className="mb-1">
-                          {log}
-                        </div>
-                      ))}
-                      {currentJob.status === 'processing' && (
-                        <div className="text-yellow-400 animate-pulse">
-                          ⏳ Processing in progress...
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            )}
-
-            {/* Detailed Import Report */}
-            {currentJob.status === 'completed' && currentJob.results?.detailedReport && Array.isArray(currentJob.results.detailedReport) && currentJob.results.detailedReport.length > 0 && (
-              <DetailedImportReport
-                report={currentJob.results.detailedReport}
-                importType={currentJob.type}
-                fileName={currentJob.fileName}
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
