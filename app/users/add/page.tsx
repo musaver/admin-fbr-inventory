@@ -8,12 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, ArrowLeft, AlertCircle } from 'lucide-react';
+import { PROVINCES, REGISTRATION_TYPES } from '@/lib/fbr/buyer';
 
 export default function AddUser() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     buyerNTNCNIC: '',
     buyerBusinessName: '',
@@ -114,6 +116,19 @@ export default function AddUser() {
               />
             </div>
         
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                type="tel"
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
+                maxLength={20}
+              />
+            </div>
+
             <div className="space-y-2 hidden">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -157,14 +172,9 @@ export default function AddUser() {
                   <SelectValue placeholder="Select Province" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Punjab">Punjab</SelectItem>
-                  <SelectItem value="Sindh">Sindh</SelectItem>
-                  <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
-                  <SelectItem value="Balochistan">Balochistan</SelectItem>
-                  <SelectItem value="Capital Territory">Capital Territory</SelectItem>
-                  <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
-                  <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
-                  <SelectItem value="N/A">N/A</SelectItem>
+                  {PROVINCES.map((province) => (
+                    <SelectItem key={province} value={province}>{province}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -188,8 +198,9 @@ export default function AddUser() {
                   <SelectValue placeholder="Select Registration Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Registered">Registered</SelectItem>
-                  <SelectItem value="Unregistered">Unregistered</SelectItem>
+                  {REGISTRATION_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

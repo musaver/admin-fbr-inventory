@@ -35,6 +35,14 @@ export {
   allScenarios,
 } from './saleTypes';
 
+// Buyer constants (provinces, registration types) and CSV normalisers
+export {
+  PROVINCES,
+  REGISTRATION_TYPES,
+  normalizeProvince,
+  normalizeRegistrationType,
+} from './buyer';
+
 // Client Functions (Server-only)
 export {
   sanitize,
@@ -59,5 +67,6 @@ export {
 // Re-export everything for convenience
 export * from './types';
 export * from './saleTypes';
+export * from './buyer';
 export * from './client';
 export * from './mapper';

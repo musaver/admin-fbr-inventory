@@ -227,7 +227,7 @@ export default function UsersList() {
     // Use pagination total for overall count, but calculate other stats from current page
     const totalUsers = pagination.total || userArray.length;
     const usersWithPhone = userArray.filter(user => user.phone).length;
-    const usersWithAddress = userArray.filter(user => user.address).length;
+    const usersWithAddress = userArray.filter(user => user.buyerAddress).length;
     
     // Loyalty points stats
     const usersWithPoints = userArray.filter(user => user.loyaltyPoints && user.loyaltyPoints.availablePoints > 0).length;
@@ -292,14 +292,11 @@ export default function UsersList() {
       mobileHidden: true
     },
     {
-      key: 'location',
-      title: 'Location',
+      key: 'buyerProvince',
+      title: 'Buyer Province',
       render: (_: any, user: User) => (
         <div className="text-sm">
-          {user.city && user.country 
-            ? `${user.city}, ${user.country}`
-            : user.country || user.city || 'No location'
-          }
+          {user.buyerProvince || 'No province'}
         </div>
       ),
       mobileHidden: true
@@ -344,11 +341,11 @@ export default function UsersList() {
       mobileHidden: true
     },
     {
-      key: 'address',
-      title: 'Address',
+      key: 'buyerAddress',
+      title: 'Buyer Address',
       render: (_: any, user: User) => (
-        <div className="text-sm max-w-xs truncate">
-          {user.address || 'No address'}
+        <div className="text-sm max-w-xs truncate" title={user.buyerAddress || undefined}>
+          {user.buyerAddress || 'No address'}
         </div>
       ),
       mobileHidden: true

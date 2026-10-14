@@ -126,6 +126,7 @@ export const POST = withTenant(async (request: NextRequest, context) => {
       password, 
       firstName,
       lastName,
+      phone,
       buyerNTNCNIC, 
       buyerBusinessName, 
       buyerProvince, 
@@ -146,6 +147,7 @@ export const POST = withTenant(async (request: NextRequest, context) => {
       firstName: firstName || null,
       lastName: lastName || null,
       email,
+      phone: typeof phone === 'string' && phone.trim() ? phone.trim() : null,
       password: hashedPassword,
       userType: 'customer', // Set as customer by default
       buyerNTNCNIC: buyerNTNCNIC || null,

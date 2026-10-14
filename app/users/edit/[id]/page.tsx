@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PROVINCES, REGISTRATION_TYPES } from '@/lib/fbr/buyer';
 
 export default function EditUser() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function EditUser() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     buyerNTNCNIC: '',
     buyerBusinessName: '',
@@ -33,6 +35,7 @@ export default function EditUser() {
         setFormData({
           name: userData.name || '',
           email: userData.email || '',
+          phone: userData.phone || '',
           password: '', // Don't populate password
           buyerNTNCNIC: userData.buyerNTNCNIC || '',
           buyerBusinessName: userData.buyerBusinessName || '',
@@ -66,6 +69,7 @@ export default function EditUser() {
     const dataToSubmit = {
       name: formData.name,
       email: formData.email,
+      phone: formData.phone.trim() || null,
       buyerNTNCNIC: formData.buyerNTNCNIC,
       buyerBusinessName: formData.buyerBusinessName,
       buyerProvince: formData.buyerProvince,
@@ -139,6 +143,21 @@ export default function EditUser() {
           />
         </div>
         
+        <div className="mb-4">
+          <label className="block text-gray-700 mb-2" htmlFor="phone">
+            Phone
+          </label>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            className="w-full p-2 border rounded"
+            maxLength={20}
+          />
+        </div>
+
         <div className="mb-4 hidden">
           <label className="block text-gray-700 mb-2" htmlFor="password">
             New Password (leave empty to keep current password)
@@ -190,14 +209,9 @@ export default function EditUser() {
               <SelectValue placeholder="Select Province" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Punjab">Punjab</SelectItem>
-              <SelectItem value="Sindh">Sindh</SelectItem>
-              <SelectItem value="Khyber Pakhtunkhwa (KPK)">Khyber Pakhtunkhwa (KPK)</SelectItem>
-              <SelectItem value="Balochistan">Balochistan</SelectItem>
-              <SelectItem value="Capital Territory">Capital Territory</SelectItem>
-              <SelectItem value="Azad Jammu & Kashmir (AJK)">Azad Jammu & Kashmir (AJK)</SelectItem>
-              <SelectItem value="Gilgit-Baltistan (GB)">Gilgit-Baltistan (GB)</SelectItem>
-              <SelectItem value="N/A">N/A</SelectItem>
+              {PROVINCES.map((province) => (
+                <SelectItem key={province} value={province}>{province}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -225,8 +239,9 @@ export default function EditUser() {
               <SelectValue placeholder="Select Registration Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Registered">Registered</SelectItem>
-              <SelectItem value="Unregistered">Unregistered</SelectItem>
+              {REGISTRATION_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

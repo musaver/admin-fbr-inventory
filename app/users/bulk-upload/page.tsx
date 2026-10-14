@@ -427,7 +427,7 @@ export default function BulkUserUpload() {
       csvContent = `Name,Email,Phone,Buyer NTN Or CNIC,Buyer Business Name,Buyer Province,Buyer Address,Buyer Registration Type
 "John Doe","john.doe@example.com","+92300-1234567","1234567890123","Doe Industries","Punjab","123 Business Street, Lahore","Registered"
 "Jane Smith","jane.smith@example.com","+92321-9876543","9876543210987","Smith Trading Co","Sindh","456 Commerce Avenue, Karachi","Registered"
-"Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","KPK","789 Market Road, Peshawar","Unregistered"`;
+"Ahmed Khan","ahmed.khan@example.com","+92333-1122334","1122334455667","Khan Enterprises","Khyber Pakhtunkhwa (KPK)","789 Market Road, Peshawar","Unregistered"`;
       fileName = 'bulk_user_import_template.csv';
     } else if (activeTab === 'products') {
       csvContent = `SKU,Unit Price,Price Including Tax,Description,GST Amount,GST Percentage,HS Code,Stock Quantity,Serial Number,List Number,BC Number,Lot Number,Expiry Date,UOM
@@ -687,7 +687,7 @@ export default function BulkUserUpload() {
       <Tabs
         value={activeTab}
         onValueChange={(value) => {
-          setActiveTab(value as 'users' | 'products');
+          setActiveTab(value as 'users' | 'products' | 'orders');
           resetForm();
           setRemoveExistingData(false); // Reset checkbox when changing tabs
         }}
@@ -1054,7 +1054,7 @@ export default function BulkUserUpload() {
                           )}
                           {currentJob.type === 'users' && (
                             <div className="text-xs text-red-600 dark:text-red-400">
-                              💡 <strong>Tip:</strong> Check that Name and Email are provided and email format is valid
+                              💡 <strong>Tip:</strong> Check that Name and Email are provided, the email format is valid and Phone is at most 20 characters
                             </div>
                           )}
                           {currentJob.type === 'products' && (
@@ -1196,9 +1196,11 @@ export default function BulkUserUpload() {
                   <div>Download the CSV template below to see the required format</div>
                   <ul className="list-disc list-inside space-y-1 mt-2">
                     <li><strong>Required fields:</strong> Name, Email</li>
-                    <li><strong>Optional fields:</strong> Buyer NTN/CNIC, Business Name, Province, Address, Registration Type</li>
+                    <li><strong>Optional fields:</strong> Phone (max 20 characters), Buyer NTN Or CNIC, Buyer Business Name, Buyer Province, Buyer Address, Buyer Registration Type</li>
+                    <li><strong>Buyer Province:</strong> Punjab, Sindh, Khyber Pakhtunkhwa (KPK), Balochistan, Capital Territory, Azad Jammu &amp; Kashmir (AJK), Gilgit-Baltistan (GB) or N/A. Short forms such as KPK, AJK, GB and Islamabad are converted automatically</li>
+                    <li><strong>Buyer Registration Type:</strong> Registered or Unregistered (any capitalisation)</li>
                     <li>Supports up to 100MB files (~200,000 users)</li>
-                    <li>Duplicate emails will update existing users with new information</li>
+                    <li>Duplicate emails update the existing user; blank cells never overwrite values the user already has</li>
                     <li>Processing happens in background with real-time progress</li>
                   </ul>
                 </AlertDescription>

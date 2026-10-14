@@ -3,6 +3,7 @@ import { importJobs, user, userLoyaltyPoints, products, stockMovements, orders, 
 import { eq, and, sql, or, isNull } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { allScenarios } from '@/lib/fbr/saleTypes';
+import { normalizeProvince, normalizeRegistrationType } from '@/lib/fbr/buyer';
 
 export interface UserImportRow {
   name: string;
@@ -485,6 +486,11 @@ function validateUser(userData: UserImportRow): string | null {
     return 'Invalid email format';
   }
 
+  // user.phone is varchar(20); fail the row with a clear message instead of a MySQL "Data too long" error
+  if (userData.phone && userData.phone.trim().length > 20) {
+    return 'Phone must be 20 characters or fewer';
+  }
+
   return null;
 }
 
@@ -587,6 +593,7 @@ export async function processUserChunk(
         result.errors.push({
           row: globalRowIndex,
           email: userData.email || 'N/A',
+          identifier: userData.email || userData.name || 'N/A',
           message: validationError
         });
         result.failed++;
@@ -597,19 +604,27 @@ export async function processUserChunk(
       // Create new user ID
       const newUserId = uuidv4();
 
+      // Normalise the row once: blank cells become null, and province / registration type are
+      // mapped to the canonical dropdown values (e.g. "kpk" -> "Khyber Pakhtunkhwa (KPK)")
+      const name = userData.name.trim();
+      const email = userData.email.toLowerCase().trim();
+      const buyerFields: Record<string, string | null> = {
+        phone: userData.phone?.trim() || null,
+        buyerNTNCNIC: userData.buyerNTNCNIC?.trim() || null,
+        buyerBusinessName: userData.buyerBusinessName?.trim() || null,
+        buyerProvince: normalizeProvince(userData.buyerProvince),
+        buyerAddress: userData.buyerAddress?.trim() || null,
+        buyerRegistrationType: normalizeRegistrationType(userData.buyerRegistrationType),
+      };
+
       // Create new user object with original email
       const newUser = {
         id: newUserId,
         tenantId,
-        name: userData.name.trim(),
-        email: userData.email.toLowerCase().trim(),
-        phone: userData.phone?.trim() || null,
+        name,
+        email,
         userType: 'customer',
-        buyerNTNCNIC: userData.buyerNTNCNIC?.trim() || null,
-        buyerBusinessName: userData.buyerBusinessName?.trim() || null,
-        buyerProvince: userData.buyerProvince?.trim() || null,
-        buyerAddress: userData.buyerAddress?.trim() || null,
-        buyerRegistrationType: userData.buyerRegistrationType?.trim() || null,
+        ...buyerFields,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -647,21 +662,17 @@ export async function processUserChunk(
         if (isTenantEmailDuplicate) {
           console.log(`🔄 User with email ${userData.email} already exists in this tenant, updating...`);
 
-          // Update existing user with new data
+          // Update the existing user with the non-empty CSV values only, so a blank cell never
+          // erases data the customer already has (same rule as the order-edit sync)
           try {
+            const updateData: Record<string, string> = { name };
+            for (const [key, value] of Object.entries(buyerFields)) {
+              if (value) updateData[key] = value;
+            }
             await db.update(user)
-              .set({
-                name: userData.name.trim(),
-                phone: userData.phone?.trim() || null,
-                buyerNTNCNIC: userData.buyerNTNCNIC?.trim() || null,
-                buyerBusinessName: userData.buyerBusinessName?.trim() || null,
-                buyerProvince: userData.buyerProvince?.trim() || null,
-                buyerAddress: userData.buyerAddress?.trim() || null,
-                buyerRegistrationType: userData.buyerRegistrationType?.trim() || null,
-                updatedAt: new Date(),
-              })
+              .set({ ...updateData, updatedAt: new Date() })
               .where(and(
-                eq(user.email, userData.email.toLowerCase().trim()),
+                eq(user.email, email),
                 eq(user.tenantId, tenantId)
               ));
 
@@ -694,6 +705,7 @@ export async function processUserChunk(
             result.errors.push({
               row: globalRowIndex,
               email: userData.email,
+              identifier: userData.email || userData.name || 'N/A',
               message: `Failed to update existing user: ${updateError.message}`
             });
             result.failed++;
@@ -709,6 +721,7 @@ export async function processUserChunk(
           result.errors.push({
             row: globalRowIndex,
             email: userData.email,
+            identifier: userData.email || userData.name || 'N/A',
             message: `Database error: ${insertError.message}`
           });
           result.failed++;
@@ -719,6 +732,7 @@ export async function processUserChunk(
       result.errors.push({
         row: globalRowIndex,
         email: userData.email || 'N/A',
+        identifier: userData.email || userData.name || 'N/A',
         message: error.message || 'Unknown error occurred'
       });
       result.failed++;
