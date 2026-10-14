@@ -494,10 +494,35 @@ export const PUT = withTenant(async (req: NextRequest, context: any) => {
     if (taxAmount !== undefined) updateData.taxAmount = taxAmount;
     if (totalAmount !== undefined) updateData.totalAmount = totalAmount;
 
+    // Buyer information (shown on the invoice): keep the order row in sync with the edit form
+    if (buyerNTNCNIC !== undefined) updateData.buyerNTNCNIC = buyerNTNCNIC || null;
+    if (buyerBusinessName !== undefined) updateData.buyerBusinessName = buyerBusinessName || null;
+    if (buyerProvince !== undefined) updateData.buyerProvince = buyerProvince || null;
+    if (buyerAddress !== undefined) updateData.buyerAddress = buyerAddress || null;
+    if (buyerRegistrationType !== undefined) updateData.buyerRegistrationType = buyerRegistrationType || null;
+
     await db
       .update(orders)
       .set(updateData)
       .where(eq(orders.id, orderId));
+
+    // Also update the customer's own record so the customer page and future orders reflect the
+    // change. Only non-empty values are written, so an order edit never blanks out customer data.
+    if (order.userId) {
+      const userBuyerUpdate: Record<string, string> = {};
+      if (buyerNTNCNIC) userBuyerUpdate.buyerNTNCNIC = buyerNTNCNIC;
+      if (buyerBusinessName) userBuyerUpdate.buyerBusinessName = buyerBusinessName;
+      if (buyerProvince) userBuyerUpdate.buyerProvince = buyerProvince;
+      if (buyerAddress) userBuyerUpdate.buyerAddress = buyerAddress;
+      if (buyerRegistrationType) userBuyerUpdate.buyerRegistrationType = buyerRegistrationType;
+      if (Object.keys(userBuyerUpdate).length > 0) {
+        await db
+          .update(user)
+          .set({ ...userBuyerUpdate, updatedAt: new Date() })
+          .where(and(eq(user.id, order.userId), eq(user.tenantId, order.tenantId)));
+        console.log(`Synced buyer information to customer ${order.userId}:`, Object.keys(userBuyerUpdate).join(', '));
+      }
+    }
 
     // Handle points redemption changes if points were modified
     if (pointsToRedeem !== undefined && order.userId && pointsToRedeem > 0) {
