@@ -402,7 +402,7 @@ export default function OrdersList() {
                 order.invoiceRefNo || '',
                 order.scenarioId || '',
                 order.phone || '',
-                order.user?.name || 'Guest',
+                order.user?.name || order.email || 'Guest',
                 order.buyerNTNCNIC || '',
                 order.email || order.user?.email || '',
                 item.sku || '',
@@ -430,7 +430,7 @@ export default function OrdersList() {
               order.invoiceRefNo || '',
               order.scenarioId || '',
               order.phone || '',
-              order.user?.name || 'Guest',
+              order.user?.name || order.email || 'Guest',
               order.buyerNTNCNIC || '',
               order.email || order.user?.email || '',
               '', // Product SKU
@@ -459,7 +459,7 @@ export default function OrdersList() {
             order.invoiceRefNo || '',
             order.scenarioId || '',
             order.phone || '',
-            order.user?.name || 'Guest',
+            order.user?.name || order.email || 'Guest',
             order.buyerNTNCNIC || '',
             order.email || order.user?.email || '',
             '', '', '', '', '', '', '', '', '', '', '', '', '', ''
@@ -669,7 +669,7 @@ export default function OrdersList() {
       render: (_: any, order: Order) => (
         <div className="min-w-0">
           <div className="font-medium text-sm truncate">
-            {order.user?.name || 'Guest'}
+            {order.user?.name || order.email || 'Guest'}
           </div>
           {order.user?.buyerBusinessName && order.user.buyerBusinessName !== order.user.name && (
             <div className="text-xs text-muted-foreground truncate" title={order.user.buyerBusinessName}>

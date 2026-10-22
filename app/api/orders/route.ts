@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { orders, orderItems, productInventory, stockMovements, products, productVariants, user, drivers, userLoyaltyPoints, loyaltyPointsHistory, settings, suppliers } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, isNull, desc, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/mysql-core';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
 import { isWeightBasedProduct, convertToGrams } from '@/utils/weightUtils';
 import { sendInvoiceEmails } from '@/lib/email';
@@ -62,16 +63,24 @@ export const GET = withTenant(async (req: NextRequest, context) => {
     const totalCount = Number(totalCountResult[0]?.count || 0);
     
     // Fetch orders with customer information and item counts (optimized for performance)
+    // Fallback customer match by phone, for orders whose linked customer row was deleted and recreated
+    const userByPhone = alias(user, 'userByPhone');
+
     const ordersWithDetails = await db
       .select({
         order: orders,
         user: user,
+        userByPhone: userByPhone,
         itemCount: sql`(SELECT COUNT(*) FROM ${orderItems} WHERE ${orderItems.orderId} = ${orders.id})`.as('itemCount')
       })
       .from(orders)
       .leftJoin(user, and(
         eq(orders.userId, user.id),
         eq(user.tenantId, context.tenantId)
+      ))
+      .leftJoin(userByPhone, and(
+        eq(userByPhone.tenantId, orders.tenantId),
+        eq(userByPhone.phone, orders.phone)
       ))
       .where(and(...whereConditions))
       .orderBy(desc(orders.createdAt))
@@ -93,7 +102,7 @@ export const GET = withTenant(async (req: NextRequest, context) => {
       currency: orderData.order.currency,
       createdAt: orderData.order.createdAt,
       updatedAt: orderData.order.updatedAt,
-      user: orderData.user,
+      user: orderData.user ?? orderData.userByPhone, // linked customer, else the customer with the order's phone
       itemCount: Number(orderData.itemCount) || 0,
       // Invoice and FBR fields
       invoiceNumber: orderData.order.invoiceNumber,

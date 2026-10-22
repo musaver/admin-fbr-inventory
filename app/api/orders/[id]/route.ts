@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { orders, orderItems, productInventory, stockMovements, user, products, userLoyaltyPoints, loyaltyPointsHistory, settings, suppliers } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/mysql-core';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
 import { isWeightBasedProduct } from '@/utils/weightUtils';
 import { withTenant, ErrorResponses } from '@/lib/api-helpers';
@@ -12,14 +13,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id: orderId } = await params;
 
     // Fetch order with customer and supplier information
+    // Fallback customer match by phone, for orders whose linked customer row was deleted and recreated
+    const userByPhone = alias(user, 'userByPhone');
+
     const orderData = await db
       .select({
         order: orders,
         user: user,
+        userByPhone: userByPhone,
         supplier: suppliers,
       })
       .from(orders)
       .leftJoin(user, eq(orders.userId, user.id))
+      .leftJoin(userByPhone, and(
+        eq(userByPhone.tenantId, orders.tenantId),
+        eq(userByPhone.phone, orders.phone)
+      ))
       .leftJoin(suppliers, eq(orders.supplierId, suppliers.id))
       .where(eq(orders.id, orderId))
       .limit(1);
@@ -42,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const order = {
       ...orderData[0].order,
-      user: orderData[0].user,
+      user: orderData[0].user ?? orderData[0].userByPhone,
       supplier: orderData[0].supplier,
       items: itemsWithParsedAddons
     };
