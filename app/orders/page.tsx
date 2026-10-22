@@ -71,6 +71,7 @@ interface Order {
     id: string;
     name?: string;
     email: string;
+    buyerBusinessName?: string | null;
   };
   // Invoice and FBR fields
   invoiceNumber?: string;
@@ -198,7 +199,8 @@ export default function OrdersList() {
         (order.customOrderNumberImport && order.customOrderNumberImport.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (order.invoiceNumber && order.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         order.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.user?.name ? order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false)
+        (order.user?.name ? order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+        (order.user?.buyerBusinessName ? order.user.buyerBusinessName.toLowerCase().includes(searchTerm.toLowerCase()) : false)
       );
     }
 
@@ -315,7 +317,9 @@ export default function OrdersList() {
                 order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 order.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (order.shippingFirstName ? order.shippingFirstName.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
-                (order.shippingLastName ? order.shippingLastName.toLowerCase().includes(searchTerm.toLowerCase()) : false)
+                (order.shippingLastName ? order.shippingLastName.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+                (order.user?.name ? order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+                (order.user?.buyerBusinessName ? order.user.buyerBusinessName.toLowerCase().includes(searchTerm.toLowerCase()) : false)
               );
             }
             if (dateRange.startDate || dateRange.endDate) {
@@ -667,6 +671,11 @@ export default function OrdersList() {
           <div className="font-medium text-sm truncate">
             {order.user?.name || 'Guest'}
           </div>
+          {order.user?.buyerBusinessName && order.user.buyerBusinessName !== order.user.name && (
+            <div className="text-xs text-muted-foreground truncate" title={order.user.buyerBusinessName}>
+              {order.user.buyerBusinessName}
+            </div>
+          )}
         </div>
       ),
       mobileLabel: 'Customer'
