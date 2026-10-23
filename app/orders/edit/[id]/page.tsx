@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { zeroTaxFields, isTaxFree, applyAdditionalTax, hasAdditionalTax } from '@/lib/orders/zero-taxes';
+import { zeroTaxFields, isTaxFree, applyAdditionalTax, detectAdditionalTaxRate, ADDITIONAL_TAX_RATE, ADDITIONAL_TAX_RATE_OPTIONS } from '@/lib/orders/zero-taxes';
 import { useRouter, useParams } from 'next/navigation';
 import CurrencySymbol from '../../../components/CurrencySymbol';
 import DualPrice, { UsdHint } from '../../../components/DualPrice';
@@ -301,6 +301,9 @@ export default function EditOrder() {
   // "Add additional tax": Further Tax 1 = 4% of each item's Price Excluding Tax (derived from items on load)
   const [addAdditionalTax, setAddAdditionalTax] = useState(false);
   const addAdditionalTaxRef = useRef(false);
+  const [additionalTaxRate, setAdditionalTaxRate] = useState<number>(ADDITIONAL_TAX_RATE); // percent
+  const additionalTaxRateRef = useRef<number>(ADDITIONAL_TAX_RATE);
+  const [isCustomAdditionalTaxRate, setIsCustomAdditionalTaxRate] = useState(false);
   const [isProductionSubmission, setIsProductionSubmission] = useState(false);
   const [productionToken, setProductionToken] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -707,11 +710,19 @@ export default function EditOrder() {
   const applyZeroTaxes = (item: OrderItem): OrderItem =>
     withRecalculatedTotal({ ...zeroTaxFields(item), disableAutoTaxCalculations: true });
 
+  const applyAdditionalTaxEverywhere = (on: boolean, rate: number) => {
+    setOrderItems(prev => prev.map(item => withRecalculatedTotal(applyAdditionalTax(item, on, rate))));
+    setProductSelection(prev => applyAdditionalTax(prev, on, rate));
+  };
   const handleAddAdditionalTaxChange = (checked: boolean) => {
     setAddAdditionalTax(checked);
     addAdditionalTaxRef.current = checked;
-    setOrderItems(prev => prev.map(item => withRecalculatedTotal(applyAdditionalTax(item, checked))));
-    setProductSelection(prev => applyAdditionalTax(prev, checked));
+    applyAdditionalTaxEverywhere(checked, additionalTaxRateRef.current);
+  };
+  const applyAdditionalTaxRate = (rate: number) => {
+    setAdditionalTaxRate(rate);
+    additionalTaxRateRef.current = rate;
+    if (addAdditionalTaxRef.current) applyAdditionalTaxEverywhere(true, rate);
   };
 
   const handleMakeTaxesZeroChange = (checked: boolean) => {
@@ -789,7 +800,7 @@ export default function EditOrder() {
           };
           // "Make taxes zero" is on: a newly selected product starts tax-free
           const withTaxRules = makeTaxesZeroRef.current ? { ...zeroTaxFields(filled), disableAutoTaxCalculations: true } : filled;
-          return addAdditionalTaxRef.current ? applyAdditionalTax(withTaxRules, true) : withTaxRules;
+          return addAdditionalTaxRef.current ? applyAdditionalTax(withTaxRules, true, additionalTaxRateRef.current) : withTaxRules;
         });
       }
     }
@@ -935,9 +946,15 @@ export default function EditOrder() {
         const allTaxFree = processedItems.length > 0 && processedItems.every((item: any) => isTaxFree(item));
         setMakeTaxesZero(allTaxFree);
         makeTaxesZeroRef.current = allTaxFree;
-        const allHaveAdditionalTax = processedItems.length > 0 && processedItems.every((item: any) => hasAdditionalTax(item));
-        setAddAdditionalTax(allHaveAdditionalTax);
-        addAdditionalTaxRef.current = allHaveAdditionalTax;
+        // "Add additional tax" + its rate are not stored; re-detect them from the items' Further Tax 1
+        const detectedRate = detectAdditionalTaxRate(processedItems);
+        setAddAdditionalTax(detectedRate !== null);
+        addAdditionalTaxRef.current = detectedRate !== null;
+        if (detectedRate !== null) {
+          setAdditionalTaxRate(detectedRate);
+          additionalTaxRateRef.current = detectedRate;
+          setIsCustomAdditionalTaxRate(!ADDITIONAL_TAX_RATE_OPTIONS.includes(detectedRate));
+        }
         const itemsToSort = allTaxFree
           ? processedItems.map((item: any) => ({ ...item, disableAutoTaxCalculations: true }))
           : processedItems;
@@ -1164,7 +1181,7 @@ export default function EditOrder() {
 
             // Keep the order tax-free while "Make taxes zero" is on
             const refreshed = makeTaxesZeroRef.current ? applyZeroTaxes(updatedItem as OrderItem) : (updatedItem as OrderItem);
-            return addAdditionalTaxRef.current ? withRecalculatedTotal(applyAdditionalTax(refreshed, true)) : refreshed;
+            return addAdditionalTaxRef.current ? withRecalculatedTotal(applyAdditionalTax(refreshed, true, additionalTaxRateRef.current)) : refreshed;
           } catch (error) {
             console.error(`Error fetching product data for SKU ${item.sku}:`, error);
             return item;
@@ -1630,7 +1647,7 @@ export default function EditOrder() {
 
         // "Add additional tax" is on: keep Further Tax 1 at 4% of the (possibly re-derived) excl-tax price
         if (addAdditionalTaxRef.current) {
-          updatedItems[index] = applyAdditionalTax(updatedItems[index], true);
+          updatedItems[index] = applyAdditionalTax(updatedItems[index], true, additionalTaxRateRef.current);
         }
 
         // Recalculate total price with updated per-unit values
@@ -2331,7 +2348,57 @@ export default function EditOrder() {
                   />
                   <div>
                     <Label htmlFor="add-additional-tax" className="text-sm">Add additional tax</Label>
-                    <p className="text-xs text-muted-foreground">Sets Further Tax 1 to 4% of each item's Price Excluding Tax</p>
+                    <p className="text-xs text-muted-foreground">Sets Further Tax 1 to {additionalTaxRate}% of each item's Price Excluding Tax</p>
+                    {addAdditionalTax && (
+                      <div className="ml-6 mt-2 max-w-xs space-y-1">
+                        <Label htmlFor="additional-tax-rate" className="text-xs text-muted-foreground">Additional tax rate</Label>
+                        {!isCustomAdditionalTaxRate ? (
+                          <Select
+                            value={String(additionalTaxRate)}
+                            onValueChange={(value) => {
+                              if (value === 'custom') { setIsCustomAdditionalTaxRate(true); return; }
+                              setIsCustomAdditionalTaxRate(false);
+                              applyAdditionalTaxRate(parseFloat(value) || 0);
+                            }}
+                          >
+                            <SelectTrigger id="additional-tax-rate" className="text-sm">
+                              <SelectValue placeholder="Select rate" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ADDITIONAL_TAX_RATE_OPTIONS.map(rate => (
+                                <SelectItem key={rate} value={String(rate)}>{rate}%</SelectItem>
+                              ))}
+                              <SelectItem value="custom">Custom (Type your own)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="additional-tax-rate"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={additionalTaxRate}
+                                onChange={(e) => applyAdditionalTaxRate(Math.max(0, parseFloat(e.target.value) || 0))}
+                                placeholder="Enter rate"
+                                className="text-sm"
+                              />
+                              <span className="text-sm text-muted-foreground">%</span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto self-start px-0 text-xs"
+                              onClick={() => { setIsCustomAdditionalTaxRate(false); applyAdditionalTaxRate(ADDITIONAL_TAX_RATE); }}
+                            >
+                              Back to Select
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

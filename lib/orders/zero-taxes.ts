@@ -29,23 +29,45 @@ export function isTaxFree(item: TaxFields): boolean {
   return (Number(item.taxPercentage) || 0) === 0 && (Number(item.taxAmount) || 0) === 0;
 }
 
-/** "Add additional tax" checkbox: Further Tax 1 = this share of the per-unit price excluding tax. */
-export const ADDITIONAL_TAX_RATE = 0.04;
+/** "Add additional tax" checkbox: Further Tax 1 = this percentage of the per-unit price excluding tax. */
+export const ADDITIONAL_TAX_RATE = 4; // percent, default
+export const ADDITIONAL_TAX_RATE_OPTIONS = [1, 2, 3, 4, 5]; // percent presets in the dropdown
 
 export interface AdditionalTaxFields {
   priceExcludingTax?: number | string | null;
   furtherTax?: number | string | null;
 }
 
-/** Returns a copy with Further Tax 1 set to 4% of Price Excluding Tax when `on`, or 0 when off. */
-export function applyAdditionalTax<T extends AdditionalTaxFields>(item: T, on: boolean): T {
+/** Returns a copy with Further Tax 1 set to `ratePercent`% of Price Excluding Tax when `on`, or 0 when off. */
+export function applyAdditionalTax<T extends AdditionalTaxFields>(item: T, on: boolean, ratePercent: number = ADDITIONAL_TAX_RATE): T {
   const excl = Number(item.priceExcludingTax) || 0;
-  return { ...item, furtherTax: on ? round2(excl * ADDITIONAL_TAX_RATE) : 0 };
+  const rate = Number(ratePercent) || 0;
+  return { ...item, furtherTax: on ? round2(excl * rate / 100) : 0 };
 }
 
-/** True when the item's Further Tax 1 already equals 4% of its excl-tax price (within a cent) and is non-zero. */
-export function hasAdditionalTax(item: AdditionalTaxFields): boolean {
+/** True when the item's Further Tax 1 equals `ratePercent`% of its excl-tax price (within a cent) and is non-zero. */
+export function hasAdditionalTax(item: AdditionalTaxFields, ratePercent: number = ADDITIONAL_TAX_RATE): boolean {
   const excl = Number(item.priceExcludingTax) || 0;
   const further = Number(item.furtherTax) || 0;
-  return further > 0 && Math.abs(further - round2(excl * ADDITIONAL_TAX_RATE)) <= 0.01;
+  return further > 0 && Math.abs(further - round2(excl * ratePercent / 100)) <= 0.01;
+}
+
+/**
+ * Finds the common additional-tax percentage (2 dp) across items, or null when the items
+ * have no further tax or disagree. Used to restore the checkbox + rate when an order is reopened.
+ */
+export function detectAdditionalTaxRate(items: AdditionalTaxFields[]): number | null {
+  const priced = items.filter(i => (Number(i.priceExcludingTax) || 0) > 0);
+  if (priced.length === 0) return null;
+  let rate: number | null = null;
+  for (const item of priced) {
+    const excl = Number(item.priceExcludingTax) || 0;
+    const further = Number(item.furtherTax) || 0;
+    if (further <= 0) return null;
+    const r = round2((further / excl) * 100);
+    if (rate === null) rate = r;
+    else if (Math.abs(r - rate) > 0.05) return null;
+    if (Math.abs(further - round2(excl * rate / 100)) > 0.01) return null;
+  }
+  return rate;
 }
