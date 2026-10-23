@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { zeroTaxFields } from '@/lib/orders/zero-taxes';
+import { zeroTaxFields, applyAdditionalTax } from '@/lib/orders/zero-taxes';
 import { useRouter } from 'next/navigation';
 import CurrencySymbol from '../../components/CurrencySymbol';
 import DualPrice, { UsdHint } from '../../components/DualPrice';
@@ -386,6 +386,16 @@ export default function AddOrder() {
     }
   };
   
+  // "Add additional tax" (Customer Information): Further Tax 1 = 4% of each item's Price Excluding Tax
+  const [addAdditionalTax, setAddAdditionalTax] = useState(false);
+  const addAdditionalTaxRef = useRef(false);
+  const handleAddAdditionalTaxChange = (checked: boolean) => {
+    setAddAdditionalTax(checked);
+    addAdditionalTaxRef.current = checked;
+    setProductSelection(prev => applyAdditionalTax(prev, checked));
+    setOrderItems(prev => prev.map(item => applyAdditionalTax(item, checked)));
+  };
+
   // Loading state for adding products
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   
@@ -492,7 +502,9 @@ export default function AddOrder() {
           uom: product.uom || ''
           };
           // "Make taxes zero" is on: a newly selected product starts tax-free
-          return makeTaxesZeroRef.current ? zeroTaxFields(filled) : filled;
+          const withTaxRules = makeTaxesZeroRef.current ? zeroTaxFields(filled) : filled;
+          // "Add additional tax" is on: Further Tax 1 follows the product's excl-tax price
+          return addAdditionalTaxRef.current ? applyAdditionalTax(withTaxRules, true) : withTaxRules;
         });
       }
     } else {
@@ -2297,6 +2309,21 @@ export default function AddOrder() {
                 <p className="text-xs text-muted-foreground">Sets Tax Percentage and Tax Amount to 0 on every item and disables automatic tax calculations</p>
               </div>
             </div>
+
+            {/* Add additional tax */}
+            <div className="flex items-start space-x-2 pt-2">
+              <input
+                type="checkbox"
+                id="add-additional-tax"
+                checked={addAdditionalTax}
+                onChange={(e) => handleAddAdditionalTaxChange(e.target.checked)}
+                className="mt-0.5 rounded border-gray-300"
+              />
+              <div>
+                <Label htmlFor="add-additional-tax" className="text-sm">Add additional tax</Label>
+                <p className="text-xs text-muted-foreground">Sets Further Tax 1 to 4% of each item's Price Excluding Tax</p>
+              </div>
+            </div>
             </CardContent>
             </CollapsibleContent>
           </Card>
@@ -3671,8 +3698,10 @@ export default function AddOrder() {
                           // Store as string if ending with decimal, otherwise store as number
                           const priceExcludingTax = value.endsWith('.') ? value : (value === '' ? 0 : parseFloat(value) || 0);
                           
-                          // Update price excluding tax immediately
-                          setProductSelection(prev => ({...prev, priceExcludingTax: priceExcludingTax}));
+                          // Update price excluding tax immediately (and Further Tax 1 when "Add additional tax" is on)
+                          setProductSelection(prev => addAdditionalTaxRef.current
+                            ? applyAdditionalTax({...prev, priceExcludingTax: priceExcludingTax}, true)
+                            : {...prev, priceExcludingTax: priceExcludingTax});
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point) and auto calculations are enabled
                           if (!disableAutoTaxCalculations && !value.endsWith('.') && value !== '') {

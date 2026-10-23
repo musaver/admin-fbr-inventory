@@ -28,3 +28,24 @@ export function zeroTaxFields<T extends TaxFields>(item: T): T {
 export function isTaxFree(item: TaxFields): boolean {
   return (Number(item.taxPercentage) || 0) === 0 && (Number(item.taxAmount) || 0) === 0;
 }
+
+/** "Add additional tax" checkbox: Further Tax 1 = this share of the per-unit price excluding tax. */
+export const ADDITIONAL_TAX_RATE = 0.04;
+
+export interface AdditionalTaxFields {
+  priceExcludingTax?: number | string | null;
+  furtherTax?: number | string | null;
+}
+
+/** Returns a copy with Further Tax 1 set to 4% of Price Excluding Tax when `on`, or 0 when off. */
+export function applyAdditionalTax<T extends AdditionalTaxFields>(item: T, on: boolean): T {
+  const excl = Number(item.priceExcludingTax) || 0;
+  return { ...item, furtherTax: on ? round2(excl * ADDITIONAL_TAX_RATE) : 0 };
+}
+
+/** True when the item's Further Tax 1 already equals 4% of its excl-tax price (within a cent) and is non-zero. */
+export function hasAdditionalTax(item: AdditionalTaxFields): boolean {
+  const excl = Number(item.priceExcludingTax) || 0;
+  const further = Number(item.furtherTax) || 0;
+  return further > 0 && Math.abs(further - round2(excl * ADDITIONAL_TAX_RATE)) <= 0.01;
+}

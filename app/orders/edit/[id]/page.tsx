@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { zeroTaxFields, isTaxFree } from '@/lib/orders/zero-taxes';
+import { zeroTaxFields, isTaxFree, applyAdditionalTax, hasAdditionalTax } from '@/lib/orders/zero-taxes';
 import { useRouter, useParams } from 'next/navigation';
 import CurrencySymbol from '../../../components/CurrencySymbol';
 import DualPrice, { UsdHint } from '../../../components/DualPrice';
@@ -298,6 +298,9 @@ export default function EditOrder() {
   // The ref mirrors the state so async code can read the current value.
   const [makeTaxesZero, setMakeTaxesZero] = useState(false);
   const makeTaxesZeroRef = useRef(false);
+  // "Add additional tax": Further Tax 1 = 4% of each item's Price Excluding Tax (derived from items on load)
+  const [addAdditionalTax, setAddAdditionalTax] = useState(false);
+  const addAdditionalTaxRef = useRef(false);
   const [isProductionSubmission, setIsProductionSubmission] = useState(false);
   const [productionToken, setProductionToken] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -691,19 +694,24 @@ export default function EditOrder() {
 
   // "Make taxes zero": zero an item's tax, lock automatic calculations and recompute its total
   // (same total formula as updateOrderItem).
-  const applyZeroTaxes = (item: OrderItem): OrderItem => {
-    const zeroed = zeroTaxFields(item);
-    const unitPrice = Number(zeroed.priceIncludingTax) || Number(zeroed.price) || 0;
-    const extraTax = Number(zeroed.extraTax) || 0;
-    const furtherTax = Number(zeroed.furtherTax) || 0;
-    const fedPayableTax = Number(zeroed.fedPayableTax) || 0;
-    const discount = Number(zeroed.discount) || 0;
-    const quantity = Number(zeroed.quantity) || 0;
-    return {
-      ...zeroed,
-      disableAutoTaxCalculations: true,
-      totalPrice: (unitPrice + extraTax + furtherTax + fedPayableTax - discount) * quantity,
-    };
+  const withRecalculatedTotal = (item: OrderItem): OrderItem => {
+    const unitPrice = Number(item.priceIncludingTax) || Number(item.price) || 0;
+    const extraTax = Number(item.extraTax) || 0;
+    const furtherTax = Number(item.furtherTax) || 0;
+    const fedPayableTax = Number(item.fedPayableTax) || 0;
+    const discount = Number(item.discount) || 0;
+    const quantity = Number(item.quantity) || 0;
+    return { ...item, totalPrice: (unitPrice + extraTax + furtherTax + fedPayableTax - discount) * quantity };
+  };
+
+  const applyZeroTaxes = (item: OrderItem): OrderItem =>
+    withRecalculatedTotal({ ...zeroTaxFields(item), disableAutoTaxCalculations: true });
+
+  const handleAddAdditionalTaxChange = (checked: boolean) => {
+    setAddAdditionalTax(checked);
+    addAdditionalTaxRef.current = checked;
+    setOrderItems(prev => prev.map(item => withRecalculatedTotal(applyAdditionalTax(item, checked))));
+    setProductSelection(prev => applyAdditionalTax(prev, checked));
   };
 
   const handleMakeTaxesZeroChange = (checked: boolean) => {
@@ -780,7 +788,8 @@ export default function EditOrder() {
           uom: product.uom || ''
           };
           // "Make taxes zero" is on: a newly selected product starts tax-free
-          return makeTaxesZeroRef.current ? { ...zeroTaxFields(filled), disableAutoTaxCalculations: true } : filled;
+          const withTaxRules = makeTaxesZeroRef.current ? { ...zeroTaxFields(filled), disableAutoTaxCalculations: true } : filled;
+          return addAdditionalTaxRef.current ? applyAdditionalTax(withTaxRules, true) : withTaxRules;
         });
       }
     }
@@ -926,6 +935,9 @@ export default function EditOrder() {
         const allTaxFree = processedItems.length > 0 && processedItems.every((item: any) => isTaxFree(item));
         setMakeTaxesZero(allTaxFree);
         makeTaxesZeroRef.current = allTaxFree;
+        const allHaveAdditionalTax = processedItems.length > 0 && processedItems.every((item: any) => hasAdditionalTax(item));
+        setAddAdditionalTax(allHaveAdditionalTax);
+        addAdditionalTaxRef.current = allHaveAdditionalTax;
         const itemsToSort = allTaxFree
           ? processedItems.map((item: any) => ({ ...item, disableAutoTaxCalculations: true }))
           : processedItems;
@@ -1151,7 +1163,8 @@ export default function EditOrder() {
             });
 
             // Keep the order tax-free while "Make taxes zero" is on
-            return makeTaxesZeroRef.current ? applyZeroTaxes(updatedItem as OrderItem) : updatedItem;
+            const refreshed = makeTaxesZeroRef.current ? applyZeroTaxes(updatedItem as OrderItem) : (updatedItem as OrderItem);
+            return addAdditionalTaxRef.current ? withRecalculatedTotal(applyAdditionalTax(refreshed, true)) : refreshed;
           } catch (error) {
             console.error(`Error fetching product data for SKU ${item.sku}:`, error);
             return item;
@@ -1615,10 +1628,15 @@ export default function EditOrder() {
           }
         }
 
+        // "Add additional tax" is on: keep Further Tax 1 at 4% of the (possibly re-derived) excl-tax price
+        if (addAdditionalTaxRef.current) {
+          updatedItems[index] = applyAdditionalTax(updatedItems[index], true);
+        }
+
         // Recalculate total price with updated per-unit values
         const finalUnitPriceIncludingTax = Number(updatedItems[index].priceIncludingTax) || basePrice;
         const extraTax = Number(updatedItem.extraTax) || 0;
-        const furtherTax = Number(updatedItem.furtherTax) || 0;
+        const furtherTax = Number(updatedItems[index].furtherTax) || 0;
         const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
         const discount = Number(updatedItem.discount) || 0;
 
@@ -2301,6 +2319,22 @@ export default function EditOrder() {
                     <p className="text-xs text-muted-foreground">Sets Tax Percentage and Tax Amount to 0 on every item and disables automatic tax calculations</p>
                   </div>
                 </div>
+
+                {/* Add additional tax */}
+                <div className="flex items-start space-x-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="add-additional-tax"
+                    checked={addAdditionalTax}
+                    onChange={(e) => handleAddAdditionalTaxChange(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300"
+                  />
+                  <div>
+                    <Label htmlFor="add-additional-tax" className="text-sm">Add additional tax</Label>
+                    <p className="text-xs text-muted-foreground">Sets Further Tax 1 to 4% of each item's Price Excluding Tax</p>
+                  </div>
+                </div>
+
               </CardContent>
               </CollapsibleContent>
             </Card>
