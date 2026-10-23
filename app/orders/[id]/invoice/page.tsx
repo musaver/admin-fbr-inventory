@@ -179,7 +179,7 @@ export default function OrderInvoice() {
       return sum + (value * quantity);
     }, 0);
     const totalExtraTax = sumItemField('extraTax');
-    const totalFurtherTax = sumItemField('furtherTax');
+    const totalFurtherTax = orderItems.reduce((sum: number, item: any) => sum + (Number(item.furtherTax) || 0), 0); // line amounts
     const totalFedPayableTax = sumItemField('fedPayableTax');
     const totalItemDiscount = sumItemField('discount');
 
@@ -1081,7 +1081,7 @@ export default function OrderInvoice() {
     return sum + (value * quantity);
   }, 0);
   const totalExtraTax = sumItemField('extraTax');
-  const totalFurtherTax = sumItemField('furtherTax');
+  const totalFurtherTax = orderItems.reduce((sum: number, item: any) => sum + (Number(item.furtherTax) || 0), 0); // line amounts
   const totalFedPayableTax = sumItemField('fedPayableTax');
   const totalItemDiscount = sumItemField('discount');
 

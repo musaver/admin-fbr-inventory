@@ -392,9 +392,12 @@ export default function AddOrder() {
   const [additionalTaxRate, setAdditionalTaxRate] = useState<number>(ADDITIONAL_TAX_RATE); // percent
   const additionalTaxRateRef = useRef<number>(ADDITIONAL_TAX_RATE);
   const [isCustomAdditionalTaxRate, setIsCustomAdditionalTaxRate] = useState(false);
+  // On this page priceExcludingTax is already the quantity-scaled line amount, so the helper runs with quantity 1
+  const applyLineAdditionalTax = <T extends { priceExcludingTax?: any; furtherTax?: any }>(x: T, on: boolean, rate: number): T =>
+    ({ ...x, furtherTax: applyAdditionalTax({ priceExcludingTax: x.priceExcludingTax, quantity: 1, furtherTax: 0 }, on, rate).furtherTax });
   const applyAdditionalTaxEverywhere = (on: boolean, rate: number) => {
-    setProductSelection(prev => applyAdditionalTax(prev, on, rate));
-    setOrderItems(prev => prev.map(item => applyAdditionalTax(item, on, rate)));
+    setProductSelection(prev => applyLineAdditionalTax(prev, on, rate));
+    setOrderItems(prev => prev.map(item => applyLineAdditionalTax(item, on, rate)));
   };
   const handleAddAdditionalTaxChange = (checked: boolean) => {
     setAddAdditionalTax(checked);
@@ -515,7 +518,7 @@ export default function AddOrder() {
           // "Make taxes zero" is on: a newly selected product starts tax-free
           const withTaxRules = makeTaxesZeroRef.current ? zeroTaxFields(filled) : filled;
           // "Add additional tax" is on: Further Tax 1 follows the product's excl-tax price
-          return addAdditionalTaxRef.current ? applyAdditionalTax(withTaxRules, true, additionalTaxRateRef.current) : withTaxRules;
+          return addAdditionalTaxRef.current ? applyLineAdditionalTax(withTaxRules, true, additionalTaxRateRef.current) : withTaxRules;
         });
       }
     } else {
@@ -2332,7 +2335,7 @@ export default function AddOrder() {
               />
               <div>
                 <Label htmlFor="add-additional-tax" className="text-sm">Add additional tax</Label>
-                <p className="text-xs text-muted-foreground">Sets Further Tax 1 to {additionalTaxRate}% of each item's Price Excluding Tax</p>
+                <p className="text-xs text-muted-foreground">Sets Further Tax 1 to {additionalTaxRate}% of each item's Price Excluding Tax × Quantity</p>
                 {addAdditionalTax && (
                   <div className="ml-6 mt-2 max-w-xs space-y-1">
                     <Label htmlFor="additional-tax-rate" className="text-xs text-muted-foreground">Additional tax rate</Label>
@@ -3761,7 +3764,7 @@ export default function AddOrder() {
                           
                           // Update price excluding tax immediately (and Further Tax 1 when "Add additional tax" is on)
                           setProductSelection(prev => addAdditionalTaxRef.current
-                            ? applyAdditionalTax({...prev, priceExcludingTax: priceExcludingTax}, true, additionalTaxRateRef.current)
+                            ? applyLineAdditionalTax({...prev, priceExcludingTax: priceExcludingTax}, true, additionalTaxRateRef.current)
                             : {...prev, priceExcludingTax: priceExcludingTax});
                           
                           // Only perform calculations if value is a complete number (not ending with decimal point) and auto calculations are enabled
@@ -3817,7 +3820,7 @@ export default function AddOrder() {
                   </div>
                   
                       <div className="space-y-2">
-                        <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1</Label>
+                        <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1 (line total)</Label>
                         <Input
                           id="further-tax-edit"
                       type="text"
@@ -3962,6 +3965,11 @@ export default function AddOrder() {
                                   const perUnitTaxAmount = prev.taxAmount / oldQty;
                                   const newTotalTaxAmount = perUnitTaxAmount * newQty;
                                   updatedSelection.taxAmount = Math.round(newTotalTaxAmount * 100) / 100;
+                                }
+
+                                // "Add additional tax" is on: Further Tax 1 follows the quantity-scaled price excl. tax
+                                if (addAdditionalTaxRef.current) {
+                                  return applyLineAdditionalTax(updatedSelection, true, additionalTaxRateRef.current);
                                 }
                                 
                                 return updatedSelection;

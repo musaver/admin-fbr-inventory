@@ -177,8 +177,9 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
   // Withholding tax: pass through only a user-entered value, never auto-calculate.
   // DI spec v1.12 error 0008 requires it to be 0 or equal to the sales tax, and
   // error 0070 rejects any withholding for unregistered buyers.
-  // NOTE: extraTax / fedPayableTax / furtherTax / discount are stored PER UNIT on order items
-  // (same as priceExcludingTax and taxAmount), so they are scaled by quantity to line totals here.
+  // NOTE: extraTax / fedPayableTax / discount are stored PER UNIT on order items (same as
+  // priceExcludingTax and taxAmount), so they are scaled by quantity to line totals here.
+  // furtherTax is already a line amount and is passed through as-is.
   if (item.extraTax !== undefined && item.extraTax !== null && item.extraTax > 0) {
     salesTaxWithheldAtSource = Number(item.extraTax) * quantity;
   } else {
@@ -311,9 +312,9 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
     fbrItem.extraTax = (parseFloat(item.extraTax.toString()) || 0) * lineQuantity;
   }
   
-  // Further tax
+  // Further tax: stored as a LINE amount already (rate × price excl. tax × quantity), so not scaled
   if (item.furtherTax && item.furtherTax > 0) {
-    fbrItem.furtherTax = (parseFloat(item.furtherTax.toString()) || 0) * lineQuantity;
+    fbrItem.furtherTax = parseFloat(item.furtherTax.toString()) || 0;
   }
   
   // FED payable (FED-in-ST scenarios)

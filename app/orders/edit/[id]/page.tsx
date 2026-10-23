@@ -704,7 +704,8 @@ export default function EditOrder() {
     const fedPayableTax = Number(item.fedPayableTax) || 0;
     const discount = Number(item.discount) || 0;
     const quantity = Number(item.quantity) || 0;
-    return { ...item, totalPrice: (unitPrice + extraTax + furtherTax + fedPayableTax - discount) * quantity };
+    // Further Tax 1 is a line amount (rate × price excl. tax × quantity); the others are per unit
+    return { ...item, totalPrice: (unitPrice + extraTax + fedPayableTax - discount) * quantity + furtherTax };
   };
 
   const applyZeroTaxes = (item: OrderItem): OrderItem =>
@@ -1599,8 +1600,15 @@ export default function EditOrder() {
         const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
         const discount = Number(updatedItem.discount) || 0;
 
-        // Calculate total price = (unit price + per-unit taxes - per-unit discount) × quantity
-        updatedItems[index].totalPrice = (unitPriceIncludingTax + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+        // "Add additional tax" is on: Further Tax 1 is a line amount, so it follows the new quantity
+        let lineFurtherTax = furtherTax;
+        if (addAdditionalTaxRef.current) {
+          updatedItems[index] = applyAdditionalTax(updatedItems[index], true, additionalTaxRateRef.current);
+          lineFurtherTax = Number(updatedItems[index].furtherTax) || 0;
+        }
+
+        // Total = (unit price + per-unit taxes - per-unit discount) × quantity + Further Tax 1 (line amount)
+        updatedItems[index].totalPrice = (unitPriceIncludingTax + extraTax + fedPayableTax - discount) * quantity + lineFurtherTax;
 
       } else if (field === 'price' || field === 'priceIncludingTax' || field === 'priceExcludingTax' || field === 'taxPercentage' || field === 'taxAmount') {
         // When tax/price fields change, recalculate related per-unit values and total
@@ -1657,7 +1665,7 @@ export default function EditOrder() {
         const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
         const discount = Number(updatedItem.discount) || 0;
 
-        updatedItems[index].totalPrice = (finalUnitPriceIncludingTax + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+        updatedItems[index].totalPrice = (finalUnitPriceIncludingTax + extraTax + fedPayableTax - discount) * quantity + furtherTax;
       }
 
       // Special handling for additional tax fields - recalculate total when they change
@@ -1669,8 +1677,8 @@ export default function EditOrder() {
         const fedPayableTax = Number(updatedItem.fedPayableTax) || 0;
         const discount = Number(updatedItem.discount) || 0;
 
-        // Calculate total with all taxes and discounts
-        updatedItems[index].totalPrice = (effectivePrice + extraTax + furtherTax + fedPayableTax - discount) * quantity;
+        // Calculate total with all taxes and discounts (Further Tax 1 is a line amount)
+        updatedItems[index].totalPrice = (effectivePrice + extraTax + fedPayableTax - discount) * quantity + furtherTax;
       }
     }
 
@@ -2348,7 +2356,7 @@ export default function EditOrder() {
                   />
                   <div>
                     <Label htmlFor="add-additional-tax" className="text-sm">Add additional tax</Label>
-                    <p className="text-xs text-muted-foreground">Sets Further Tax 1 to {additionalTaxRate}% of each item's Price Excluding Tax</p>
+                    <p className="text-xs text-muted-foreground">Sets Further Tax 1 to {additionalTaxRate}% of each item's Price Excluding Tax × Quantity</p>
                     {addAdditionalTax && (
                       <div className="ml-6 mt-2 max-w-xs space-y-1">
                         <Label htmlFor="additional-tax-rate" className="text-xs text-muted-foreground">Additional tax rate</Label>
@@ -2809,7 +2817,7 @@ export default function EditOrder() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1</Label>
+                            <Label htmlFor="further-tax-edit" className="text-sm">Further Tax 1 (line total)</Label>
                             <Input
                               id="further-tax-edit"
                               type="text"
@@ -3506,7 +3514,7 @@ export default function EditOrder() {
                             </div>
 
                             <div>
-                              <Label className="text-sm">Further Tax 1</Label>
+                              <Label className="text-sm">Further Tax 1 (line total)</Label>
                               <Input
                                 type="number"
                                 step="0.01"
