@@ -535,9 +535,11 @@ export default function EditOrder() {
               quantity: qty,
               priceExcludingTaxTotal: unitEx * qty,
               priceIncludingTaxTotal: unitInc * qty,
-              salesTaxApplicable: unitTax * qty, // for display
-              valueSalesExcludingST: unitEx * qty,
-              totalValues: unitInc * qty,
+              // Prefer the values the FBR mapper computed (they include further/extra/FED tax and discount,
+              // exactly as submitted); fall back to the local quantity-adjusted figures
+              salesTaxApplicable: Number(it.salesTaxApplicable) || unitTax * qty,
+              valueSalesExcludingST: Number(it.valueSalesExcludingST) || unitEx * qty,
+              totalValues: Number(it.totalValues) || unitInc * qty,
             };
           });
         }

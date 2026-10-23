@@ -1060,6 +1060,9 @@ export default function AddOrder() {
       }
     }
 
+    // Further Tax 1 (line amount) is added on top of the price including tax
+    totalPrice += Number(productSelection.furtherTax) || 0;
+
     // Generate a unique ID for this item to track updates
     const itemId = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -1340,6 +1343,8 @@ export default function AddOrder() {
       } else {
         itemTotal = item.price * item.quantity; // Calculate from unit price
       }
+      // Further Tax 1 is a line amount on top of the price including tax
+      itemTotal += Number(item.furtherTax) || 0;
       
       // Add addon prices for group products
       if (item.addons && Array.isArray(item.addons) && item.addons.length > 0) {
@@ -1934,9 +1939,11 @@ export default function AddOrder() {
               quantity: qty,
               priceExcludingTaxTotal: finalTotalEx,
               priceIncludingTaxTotal: finalTotalInc,
-              salesTaxApplicable: finalTotalTax, // for display
-              valueSalesExcludingST: finalTotalEx,
-              totalValues: finalTotalInc,
+              // Prefer the values the FBR mapper computed (they include further/extra/FED tax and discount,
+              // exactly as submitted); fall back to the local figures
+              salesTaxApplicable: Number(it.salesTaxApplicable) || finalTotalTax,
+              valueSalesExcludingST: Number(it.valueSalesExcludingST) || finalTotalEx,
+              totalValues: Number(it.totalValues) || finalTotalInc,
               taxPercentage: pct, // Ensure taxPercentage is a number, not string
             };
           });
