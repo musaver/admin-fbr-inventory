@@ -177,16 +177,18 @@ function calculateItemTax(item: OrderItem, scenarioId: ScenarioId) {
   // Withholding tax: pass through only a user-entered value, never auto-calculate.
   // DI spec v1.12 error 0008 requires it to be 0 or equal to the sales tax, and
   // error 0070 rejects any withholding for unregistered buyers.
+  // NOTE: extraTax / fedPayableTax / furtherTax / discount are stored PER UNIT on order items
+  // (same as priceExcludingTax and taxAmount), so they are scaled by quantity to line totals here.
   if (item.extraTax !== undefined && item.extraTax !== null && item.extraTax > 0) {
-    salesTaxWithheldAtSource = item.extraTax;
+    salesTaxWithheldAtSource = Number(item.extraTax) * quantity;
   } else {
     salesTaxWithheldAtSource = 0;
   }
   
   // Calculate FED payable for FED-in-ST scenarios
   if (requiresFedPayable(scenarioId)) {
-    // Use user-provided value if available, otherwise default to 0
-    fedPayable = item.fedPayableTax || 0;
+    // Use user-provided per-unit value if available, otherwise default to 0
+    fedPayable = (Number(item.fedPayableTax) || 0) * quantity;
   }
   
   return {
@@ -301,14 +303,17 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
     fbrItem.salesTaxWithheldAtSource = parseFloat(taxCalc.salesTaxWithheldAtSource.toString()) || 0;
   }
   
+  // Per-unit item taxes/discount are scaled to line totals (base amount and sales tax are line totals too)
+  const lineQuantity = parseFloat(item.quantity.toString()) || 1;
+
   // Extra tax - use provided value or keep empty string
   if (item.extraTax !== undefined && item.extraTax !== null) {
-    fbrItem.extraTax = parseFloat(item.extraTax.toString()) || 0;
+    fbrItem.extraTax = (parseFloat(item.extraTax.toString()) || 0) * lineQuantity;
   }
   
   // Further tax
   if (item.furtherTax && item.furtherTax > 0) {
-    fbrItem.furtherTax = parseFloat(item.furtherTax.toString()) || 0;
+    fbrItem.furtherTax = (parseFloat(item.furtherTax.toString()) || 0) * lineQuantity;
   }
   
   // FED payable (FED-in-ST scenarios)
@@ -318,7 +323,7 @@ async function mapOrderItemToFbrItem(item: OrderItem, scenarioId: ScenarioId, sa
   
   // Discount
   if (item.discount && item.discount > 0) {
-    fbrItem.discount = parseFloat(item.discount.toString()) || 0;
+    fbrItem.discount = (parseFloat(item.discount.toString()) || 0) * lineQuantity;
   }
   
   // 3rd Schedule (SN008) - override the default 0

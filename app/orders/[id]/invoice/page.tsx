@@ -172,7 +172,18 @@ export default function OrderInvoice() {
       return sum + (taxAmount * quantity);
     }, 0);
 
-    const computedSubtotal = round2(totalAmount + totalGST);
+    // Additional per-item taxes and discounts (per unit, like taxAmount)
+    const sumItemField = (field: string) => orderItems.reduce((sum: number, item: any) => {
+      const value = Number(item[field]) || 0;
+      const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+      return sum + (value * quantity);
+    }, 0);
+    const totalExtraTax = sumItemField('extraTax');
+    const totalFurtherTax = sumItemField('furtherTax');
+    const totalFedPayableTax = sumItemField('fedPayableTax');
+    const totalItemDiscount = sumItemField('discount');
+
+    const computedSubtotal = round2(totalAmount + totalGST + totalExtraTax + totalFurtherTax + totalFedPayableTax - totalItemDiscount);
 
     // Build the print content
     const printContent = `
@@ -800,6 +811,30 @@ export default function OrderInvoice() {
                 <span>${formatAmountForPrint(totalGST)}</span>
               </div>
               ` : ''}
+              ${totalExtraTax > 0 ? `
+              <div class="total-row">
+                <span>Extra Tax:</span>
+                <span>${formatAmountForPrint(totalExtraTax)}</span>
+              </div>
+              ` : ''}
+              ${totalFurtherTax > 0 ? `
+              <div class="total-row">
+                <span>Further Tax:</span>
+                <span>${formatAmountForPrint(totalFurtherTax)}</span>
+              </div>
+              ` : ''}
+              ${totalFedPayableTax > 0 ? `
+              <div class="total-row">
+                <span>FED Payable:</span>
+                <span>${formatAmountForPrint(totalFedPayableTax)}</span>
+              </div>
+              ` : ''}
+              ${totalItemDiscount > 0 ? `
+              <div class="total-row" style="color: #10b981;">
+                <span>Item Discounts:</span>
+                <span>-${formatAmountForPrint(totalItemDiscount)}</span>
+              </div>
+              ` : ''}
               <div class="total-row">
                 <span>Subtotal:</span>
                 <span>${formatAmountForPrint(computedSubtotal)}</span>
@@ -1039,7 +1074,18 @@ export default function OrderInvoice() {
     return sum + (taxAmount * quantity);
   }, 0);
 
-  const computedSubtotal = round2(totalAmount + totalGST);
+  // Additional per-item taxes and discounts (per unit, like taxAmount)
+  const sumItemField = (field: string) => orderItems.reduce((sum: number, item: any) => {
+    const value = Number(item[field]) || 0;
+    const quantity = item.isWeightBased && item.weightQuantity ? 1 : (Number(item.quantity) || 1);
+    return sum + (value * quantity);
+  }, 0);
+  const totalExtraTax = sumItemField('extraTax');
+  const totalFurtherTax = sumItemField('furtherTax');
+  const totalFedPayableTax = sumItemField('fedPayableTax');
+  const totalItemDiscount = sumItemField('discount');
+
+  const computedSubtotal = round2(totalAmount + totalGST + totalExtraTax + totalFurtherTax + totalFedPayableTax - totalItemDiscount);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8">
@@ -1688,6 +1734,34 @@ export default function OrderInvoice() {
                       <div className="flex justify-between py-2">
                         <span>GST:</span>
                         <span>{formatAmount(totalGST)}</span>
+                      </div>
+                    )}
+
+                    {totalExtraTax > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span>Extra Tax:</span>
+                        <span>{formatAmount(totalExtraTax)}</span>
+                      </div>
+                    )}
+
+                    {totalFurtherTax > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span>Further Tax:</span>
+                        <span>{formatAmount(totalFurtherTax)}</span>
+                      </div>
+                    )}
+
+                    {totalFedPayableTax > 0 && (
+                      <div className="flex justify-between py-2">
+                        <span>FED Payable:</span>
+                        <span>{formatAmount(totalFedPayableTax)}</span>
+                      </div>
+                    )}
+
+                    {totalItemDiscount > 0 && (
+                      <div className="flex justify-between py-2 text-green-600">
+                        <span>Item Discounts:</span>
+                        <span>-{formatAmount(totalItemDiscount)}</span>
                       </div>
                     )}
                     
